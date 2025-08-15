@@ -168,32 +168,6 @@ app.get('/api/materials', (req, res) => {
   });
 });
 
-// 新增接口3: 处理素材上传
-// upload.single('imageFile') 表示处理表单中名为 'imageFile' 的单个文件
-// 修改上传接口，增加媒体类型判断
-// app.post('/api/materials', authenticateToken, upload.single('imageFile'), (req, res) => {
-//   const { name, tags } = req.body;
-//   const filePath = '/uploads/' + req.file.filename;
-//   // 从文件的mimetype判断是图片还是视频
-//   const mediaType = req.file.mimetype.startsWith('image') ? 'image' : 'video';
-
-//   if (!name || !tags || !req.file) {
-//       return res.status(400).json({ error: '缺少必要信息！' });
-//   }
-
-//   const sql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
-//   const params = [name, filePath, tags, mediaType];
-
-//   db.run(sql, params, function(err) {
-//       if (err) {
-//           return res.status(500).json({ error: err.message });
-//       }
-//       res.json({
-//           message: '上传成功!',
-//           id: this.lastID
-//       });
-//   });
-// });
 // 上传接口（OSS版本）
 app.post('/api/materials', authenticateToken, upload.single('imageFile'), async (req, res) => {
   try {
@@ -202,18 +176,20 @@ app.post('/api/materials', authenticateToken, upload.single('imageFile'), async 
       return res.status(400).json({ error: '缺少必要信息！' });
     }
 
-    // 1. 生成唯一的文件名 (例如: videos/1678886400000-original-name.mp4)
+    console.log(`[${new Date().toISOString()}] - [日志] 开始处理上传: ${req.file.originalname}, 大小: ${(req.file.size / 1024).toFixed(2)} KB`);
+
     const mediaType = req.file.mimetype.startsWith('image') ? 'image' : 'video';
     const folder = mediaType === 'image' ? 'images/' : 'videos/';
     const fileName = folder + Date.now() + '-' + req.file.originalname;
 
-    // 2. 使用 client.put 将文件 buffer 上传到 OSS
-    const result = await client.put(fileName, req.file.buffer);
+    console.log(`[${new Date().toISOString()}] - [日志] 准备上传到OSS，目标文件名: ${fileName}`);
 
-    // 3. result.url 就是文件在OSS上的公开访问地址
+    const result = await client.put(fileName, req.file.buffer);
+    
+    console.log(`[${new Date().toISOString()}] - [日志] 成功上传到OSS: ${result.url}`);
+
     const fileUrl = result.url;
 
-    // 4. 将这个公开地址存入数据库
     const sql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
     const params = [name, fileUrl, tags, mediaType];
 
@@ -222,6 +198,7 @@ app.post('/api/materials', authenticateToken, upload.single('imageFile'), async 
             console.error("数据库写入失败:", err);
             return res.status(500).json({ error: err.message });
         }
+        console.log(`[${new Date().toISOString()}] - [日志] 数据库写入成功，ID: ${this.lastID}。准备向客户端发送成功响应。`);
         res.status(201).json({ message: '上传成功!', id: this.lastID });
     });
   } catch (error) {
