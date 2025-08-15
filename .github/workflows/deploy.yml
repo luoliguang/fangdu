@@ -1,0 +1,48 @@
+# .github/workflows/deploy.yml
+name: Deploy to Cloud Server
+
+# 触发条件：当有代码推送到 main 分支时
+on:
+  push:
+    branches:
+      - main
+
+# 任务
+jobs:
+  deploy:
+    # 运行环境
+    runs-on: ubuntu-latest
+
+    steps:
+    # 第一步：检出代码
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 第二步：执行SSH命令，部署应用
+    - name: Deploy to Server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          # 进入项目目录
+          cd /www/fangdu
+
+          # 拉取最新的代码
+          echo ">>> Pulling latest code from GitHub..."
+          git pull origin main
+
+          # 部署后端
+          echo ">>> Deploying backend..."
+          cd backend
+          npm install
+          pm2 restart material-hub-api
+
+          # 部署前端
+          echo ">>> Deploying frontend..."
+          cd ../frontend
+          npm install
+          npm run build
+
+          echo ">>> Deployment finished!"
