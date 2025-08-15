@@ -172,7 +172,7 @@ onMounted(fetchMaterials);
         </thead>
         <tbody>
           <tr v-for="material in materials" :key="material.id">
-            <td><img :src="'http://localhost:3001' + material.file_path" class="preview-img"></td>
+            <td><img :src="material.file_path" class="preview-img"></td>
             <td>
               <input v-if="editingMaterial && editingMaterial.id === material.id" v-model="editingMaterial.name">
               <span v-else>{{ material.name }}</span>

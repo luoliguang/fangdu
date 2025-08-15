@@ -14,7 +14,12 @@ const isLoading = ref(true);
 // 2. 新增 Lightbox 需要的变量(images)
 const lightboxVisible = ref(false);
 const lightboxIndex = ref(0); // 当前显示的图片索引
-const imageSources = computed(() => materials.value.filter(m => m.media_type === 'image').map(m => 'http://localhost:3001' + m.file_path));
+// Lightbox的图片源，现在直接使用file_path
+const imageSources = computed(() => 
+    materials.value
+        .filter(m => m.media_type === 'image')
+        .map(m => m.file_path)
+);
 
 // --- Modal State (for videos) ---
 const videoModalVisible = ref(false);
@@ -39,7 +44,7 @@ const showMedia = (material) => {
     lightboxIndex.value = imageIndex;
     lightboxVisible.value = true;
   } else if (material.media_type === 'video') {
-    currentVideoUrl.value = 'http://localhost:3001' + material.file_path;
+    currentVideoUrl.value = material.file_path; // <--- 直接赋值
     videoModalVisible.value = true;
   }
 };
@@ -128,16 +133,8 @@ watch(searchTerm, (newValue) => {
         class="grid-item"
         @click="showMedia(material)" 
       >
-        <img 
-          v-if="material.media_type === 'image'"
-          :src="'http://localhost:3001' + material.file_path" 
-          :alt="material.name"
-        >
-        <video 
-          v-else-if="material.media_type === 'video'"
-          :src="'http://localhost:3001' + material.file_path" 
-          muted loop playsinline
-        ></video>
+        <img v-if="material.media_type === 'image'" :src="material.file_path" :alt="material.name">
+        <video v-else-if="material.media_type === 'video'" :src="material.file_path" muted loop playsinline></video>
 
         <p>{{ material.name }}</p>
 

@@ -5,6 +5,7 @@ const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 require('dotenv').config();
+const OSS = require('ali-oss'); // <--- 1. 引入 ali-oss
 
 // --- 2. 初始化 ---
 const app = express();
@@ -16,6 +17,14 @@ if (!SECRET_TOKEN) {
     console.error("严重错误：未在 .env 文件中定义 SECRET_TOKEN！");
     process.exit(1);
 }
+
+// 2. 初始化 OSS 客户端
+const client = new OSS({
+  region: process.env.ALI_OSS_REGION,
+  accessKeyId: process.env.ALI_OSS_ACCESS_KEY_ID,
+  accessKeySecret: process.env.ALI_OSS_ACCESS_KEY_SECRET,
+  bucket: process.env.ALI_OSS_BUCKET,
+});
 
 // --- 3. 连接数据库 ---
 const db = new sqlite3.Database('./database/my_materials.db', (err) => {
@@ -57,15 +66,16 @@ const db = new sqlite3.Database('./database/my_materials.db', (err) => {
 // 新增：配置 Multer 用于文件上传 (升级版)
 const multer = require('multer');
 
-const fileFilter = (req, file, cb) => {
-    // 允许的MIME类型
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'];
-    if (allowedTypes.includes(file.mimetype)) {
-        cb(null, true); // 接受文件
-    } else {
-        cb(new Error('不支持的文件类型!'), false); // 拒绝文件
-    }
-};
+// const fileFilter = (req, file, cb) => {
+//     // 允许的MIME类型
+//     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'];
+//     if (allowedTypes.includes(file.mimetype)) {
+//         cb(null, true); // 接受文件
+//     } else {
+//         cb(new Error('不支持的文件类型!'), false); // 拒绝文件
+//     }
+// };
+
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -77,7 +87,8 @@ const storage = multer.diskStorage({
 });
 
 // 将 fileFilter 应用到 multer
-const upload = multer({ storage: storage, fileFilter: fileFilter });
+// const upload = multer({ storage: storage, fileFilter: fileFilter });
+const upload = multer({ storage: multer.memoryStorage() }); // 使用内存存储，不保存文件到硬盘
 
 // 新增：“保安”中间件，用于验证令牌
 const authenticateToken = (req, res, next) => {
@@ -160,71 +171,98 @@ app.get('/api/materials', (req, res) => {
 // 新增接口3: 处理素材上传
 // upload.single('imageFile') 表示处理表单中名为 'imageFile' 的单个文件
 // 修改上传接口，增加媒体类型判断
-app.post('/api/materials', authenticateToken, upload.single('imageFile'), (req, res) => {
-  const { name, tags } = req.body;
-  const filePath = '/uploads/' + req.file.filename;
-  // 从文件的mimetype判断是图片还是视频
-  const mediaType = req.file.mimetype.startsWith('image') ? 'image' : 'video';
+// app.post('/api/materials', authenticateToken, upload.single('imageFile'), (req, res) => {
+//   const { name, tags } = req.body;
+//   const filePath = '/uploads/' + req.file.filename;
+//   // 从文件的mimetype判断是图片还是视频
+//   const mediaType = req.file.mimetype.startsWith('image') ? 'image' : 'video';
 
-  if (!name || !tags || !req.file) {
+//   if (!name || !tags || !req.file) {
+//       return res.status(400).json({ error: '缺少必要信息！' });
+//   }
+
+//   const sql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
+//   const params = [name, filePath, tags, mediaType];
+
+//   db.run(sql, params, function(err) {
+//       if (err) {
+//           return res.status(500).json({ error: err.message });
+//       }
+//       res.json({
+//           message: '上传成功!',
+//           id: this.lastID
+//       });
+//   });
+// });
+// 上传接口（OSS版本）
+app.post('/api/materials', authenticateToken, upload.single('imageFile'), async (req, res) => {
+  try {
+    const { name, tags } = req.body;
+    if (!name || !tags || !req.file) {
       return res.status(400).json({ error: '缺少必要信息！' });
+    }
+
+    // 1. 生成唯一的文件名 (例如: videos/1678886400000-original-name.mp4)
+    const mediaType = req.file.mimetype.startsWith('image') ? 'image' : 'video';
+    const folder = mediaType === 'image' ? 'images/' : 'videos/';
+    const fileName = folder + Date.now() + '-' + req.file.originalname;
+
+    // 2. 使用 client.put 将文件 buffer 上传到 OSS
+    const result = await client.put(fileName, req.file.buffer);
+
+    // 3. result.url 就是文件在OSS上的公开访问地址
+    const fileUrl = result.url;
+
+    // 4. 将这个公开地址存入数据库
+    const sql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
+    const params = [name, fileUrl, tags, mediaType];
+
+    db.run(sql, params, function(err) {
+        if (err) {
+            console.error("数据库写入失败:", err);
+            return res.status(500).json({ error: err.message });
+        }
+        res.status(201).json({ message: '上传成功!', id: this.lastID });
+    });
+  } catch (error) {
+    console.error("上传到OSS或处理请求失败:", error);
+    res.status(500).json({ error: '上传失败，请检查服务器日志' });
   }
-
-  const sql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
-  const params = [name, filePath, tags, mediaType];
-
-  db.run(sql, params, function(err) {
-      if (err) {
-          return res.status(500).json({ error: err.message });
-      }
-      res.json({
-          message: '上传成功!',
-          id: this.lastID
-      });
-  });
 });
 
-// 接口4: 删除素材
-app.delete('/api/materials/:id', authenticateToken, (req, res) => {
-  const id = req.params.id;
-  
-  // 1. 先从数据库找到文件路径，以便删除文件
-  db.get('SELECT file_path FROM materials WHERE id = ?', [id], (err, row) => {
-      if (err) {
-          console.error("数据库查询失败:", err);
-          return res.status(500).json({ error: '数据库查询失败' });
-      }
-      if (!row) {
-          return res.status(404).json({ error: '未在数据库中找到该素材' });
-      }
-      
-      // __dirname 指向当前文件(server.js)所在的目录
-      // 我们需要拼接出文件的绝对路径
-      const filePath = path.join(__dirname, row.file_path);
 
-      // 2. 从数据库删除条目
-      db.run('DELETE FROM materials WHERE id = ?', id, function (err) {
-          if (err) {
-              console.error("数据库删除失败:", err);
-              return res.status(500).json({ error: err.message });
-          }
-          
-          // 3. 从服务器硬盘删除文件 (确保文件存在再删除)
-          if (fs.existsSync(filePath)) {
-              fs.unlink(filePath, (fsErr) => {
-                  if (fsErr) {
-                      // 即使文件删除失败，也应该告诉前端数据库操作成功了
-                      // 这是一个非关键性错误，可以在后台记录日志
-                      console.error("删除服务器文件失败:", fsErr);
-                  }
-              });
-          } else {
-              console.warn("文件不存在，无法删除:", filePath);
-          }
-          
-          res.json({ message: '删除成功' });
+// 删除接口（OSS版本）
+app.delete('/api/materials/:id', authenticateToken, async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    // 1. 从数据库找到文件的完整URL
+    db.get('SELECT file_path FROM materials WHERE id = ?', [id], async (err, row) => {
+      if (err || !row) { return res.status(404).send('未找到素材'); }
+
+      const fileUrl = row.file_path;
+
+      // 2. 从数据库删除条目 (无论OSS删除是否成功，都先执行)
+      db.run('DELETE FROM materials WHERE id = ?', id, async function (dbErr) {
+        if (dbErr) { return res.status(500).send(dbErr.message); }
+
+        try {
+          // 3. 从URL中解析出OSS上的对象名 (例如: images/1678886400000-cat.jpg)
+          const objectName = new URL(fileUrl).pathname.substring(1);
+          // 4. 从OSS删除该对象
+          await client.delete(objectName);
+        } catch (ossErr) {
+          // 如果OSS删除失败，仅在后台记录日志，因为数据库条目已删除，不影响用户
+          console.error("从OSS删除文件失败，但数据库条目已移除:", ossErr);
+        }
+
+        res.json({ message: '删除成功' });
       });
-  });
+    });
+  } catch (error) {
+    console.error("处理删除请求失败:", error);
+    res.status(500).json({ error: '删除失败，请检查服务器日志' });
+  }
 });
 
 // 接口5: 修改素材信息
