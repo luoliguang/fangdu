@@ -265,6 +265,24 @@ app.delete('/api/materials/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// 新增接口6: 验证令牌的有效性
+app.post('/api/auth/validate', (req, res) => {
+  const { token } = req.body; // 从请求体中获取前端发来的令牌
+
+  if (!token) {
+      return res.status(400).json({ message: '未输入密码' });
+  }
+
+  // 将前端发来的令牌与服务器环境变量中的令牌进行比对
+  if (token === process.env.SECRET_TOKEN) {
+      // 如果一致，返回成功
+      res.status(200).json({ message: '恭喜恭喜😄' });
+  } else {
+      // 如果不一致，返回未授权错误
+      res.status(401).json({ message: '别来这里，要密码的🙄' });
+  }
+});
+
 // 接口5: 修改素材信息
 // 请确保这里是 app.put, 路径是 '/api/materials/:id', 并且有 authenticateToken
 app.put('/api/materials/:id', authenticateToken, (req, res) => {
