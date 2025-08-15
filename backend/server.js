@@ -201,8 +201,14 @@ app.post('/api/materials', authenticateToken, upload.single('imageFile'), async 
     
     console.log(`[${new Date().toISOString()}] - [日志] 成功上传到OSS: ${result.url}`);
 
-    const fileUrl = result.url;
+    let fileUrl = result.url;
 
+    // --- 关键修复：确保URL是HTTPS ---
+    if (fileUrl.startsWith('http://')) {
+        fileUrl = fileUrl.replace('http://', 'https://');
+      }
+
+    // 将这个安全的HTTPS地址存入数据库
     const sql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
     const params = [name, fileUrl, tags, mediaType];
 
