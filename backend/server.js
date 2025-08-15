@@ -27,39 +27,52 @@ const client = new OSS({
 });
 
 // --- 3. 连接数据库 ---
-const db = new sqlite3.Database('./database/my_materials.db', (err) => {
-  if (err) { console.error(err.message); }
-  console.log('成功连接到多媒体数据库.');
+// --- 3. 连接数据库 (使用绝对路径的修正版) ---
+// __dirname 会获取当前文件(server.js)所在的文件夹的绝对路径
+// path.join 会智能地将路径拼接起来，避免了跨系统（Windows/Linux）的路径问题
+const dbPath = path.join(__dirname, 'database', 'my_materials.db'); // <--- 关键修改1：创建绝对路径
 
-  // 重新创建表格，增加一个 media_type 字段
-  db.run(`CREATE TABLE IF NOT EXISTS materials (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      file_path TEXT NOT NULL,
-      tags TEXT,
-      media_type TEXT NOT NULL 
-  )`, (err) => {
-      if (err) {
-          console.error("创建表格失败:", err);
-      } else {
-          // 插入一些更丰富的测试数据, 包括视频
-          const checkSql = "SELECT COUNT(*) as count FROM materials";
-          db.get(checkSql, [], (err, row) => {
-              if (row.count === 0) {
-                  console.log("数据库为空，正在插入测试数据...");
-                  const materialsToInsert = [
-                      { name: "130克小方格速干", path: "/uploads/sample1.jpg", tags: "面料,速干,130克", type: "image" },
-                      { name: "珠地棉细节展示", path: "/uploads/sample_video.mp4", tags: "面料,棉,视频", type: "video" },
-                      { name: "圆领基础款T恤", path: "/uploads/sample3.jpg", tags: "款式,T恤,圆领", type: "image" },
-                      { name: "拉链连帽卫衣", path: "/uploads/sample4.jpg", tags: "款式,卫衣,拉链", type: "image" }
-                  ];
-                  // 注意：SQL语句也更新了
-                  const insertSql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
-                  materialsToInsert.forEach(m => db.run(insertSql, [m.name, m.path, m.tags, m.type]));
-              }
-          });
-      }
-  });
+// 增加一条日志，方便我们以后调试
+console.log(`[数据库日志] 正在尝试连接数据库，完整路径: ${dbPath}`);
+
+// 使用这个绝对路径来连接数据库
+const db = new sqlite3.Database(dbPath, (err) => { // <--- 关键修改2：使用新路径
+    if (err) {
+        console.error("数据库连接失败:", err.message);
+        // 在关键错误时退出进程，PM2会自动重启它
+        process.exit(1);
+    }
+    console.log('成功连接到多媒体数据库.');
+
+    // 下面的建表和插入测试数据逻辑保持不变
+    db.run(`CREATE TABLE IF NOT EXISTS materials (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        tags TEXT,
+        media_type TEXT NOT NULL
+    )`, (err) => {
+        if (err) {
+            console.error("创建表格失败:", err);
+        } else {
+            // 插入一些更丰富的测试数据, 包括视频
+            const checkSql = "SELECT COUNT(*) as count FROM materials";
+            db.get(checkSql, [], (err, row) => {
+                if (row.count === 0) {
+                    console.log("数据库为空，正在插入测试数据...");
+                    const materialsToInsert = [
+                        { name: "130克小方格速干", path: "/uploads/sample1.jpg", tags: "面料,速干,130克", type: "image" },
+                        { name: "珠地棉细节展示", path: "/uploads/sample_video.mp4", tags: "面料,棉,视频", type: "video" },
+                        { name: "圆领基础款T恤", path: "/uploads/sample3.jpg", tags: "款式,T恤,圆领", type: "image" },
+                        { name: "拉链连帽卫衣", path: "/uploads/sample4.jpg", tags: "款式,卫衣,拉链", type: "image" }
+                    ];
+                    // 注意：SQL语句也更新了
+                    const insertSql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
+                    materialsToInsert.forEach(m => db.run(insertSql, [m.name, m.path, m.tags, m.type]));
+                }
+            });
+        }
+    });
 });
 
 // 新增：配置 Multer 用于文件上传
