@@ -14,18 +14,17 @@ const isLoading = ref(true);
 // 2. 新增 Lightbox 需要的变量(images)
 const lightboxVisible = ref(false);
 const lightboxIndex = ref(0); // 当前显示的图片索引
-// Lightbox的图片源，现在直接使用file_path
-const imageSources = computed(() => 
-    materials.value
-        .filter(m => m.media_type === 'image')
-        .map(m => m.file_path)
-);
 
 // --- Modal State (for videos) ---
 const videoModalVisible = ref(false);
 const currentVideoUrl = ref('');
 
-const imageComputed = () => materials.value.map(m => 'http://localhost:3001' + m.file_path);
+// 直接使用从数据库获取的完整OSS URL ---
+const imageSources = computed(() => 
+    materials.value
+        .filter(m => m.media_type === 'image')
+        .map(m => m.file_path) // m.file_path 本身就是完整的URL，不再需要拼接
+);
 
 // 3. 定义打开 Lightbox 的函数
 const showLightbox = (index) => {
@@ -54,7 +53,7 @@ const fetchMaterials = async () => {
   isLoading.value = true;
   try {
     // 同时支持搜索和标签过滤
-    const response = await apiClient.get(`http://localhost:3001/api/materials?search=${searchTerm.value}&tag=${activeTag.value}`);
+    const response = await apiClient.get(`/materials?search=${searchTerm.value}&tag=${activeTag.value}`);
     materials.value = response.data.data;
   } catch (error) {
     console.error('获取素材失败:', error);
@@ -66,7 +65,8 @@ const fetchMaterials = async () => {
 // 获取所有标签的函数
 const fetchTags = async () => {
   try {
-    const response = await apiClient.get(`http://localhost:3001/api/tags`);
+    // --- 修正 3: 使用相对路径 ---
+    const response = await apiClient.get(`/tags`);
     tags.value = response.data.data;
   } catch (error) {
     console.error('获取标签失败:', error);
