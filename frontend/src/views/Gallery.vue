@@ -133,7 +133,7 @@ watch(searchTerm, (newValue) => {
         class="grid-item"
         @click="showMedia(material)" 
       >
-        <img v-if="material.media_type === 'image'" :src="material.file_path" :alt="material.name">
+        <img v-if="material.media_type === 'image'" :src="material.file_path" :alt="material.name" loading="lazy" >
         <video v-else-if="material.media_type === 'video'" :src="material.file_path" muted loop playsinline></video>
 
         <p>{{ material.name }}</p>
@@ -233,7 +233,7 @@ watch(searchTerm, (newValue) => {
   }
 
   .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
-  .grid-item { border: 1px solid #ccc; border-radius: 8px; background-color: white; text-align: center; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease-in-out; cursor: pointer;/* 让所有变化都更平滑 */}
+  .grid-item { border: 1px solid #ccc; border-radius: 8px; background-color: white; text-align: center; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease-in-out; cursor: pointer;/* 让所有变化都更平滑 */position: relative; /* 新增这一行 */}
   .grid-item img { max-width: 100%; height: 150px; object-fit: cover; border-radius: 4px; }
   .grid-item p { margin-top: 0.5rem; font-weight: bold; }
   

@@ -19,8 +19,8 @@ defineEmits(['close']);
 
 <style scoped>
 .modal-mask { position: fixed; z-index: 9998; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; }
-.modal-container { position: relative; max-width: 80vw; max-height: 80vh; }
-.modal-container video { width: 100%; height: 100%; display: block; }
+.modal-container { position: relative; max-width: 80vw; max-height: 80vh;   display: flex; justify-content: center; align-items: center;}
+.modal-container video { max-width: 100%; max-height: 100%; width: auto; height: 90vh; object-fit: contain; /* 保持比例完整显示 */ display: block; }
 .close-button { position: absolute; top: -30px; right: -30px; background: none; border: none; color: white; font-size: 2.5rem; cursor: pointer; }
 .modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
