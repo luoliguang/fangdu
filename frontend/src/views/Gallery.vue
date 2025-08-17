@@ -239,8 +239,15 @@ watch(searchTerm, (newValue) => {
   
   .no-results { text-align: center; color: #888; margin-top: 2rem; }
 
-  /* 动画效果 */
-.gallery-move, /* 应用于移动中的元素 */
+/* 动画效果 (优化版) */
+
+/* 1. move 过渡效果 - 应用于移动中的元素 */
+/* 这是最需要流畅度的部分，我们使用一个更平滑的 cubic-bezier 缓动函数 */
+.gallery-move {
+  transition: transform 0.8s cubic-bezier(0.55, 0, 0.1, 1);
+}
+
+/* 2. enter/leave 过渡效果 - 应用于进入和离开的元素 */
 .gallery-enter-active,
 .gallery-leave-active {
   transition: all 0.5s cubic-bezier(0.55, 0, 0.1, 1);
@@ -252,10 +259,12 @@ watch(searchTerm, (newValue) => {
   transform: scale(0.8);
 }
 
-/* 确保离开的元素能被正确计算位置，以实现流畅的移动动画 */
+/* 3. (关键优化) 确保离开的元素能被正确计算位置，并让它脱离文档流 */
+/* 这能极大地提升剩余元素移动时的动画性能 */
 .gallery-leave-active {
   position: absolute;
 }
+
 
 /* 视频的样式 */
 .grid-item video {
