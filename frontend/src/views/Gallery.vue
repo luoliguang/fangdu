@@ -1,71 +1,85 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import apiClient from '../axiosConfig.js';
-import VueEasyLightbox from 'vue-easy-lightbox'; // 1. 引入Lightbox
-import VideoModal from '../components/VideoModal.vue'; // 1. 引入视频模态框
+import VueEasyLightbox from 'vue-easy-lightbox';
+import VideoModal from '../components/VideoModal.vue';
 
+// --- 基础状态 ---
 const materials = ref([]);
 const searchTerm = ref('');
-const tags = ref([]); // 新增：存储所有标签
-const activeTag = ref(''); // 新增：存储当前选中的标签
-let debounceTimer = null; // 新增一个计时器变量
-const isLoading = ref(true);
+const tags = ref([]);
+const activeTag = ref('');
+const isLoading = ref(false); // 初始为 false
+let debounceTimer = null;
 
-// 2. 新增 Lightbox 需要的变量(images)
+// --- 分页与无限滚动状态 ---
+const currentPage = ref(1);
+const totalPages = ref(1);
+const hasMore = computed(() => currentPage.value < totalPages.value);
+const observerEl = ref(null);
+let observer = null;
+
+// --- Lightbox 和 Video Modal 状态 ---
 const lightboxVisible = ref(false);
-const lightboxIndex = ref(0); // 当前显示的图片索引
-
-// --- Modal State (for videos) ---
+const lightboxIndex = ref(0);
 const videoModalVisible = ref(false);
 const currentVideoUrl = ref('');
 
-// 直接使用从数据库获取的完整OSS URL ---
-const imageSources = computed(() => 
+const imageSources = computed(() =>
     materials.value
         .filter(m => m.media_type === 'image')
-        .map(m => m.file_path) // m.file_path 本身就是完整的URL，不再需要拼接
+        .map(m => m.file_path)
 );
 
-// 3. 定义打开 Lightbox 的函数
-const showLightbox = (index) => {
-  lightboxIndex.value = index;
-  lightboxVisible.value = true;
-};
-
-const handleHide = () => {
-  lightboxVisible.value = false;
-};
-
 const showMedia = (material) => {
-  if (material.media_type === 'image') {
-    // 找到这张图片在所有图片中的索引
-    const imageIndex = materials.value.filter(m => m.media_type === 'image').findIndex(m => m.id === material.id);
-    lightboxIndex.value = imageIndex;
-    lightboxVisible.value = true;
-  } else if (material.media_type === 'video') {
-    currentVideoUrl.value = material.file_path; // <--- 直接赋值
-    videoModalVisible.value = true;
-  }
+    if (material.media_type === 'image') {
+        const imageIndex = materials.value.filter(m => m.media_type === 'image').findIndex(m => m.id === material.id);
+        lightboxIndex.value = imageIndex;
+        lightboxVisible.value = true;
+    } else if (material.media_type === 'video') {
+        currentVideoUrl.value = material.file_path;
+        videoModalVisible.value = true;
+    }
 };
 
-// 获取素材列表的函数
-const fetchMaterials = async () => {
-  isLoading.value = true;
-  try {
-    // 同时支持搜索和标签过滤
-    const response = await apiClient.get(`/materials?search=${searchTerm.value}&tag=${activeTag.value}`);
-    materials.value = response.data.data;
-  } catch (error) {
-    console.error('获取素材失败:', error);
-  }finally {
-    isLoading.value = false;
-  }
+const fetchMaterials = async (isLoadMore = false) => {
+    // 关键：如果正在加载，并且不是加载更多（即是筛选触发的），则直接返回，防止重复请求
+    if (isLoading.value && !isLoadMore) return;
+    isLoading.value = true;
+
+    try {
+        const response = await apiClient.get(`/materials`, {
+            params: {
+                search: searchTerm.value,
+                tag: activeTag.value,
+                page: currentPage.value,
+                limit: 20
+            }
+        });
+
+        // 确保 response.data 和 meta 存在
+        if (response.data && response.data.meta) {
+            const { data, meta } = response.data;
+            if (isLoadMore) {
+                materials.value.push(...data);
+            } else {
+                materials.value = data;
+            }
+            totalPages.value = meta.totalPages;
+        } else {
+            // 如果后端返回数据格式不正确，清空并打印警告
+            console.warn("后端返回数据格式不正确，缺少 meta 信息");
+            materials.value = [];
+        }
+    } catch (error) {
+        console.error('获取素材失败:', error);
+    } finally {
+        isLoading.value = false;
+    }
 };
 
-// 获取所有标签的函数
 const fetchTags = async () => {
   try {
-    // --- 修正 3: 使用相对路径 ---
     const response = await apiClient.get(`/tags`);
     tags.value = response.data.data;
   } catch (error) {
@@ -73,35 +87,49 @@ const fetchTags = async () => {
   }
 };
 
-// 点击标签时触发的函数
-const filterByTag = (tag) => {
-  // 如果点击的已经是激活的标签，则取消筛选
-  if (activeTag.value === tag) {
-    activeTag.value = '';
-  } else {
-    activeTag.value = tag;
-  }
-  // 筛选后立即获取新的素材列表
-  fetchMaterials();
+const handleFilterChange = () => {
+    currentPage.value = 1;
+    totalPages.value = 1;
+    // 不立即清空，让 fetchMaterials 直接替换，避免闪烁
+    fetchMaterials(false); // 传入 false 表示是全新加载
 };
 
-// 页面加载时，获取素材和标签
+const filterByTag = (tag) => {
+    if (activeTag.value === tag) return;
+    activeTag.value = tag;
+    handleFilterChange();
+};
+
+watch(searchTerm, () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(handleFilterChange, 300);
+});
+
+const setupObserver = () => {
+    observer = new IntersectionObserver((entries) => {
+        const firstEntry = entries[0];
+        if (firstEntry.isIntersecting && hasMore.value && !isLoading.value) {
+            currentPage.value++;
+            fetchMaterials(true);
+        }
+    });
+
+    if (observerEl.value) {
+        observer.observe(observerEl.value);
+    }
+};
+
 onMounted(() => {
-  fetchMaterials();
-  fetchTags();
+    handleFilterChange();
+    fetchTags();
+    setupObserver();
 });
 
-// 监听搜索框的变化
-// watch(searchTerm, fetchMaterials);
-// 使用新的、带防抖的 watch
-watch(searchTerm, (newValue) => {
-    clearTimeout(debounceTimer); // 清除上一个计时器
-    debounceTimer = setTimeout(() => {
-        fetchMaterials(); // 300毫秒后执行搜索
-    }, 300);
+onUnmounted(() => {
+    if (observer && observerEl.value) {
+        observer.unobserve(observerEl.value);
+    }
 });
-
-
 </script>
 
 <template>
@@ -135,14 +163,18 @@ watch(searchTerm, (newValue) => {
       >
         <img v-if="material.media_type === 'image'" :src="material.file_path" :alt="material.name" loading="lazy" >
         <video v-else-if="material.media_type === 'video'" :src="material.file_path" muted loop playsinline></video>
-
         <p>{{ material.name }}</p>
-
         <div v-if="material.media_type === 'video'" class="media-icon">▶</div>
       </div>
     </TransitionGroup>
 
-    <p v-if="materials.length === 0 && !isLoading" class="no-results">没有找到匹配的素材。</p>
+    <div class="load-more-container">
+        <div v-if="isLoading" class="loader"></div>
+        <p v-if="!hasMore && materials.length > 0">已加载全部内容</p>
+        <p v-if="materials.length === 0 && !isLoading" class="no-results">没有找到匹配的素材。</p>
+    </div>
+    <div ref="observerEl" class="observer"></div>
+
   </main>
 
   <vue-easy-lightbox
@@ -160,133 +192,42 @@ watch(searchTerm, (newValue) => {
 </template>
 
 <style>
-  body { font-family: sans-serif; background-color: #f0f2f5; margin: 0; }
-  /* header { background-color: #333; color: white; padding: 1rem; text-align: center; }
-  .search-input { width: 50%; padding: 0.5rem; margin-top: 1rem; border-radius: 4px; border: none; } */
-  main { padding: 1rem; max-width: 1200px; margin: 0 auto; }
+  body { font-family: sans-serif; background-color: #f0f2f5; margin: 0; overflow-y: scroll; }
+  main { padding: 1rem; max-width: 1200px; margin: 0 auto; min-height: 50vh; }
 
   .hero-header {
-  background: linear-gradient(45deg, #1ba98c, #276e6c); /* 漂亮的渐变背景 */
-  color: white;
-  text-align: center;
-  padding: 2rem 1rem;
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 20px;
-}
-
-.hero-content {
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-.hero-title {
-  font-size: 3rem;
-  font-weight: 700;
-  margin: 0;
-  letter-spacing: 2px;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-}
-
-.hero-subtitle {
-  font-size: 1.2rem;
-  font-weight: 300;
-  opacity: 0.9;
-  margin: 0.5rem 0 2rem 0;
-}
-
-.search-input-cool {
-  width: 100%;
-  padding: 1rem 1.5rem;
-  font-size: 1rem;
-  border-radius: 50px; /* 圆角胶囊形状 */
-  border: none;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-  transition: all 0.3s ease;
-}
-
-.search-input-cool:focus {
-  outline: none;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.2), 0 0 0 3px rgba(255,255,255,0.5);
-}
-
-  /* 标签按钮的样式 */
-  .tags-container {
-    margin-bottom: 1.5rem;
-    text-align: center;
-  }
-  .tags-container button {
-    background-color: #fff;
-    border: 1px solid #ccc;
-    border-radius: 16px;
-    padding: 0.5rem 1rem;
-    margin: 0.25rem;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .tags-container button:hover {
-    background-color: #e0e0e0;
-  }
-  .tags-container button.active {
-    background-color: #007bff;
+    background: linear-gradient(45deg, #1ba98c, #276e6c);
     color: white;
-    border-color: #007bff;
+    text-align: center;
+    padding: 2rem 1rem;
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
   }
+  .hero-content { max-width: 600px; margin: 0 auto; }
+  .hero-title { font-size: 3rem; font-weight: 700; margin: 0; letter-spacing: 2px; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+  .hero-subtitle { font-size: 1.2rem; font-weight: 300; opacity: 0.9; margin: 0.5rem 0 2rem 0; }
+  .search-input-cool { width: 100%; padding: 1rem 1.5rem; font-size: 1rem; border-radius: 50px; border: none; box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: all 0.3s ease; }
+  .search-input-cool:focus { outline: none; box-shadow: 0 8px 25px rgba(0,0,0,0.2), 0 0 0 3px rgba(255,255,255,0.5); }
+  
+  .tags-container { margin-bottom: 1.5rem; text-align: center; }
+  .tags-container button { background-color: #fff; border: 1px solid #ccc; border-radius: 16px; padding: 0.5rem 1rem; margin: 0.25rem; cursor: pointer; transition: all 0.2s; }
+  .tags-container button:hover { background-color: #e0e0e0; }
+  .tags-container button.active { background-color: #007bff; color: white; border-color: #007bff; }
 
   .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
-  .grid-item { border: 1px solid #ccc; border-radius: 8px; background-color: white; text-align: center; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease-in-out; cursor: pointer;/* 让所有变化都更平滑 */position: relative; /* 新增这一行 */}
-  .grid-item img { max-width: 100%; height: 150px; object-fit: cover; border-radius: 4px; }
+  .grid-item { border: 1px solid #ccc; border-radius: 8px; background-color: white; text-align: center; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease-in-out; cursor: pointer; position: relative; }
+  .grid-item img, .grid-item video { max-width: 100%; height: 150px; object-fit: cover; border-radius: 4px; display: block; background-color: #000; }
   .grid-item p { margin-top: 0.5rem; font-weight: bold; }
+  .no-results, .loading-results { text-align: center; color: #888; margin-top: 2rem; }
+
+  .gallery-move, .gallery-enter-active, .gallery-leave-active { transition: all 0.5s cubic-bezier(0.55, 0, 0.1, 1); }
+  .gallery-enter-from, .gallery-leave-to { opacity: 0; transform: scale(0.8); }
+  .gallery-leave-active { position: absolute; }
+
+  .media-icon { position: absolute; top: 10px; right: 10px; background-color: rgba(0, 0, 0, 0.5); color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; justify-content: center; align-items: center; font-size: 14px; }
   
-  .no-results { text-align: center; color: #888; margin-top: 2rem; }
-
-/* 动画效果 (优化版) */
-
-/* 1. move 过渡效果 - 应用于移动中的元素 */
-/* 这是最需要流畅度的部分，我们使用一个更平滑的 cubic-bezier 缓动函数 */
-.gallery-move {
-  transition: transform 0.8s cubic-bezier(0.55, 0, 0.1, 1);
-}
-
-/* 2. enter/leave 过渡效果 - 应用于进入和离开的元素 */
-.gallery-enter-active,
-.gallery-leave-active {
-  transition: all 0.5s cubic-bezier(0.55, 0, 0.1, 1);
-}
-
-.gallery-enter-from,
-.gallery-leave-to {
-  opacity: 0;
-  transform: scale(0.8);
-}
-
-/* 3. (关键优化) 确保离开的元素能被正确计算位置，并让它脱离文档流 */
-/* 这能极大地提升剩余元素移动时的动画性能 */
-.gallery-leave-active {
-  position: absolute;
-}
-
-
-/* 视频的样式 */
-.grid-item video {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  display: block;
-  background-color: #000;
-}
-
-.media-icon {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-color: rgba(0, 0, 0, 0.5);
-  color: white;
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 14px;
-}
+  .load-more-container { display: flex; justify-content: center; align-items: center; padding: 2rem; color: #888; }
+  .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  .observer { height: 20px; }
 </style>

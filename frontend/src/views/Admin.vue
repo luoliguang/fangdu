@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'; // 引入 reactive
+import { ref, reactive, onMounted,computed  } from 'vue'; // 引入 reactive
 import apiClient from '../axiosConfig.js';
 import { useToast } from 'vue-toastification'; // 1. 引入 useToast
 
@@ -19,13 +19,42 @@ const errors = reactive({
   file: false
 });
 
-// --- Functions ---
+// --- 新增：分页状态 ---
+const currentPage = ref(1);
+const totalPages = ref(1);
+const limit = ref(20); // 和后端保持一致
+
+// --- 新增：计算属性来判断按钮是否应该禁用 ---
+const isPrevDisabled = computed(() => currentPage.value <= 1);
+const isNextDisabled = computed(() => currentPage.value >= totalPages.value);
+
+// --- 修改：让 fetchMaterials 支持分页 ---
 const fetchMaterials = async () => {
+  isLoading.value = true;
   try {
-    const response = await apiClient.get('/materials');
+    const response = await apiClient.get('/materials', {
+      params: {
+        page: currentPage.value,
+        limit: limit.value
+      }
+    });
     materials.value = response.data.data;
-  } catch (error) { console.error('获取后台素材列表失败:', error); }
+    // 更新总页数
+    totalPages.value = response.data.meta.totalPages;
+  } catch (error) {
+    console.error('获取后台素材列表失败:', error);
+    toast.error('获取素材失败');
+  } finally {
+    isLoading.value = false;
+  }
 };
+
+// --- 新增：翻页函数 ---
+const goToPage = (page) => {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+  fetchMaterials();
+}
 
 // 校验表单函数
 const validateForm = () => {
@@ -116,48 +145,48 @@ onMounted(fetchMaterials);
 <template>
   <div class="admin-container">
     <div class="card">
-  <h2>上传新素材</h2>
-  <form @submit.prevent="handleUpload">
-    <label
-      class="upload-drop-zone"
-      :class="{ 'has-error': errors.file }"
-      @dragover.prevent @dragenter.prevent @drop.prevent="handleFileDrop"
-    >
-    <input type="file" id="file-input" @change="handleFileChange" hidden accept="image/*,video/*">
-      <div v-if="!newMaterial.file" class="upload-prompt">
-        <p>将文件拖拽到此处，或<span>点击选择</span></p>
-      </div>
-      <div v-else class="file-preview">
-        <p>已选择文件: <strong>{{ newMaterial.file.name }}</strong></p>
-      </div>
-    </label>
-    
-    <div class="form-grid">
-      <input 
-        type="text" 
-        v-model="newMaterial.name" 
-        placeholder="素材名称"
-        :class="{ 'has-error': errors.name }"
-        @input="errors.name = false"
-      >
-      <input 
-        type="text" 
-        v-model="newMaterial.tags" 
-        placeholder="标签,用逗号隔开"
-        :class="{ 'has-error': errors.tags }"
-        @input="errors.tags = false"
-      >
-    </div>
+      <h2>上传新素材</h2>
+      <form @submit.prevent="handleUpload">
+        <label
+          class="upload-drop-zone"
+          :class="{ 'has-error': errors.file }"
+          @dragover.prevent @dragenter.prevent @drop.prevent="handleFileDrop"
+        >
+        <input type="file" id="file-input" @change="handleFileChange" hidden accept="image/*,video/*">
+          <div v-if="!newMaterial.file" class="upload-prompt">
+            <p>将文件拖拽到此处，或<span>点击选择</span></p>
+          </div>
+          <div v-else class="file-preview">
+            <p>已选择文件: <strong>{{ newMaterial.file.name }}</strong></p>
+          </div>
+        </label>
+        
+        <div class="form-grid">
+          <input 
+            type="text" 
+            v-model="newMaterial.name" 
+            placeholder="素材名称"
+            :class="{ 'has-error': errors.name }"
+            @input="errors.name = false"
+          >
+          <input 
+            type="text" 
+            v-model="newMaterial.tags" 
+            placeholder="标签,用空格或逗号隔开"
+            :class="{ 'has-error': errors.tags }"
+            @input="errors.tags = false"
+          >
+        </div>
 
-    <div v-if="isLoading" class="progress-bar-container">
-      <div class="progress-bar" :style="{ width: uploadProgress + '%' }"></div>
-    </div>
+        <div v-if="isLoading" class="progress-bar-container">
+          <div class="progress-bar" :style="{ width: uploadProgress + '%' }"></div>
+        </div>
 
-    <button type="submit" :disabled="isLoading">
-      {{ isLoading ? `上传中... ${uploadProgress}%` : '确认上传' }}
-    </button>
-  </form>
-</div>
+        <button type="submit" :disabled="isLoading">
+          {{ isLoading ? `上传中... ${uploadProgress}%` : '确认上传' }}
+        </button>
+      </form>
+    </div>
 
     <div class="card">
       <h2>素材管理</h2>
@@ -194,9 +223,22 @@ onMounted(fetchMaterials);
           </tr>
         </tbody>
       </table>
-    </div>
+
+      <div class="pagination-container">
+        <button @click="goToPage(currentPage - 1)" :disabled="isPrevDisabled" class="btn-page">
+          &lt; 上一页
+        </button>
+        <span>
+          第 {{ currentPage }} 页 / 共 {{ totalPages }} 页
+        </span>
+        <button @click="goToPage(currentPage + 1)" :disabled="isNextDisabled" class="btn-page">
+          下一页 &gt;
+        </button>
+      </div>
+      </div>
   </div>
 </template>
+
 
 <style scoped>
 .admin-container { max-width: 960px; margin: 2rem auto; display: flex; flex-direction: column; gap: 2rem; }
@@ -262,5 +304,34 @@ button { cursor: pointer; border: none; padding: 0.5rem 1rem; border-radius: 4px
 .has-error {
   border-color: #dc3545 !important; /* 使用 !important 确保覆盖默认样式 */
   background-color: #fff8f8;
+}
+
+/* --- 新增：分页容器和按钮的样式 --- */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1.5rem;
+  gap: 1rem;
+}
+
+.pagination-container span {
+  font-weight: 500;
+  color: #555;
+}
+
+.btn-page {
+  background-color: #f0f2f5;
+  color: #333;
+  border: 1px solid #ccc;
+}
+
+.btn-page:hover:not(:disabled) {
+  background-color: #e0e0e0;
+}
+
+.btn-page:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

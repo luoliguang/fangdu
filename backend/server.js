@@ -55,7 +55,7 @@ const db = new sqlite3.Database(dbPath, (err) => { // <--- 关键修改2：使�
         if (err) {
             console.error("创建表格失败:", err);
         } else {
-            // 插入一些更丰富的测试数据, 包括视频
+            // 插入一些更丰富的测试数据, 包括视频(生成环境)
             const checkSql = "SELECT COUNT(*) as count FROM materials";
             db.get(checkSql, [], (err, row) => {
                 if (row.count === 0) {
@@ -72,23 +72,56 @@ const db = new sqlite3.Database(dbPath, (err) => { // <--- 关键修改2：使�
                 }
             });
         }
+
+      /*生成虚假数据用于测试(开发环境)*/
+      // } else {
+      //   // --- 数据填充 (Data Seeding) ---
+      //   const checkSql = "SELECT COUNT(*) as count FROM materials";
+      //   db.get(checkSql, [], (err, row) => {
+      //       // 改为 < 10 来判断是否需要填充，这样您手动上传的少量图片不会影响填充
+      //       if (row.count < 20) {
+      //           console.log("数据库素材较少，正在为您生成大量测试数据...");
+                
+      //           // --- 1. 定义数据源 ---
+      //           const fabricTypes = ["棉", "麻", "丝", "涤纶", "氨纶", "速干", "珠地", "莱卡"];
+      //           const styles = ["T恤", "卫衣", "Polo衫", "夹克", "运动裤", "瑜伽裤"];
+      //           const features = ["透气", "弹力", "防水", "抗皱", "印花", "纯色", "条纹"];
+                
+      //           // --- 2. 设定要生成的数量 ---
+      //           const numberOfItems = 300; // 在这里修改您想要的数量，比如 100 或 500
+
+      //           const insertSql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
+                
+      //           // --- 3. 循环生成数据 ---
+      //           for (let i = 0; i < numberOfItems; i++) {
+      //               // 从数据源随机取样
+      //               const randomFabric = fabricTypes[Math.floor(Math.random() * fabricTypes.length)];
+      //               const randomStyle = styles[Math.floor(Math.random() * styles.length)];
+      //               const randomFeature = features[Math.floor(Math.random() * features.length)];
+
+      //               // 组合成随机的名称和标签
+      //               const name = `${randomFabric}${randomStyle} (${randomFeature})`;
+      //               const tags = `${randomFabric},${randomStyle},${randomFeature}`;
+                    
+      //               // --- 核心：使用 placeholder 图片服务 ---
+      //               // picsum.photos 会提供一个随机的图片, 尺寸250x300
+      //               // ?random=${i} 是为了防止图片URL重复
+      //               const imagePath = `https://picsum.photos/250/300?random=${i}`;
+
+      //               // 插入数据库
+      //               db.run(insertSql, [name, imagePath, tags, "image"]);
+      //           }
+      //           console.log(`成功生成 ${numberOfItems} 条测试数据！`);
+      //       }
+      //   });
+      // }
+
     });
 });
 
 // 新增：配置 Multer 用于文件上传
 // 新增：配置 Multer 用于文件上传 (升级版)
 const multer = require('multer');
-
-// const fileFilter = (req, file, cb) => {
-//     // 允许的MIME类型
-//     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'];
-//     if (allowedTypes.includes(file.mimetype)) {
-//         cb(null, true); // 接受文件
-//     } else {
-//         cb(new Error('不支持的文件类型!'), false); // 拒绝文件
-//     }
-// };
-
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -145,39 +178,54 @@ app.get('/api/tags', (req, res) => {
 
 
 // 接口2: 获取素材列表 (支持多关键词搜索和标签过滤的终极版)
+// 支持分页
 app.get('/api/materials', (req, res) => {
-  // 1. 获取原始的搜索字符串和标签
+  // 1. 获取分页、搜索和标签参数
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20; // 每页默认20条
+  const offset = (page - 1) * limit;
   const rawSearchTerm = req.query.search || '';
   const filterTag = req.query.tag || '';
 
-  // 2. 将搜索字符串按空格分割成关键词数组
-  //    并使用 .filter(k => k) 清除因多个空格产生的空字符串
+  // 2. 构建查询条件
   const keywords = rawSearchTerm.split(' ').filter(k => k);
-
-  // 3. 动态构建 SQL 查询
-  //    我们使用 `WHERE 1=1` 是一个小技巧，方便后续无脑拼接 `AND` 条件
-  let sql = `SELECT * FROM materials WHERE 1=1`;
+  let whereClause = ` WHERE 1=1`;
   const params = [];
-
-  // 4. 遍历关键词数组，为每个关键词动态添加一个 AND name LIKE ? 条件
   keywords.forEach(keyword => {
-      sql += ` AND name LIKE ?`;
+      whereClause += ` AND name LIKE ?`;
       params.push(`%${keyword}%`);
   });
-
-  // 5. 处理标签过滤，这个逻辑保持不变，继续拼接在后面
   if (filterTag) {
-      sql += ` AND tags LIKE ?`;
+      whereClause += ` AND tags LIKE ?`;
       params.push(`%${filterTag}%`);
   }
 
-  // 6. 执行最终构建好的SQL查询
-  db.all(sql, params, (err, rows) => {
-      if (err) { 
-          console.error("多关键词搜索失败:", err);
-          return res.status(500).json({ "error": err.message }); 
+  // 3. 先查询总数
+  const countSql = `SELECT COUNT(*) as total FROM materials` + whereClause;
+  db.get(countSql, params, (err, row) => {
+      if (err) {
+          return res.status(500).json({ "error": err.message });
       }
-      res.json({ "message": "success", "data": rows });
+      const total = row.total;
+
+      // 4. 再查询分页后的数据
+      const dataSql = `SELECT * FROM materials` + whereClause + ` ORDER BY id DESC LIMIT ? OFFSET ?`;
+      db.all(dataSql, [...params, limit, offset], (err, rows) => {
+          if (err) {
+              return res.status(500).json({ "error": err.message });
+          }
+          // 5. 返回包含分页信息的数据结构
+          res.json({
+              message: "success",
+              data: rows,
+              meta: {
+                  total: total,
+                  page: page,
+                  limit: limit,
+                  totalPages: Math.ceil(total / limit)
+              }
+          });
+      });
   });
 });
 
@@ -185,7 +233,16 @@ app.get('/api/materials', (req, res) => {
 app.post('/api/materials', authenticateToken, upload.single('imageFile'), async (req, res) => {
   try {
     const { name, tags } = req.body;
-    if (!name || !tags || !req.file) {
+    // --- 新增：标签处理逻辑 ---
+    const formattedTags = req.body.tags
+        .trim() // 1. 去掉首尾空格
+        .replace(/\s+/g, ',') // 2. 将一个或多个连续的空格替换为单个逗号
+        .replace(/,+/g, ',') // 3. 将多个连续的逗号合并为一个
+        .split(',') // 4. 按逗号分割成数组
+        .filter(Boolean) // 5. 去掉可能产生的空字符串
+        .join(','); // 6. 重新用单个逗号拼接成最终的字符串
+
+    if (!name || !formattedTags || !req.file) { // 注意这里也改成了 formattedTags
       return res.status(400).json({ error: '缺少必要信息！' });
     }
 
@@ -283,21 +340,29 @@ app.post('/api/auth/validate', (req, res) => {
 // 请确保这里是 app.put, 路径是 '/api/materials/:id', 并且有 authenticateToken
 app.put('/api/materials/:id', authenticateToken, (req, res) => {
   const id = req.params.id;
-  const { name, tags } = req.body;
+  const { name } = req.body;
 
-  // 增加一个检查，确保name和tags存在
-  if (!name || !tags) {
-      return res.status(400).json({ error: '名称和标签不能为空！' });
-  }
+// --- 新增：标签处理逻辑 (与上传接口完全相同) ---
+    const formattedTags = req.body.tags
+    .trim()
+    .replace(/\s+/g, ',')
+    .replace(/,+/g, ',')
+    .split(',')
+    .filter(Boolean)
+    .join(',');
 
-  const sql = 'UPDATE materials SET name = ?, tags = ? WHERE id = ?';
-  db.run(sql, [name, tags, id], function (err) {
-      if (err) { 
-          console.error("数据库更新失败:", err);
-          return res.status(500).json({ error: err.message });
-      }
-      res.json({ message: '修改成功' });
-  });
+    if (!name || !formattedTags) {
+    return res.status(400).json({ error: '名称和标签不能为空！' });
+    }
+
+    const sql = 'UPDATE materials SET name = ?, tags = ? WHERE id = ?';
+    db.run(sql, [name, formattedTags, id], function (err) { // <-- 注意这里使用格式化后的 formattedTags
+    if (err) { 
+      console.error("数据库更新失败:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ message: '修改成功' });
+    });
 });
 
 // --- 6. 启动服务器 ---
