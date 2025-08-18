@@ -230,4 +230,33 @@ onUnmounted(() => {
   .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
   @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   .observer { height: 20px; }
+
+  /* --- 新增：针对移动端的响应式优化 --- */
+@media (max-width: 768px) {
+  .hero-content {
+    /* 为内容区增加左右内边距，防止搜索框紧贴边缘 */
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .hero-title {
+    font-size: 2.2rem; /* 在小屏幕上适当缩小标题字号 */
+  }
+
+  .tags-container {
+    /* 关键：允许标签按钮自动换行 */
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center; /* 让换行后的标签也保持居中 */
+  }
+
+  .grid-container {
+    /* 在手机上使用更少的列数，让图片更大更清晰 */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  /* 移动端搜索框 */
+  .search-input-cool{
+    width: 80%;
+  }
+}
 </style>
