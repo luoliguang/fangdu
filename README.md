@@ -49,7 +49,7 @@ Material Hub 是一个为服饰行业或任何需要管理视觉素材的创意�
 ### 1. 克隆仓库
 
 ```bash
-git clone [https://github.com/luoliguang/fangdu.git](https://github.com/luoliguang/fangdu.git)
+git clone https://github.com/luoliguang/fangdu.git
 cd fangdu
 ```
 
@@ -107,8 +107,8 @@ npm run dev
 ## 🔮 未来规划
 
 -   [ ] **用户系统**: 引入完整的用户认证和多角色权限管理。
--   [ ] **分页加载**: 当素材量巨大时，实现后端分页，优化性能。
--   [ ] **云存储**: 支持将文件上传到 AWS S3, 阿里云 OSS 等对象存储服务。
+-   [✅] **分页加载**: 当素材量巨大时，实现后端分页，优化性能。
+-   [✅] **云存储**: 支持将文件上传到 AWS S3, 阿里云 OSS 等对象存储服务。
 -   [ ] **数据备份**: 增加一键备份 SQLite 数据库和上传文件的功能。
 
 ---
