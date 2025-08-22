@@ -120,6 +120,20 @@ const db = new sqlite3.Database(dbPath, (err) => { // <--- 关键修改2：使�
     });
 });
 
+// 新增：创建 feedbacks 表
+db.run(`CREATE TABLE IF NOT EXISTS feedbacks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+    if (err) {
+        console.error("创建 feedbacks 表失败:", err);
+    } else {
+        console.log("表 feedbacks 创建成功或已存在。");
+    }
+});
+
 // 新增：如果 materials 表格不存在 cover_image_path 字段，则添加它
 db.run("ALTER TABLE materials ADD COLUMN cover_image_path TEXT", (err) => {
   if (err && !err.message.includes("duplicate column name")) {
@@ -129,6 +143,17 @@ db.run("ALTER TABLE materials ADD COLUMN cover_image_path TEXT", (err) => {
     console.log("列 cover_image_path 已存在，跳过添加。");
   } else {
     console.log("列 cover_image_path 添加成功或已存在。");
+  }
+});
+
+// 新增：为 feedbacks 表添加 user_id 字段
+db.run("ALTER TABLE feedbacks ADD COLUMN user_id TEXT", (err) => {
+  if (err && !err.message.includes("duplicate column name")) {
+    console.error("添加 user_id 列失败:", err);
+  } else if (err && err.message.includes("duplicate column name")) {
+    console.log("列 user_id 已存在，跳过添加。");
+  } else {
+    console.log("列 user_id 添加成功或已存在。");
   }
 });
 
@@ -349,6 +374,102 @@ app.delete('/api/materials/:id', authenticateToken, async (req, res) => {
     console.error("处理删除请求失败:", error);
     res.status(500).json({ error: '删除失败，请检查服务器日志' });
   }
+});
+
+// 新增：接口7: 提交用户留言
+app.post('/api/feedback', (req, res) => {
+  const { message, user_id } = req.body;
+  if (!message) {
+    return res.status(400).json({ error: '留言内容不能为空' });
+  }
+  const sql = `INSERT INTO feedbacks (message, user_id) VALUES (?, ?)`;
+  db.run(sql, [message, user_id], function(err) {
+    if (err) {
+      console.error("保存留言失败:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(201).json({ message: '留言成功', id: this.lastID });
+  });
+});
+
+// 新增：接口8: 获取所有留言 (需要认证)
+app.get('/api/feedbacks', authenticateToken, (req, res) => {
+  const sql = "SELECT id, message, status, created_at FROM feedbacks ORDER BY created_at DESC";
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      console.error("获取留言失败:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ data: rows });
+  });
+});
+
+// 新增：接口9: 更新留言状态 (需要认证)
+app.put('/api/feedbacks/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // status 可以是 'pending' 或 'resolved'
+
+  if (!status || !['pending', 'resolved'].includes(status)) {
+    return res.status(400).json({ error: '无效的状态' });
+  }
+
+  const sql = `UPDATE feedbacks SET status = ? WHERE id = ?`;
+  db.run(sql, [status, id], function(err) {
+    if (err) {
+      console.error("更新留言状态失败:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ message: '未找到留言' });
+    }
+    res.json({ message: '留言状态更新成功' });
+  });
+});
+
+// 新增：接口10: 删除留言 (需要认证)
+app.delete('/api/feedbacks/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+
+  const sql = `DELETE FROM feedbacks WHERE id = ?`;
+  db.run(sql, [id], function(err) {
+    if (err) {
+      console.error("删除留言失败:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ message: '未找到留言' });
+    }
+    res.json({ message: '留言删除成功' });
+  });
+});
+
+// 新增：接口11: 获取未处理留言的数量 (需要认证)
+app.get('/api/feedbacks/pending/count', authenticateToken, (req, res) => {
+  const sql = "SELECT COUNT(*) as count FROM feedbacks WHERE status = 'pending'";
+  db.get(sql, [], (err, row) => {
+    if (err) {
+      console.error("获取未处理留言数量失败:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ count: row.count });
+  });
+});
+
+// 新增：接口12: 根据 user_id 获取用户的留言列表
+app.get('/api/feedbacks/user/:userId', (req, res) => {
+  const { userId } = req.params;
+  if (!userId) {
+    return res.status(400).json({ error: '用户ID不能为空' });
+  }
+
+  const sql = "SELECT id, message, status, created_at FROM feedbacks WHERE user_id = ? ORDER BY created_at DESC";
+  db.all(sql, [userId], (err, rows) => {
+    if (err) {
+      console.error("获取用户留言失败:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ data: rows });
+  });
 });
 
 // 新增接口6: 验证令牌的有效性
