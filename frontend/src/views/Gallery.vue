@@ -161,7 +161,7 @@ onUnmounted(() => {
         class="grid-item"
         @click="showMedia(material)" 
       >
-        <img v-if="material.media_type === 'image'" :src="material.file_path" :alt="material.name" loading="lazy" >
+        <img v-if="material.media_type === 'image'" :src="material.thumbnail_url || material.file_path" :alt="material.name" loading="lazy" >
         <video v-else-if="material.media_type === 'video'" :src="material.file_path" muted loop playsinline></video>
         <p>{{ material.name }}</p>
         <div v-if="material.media_type === 'video'" class="media-icon">▶</div>

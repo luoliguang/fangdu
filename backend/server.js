@@ -214,10 +214,20 @@ app.get('/api/materials', (req, res) => {
           if (err) {
               return res.status(500).json({ "error": err.message });
           }
+          // --- 新增: 为图片类型素材生成缩略图URL ---
+          const processedRows = rows.map(row => {
+            if (row.media_type === 'image') {
+                // 假设原始URL是这样的: https://your-bucket.oss-cn-hangzhou.aliyuncs.com/images/some-image.jpg
+                // 缩略图URL将是: https://your-bucket.oss-cn-hangzhou.aliyuncs.com/images/some-image.jpg?x-oss-process=image/resize,w_200
+                const thumbnailUrl = `${row.file_path}?x-oss-process=image/resize,w_200`;
+                return { ...row, thumbnail_url: thumbnailUrl };
+            }
+            return row;
+          });
           // 5. 返回包含分页信息的数据结构
           res.json({
               message: "success",
-              data: rows,
+              data: processedRows, // <--- 使用处理后的数据
               meta: {
                   total: total,
                   page: page,
@@ -233,6 +243,8 @@ app.get('/api/materials', (req, res) => {
 app.post('/api/materials', authenticateToken, upload.single('imageFile'), async (req, res) => {
   try {
     const { name, tags } = req.body;
+    // --- 新增：标签处理逻辑 ---
+    console.log(`[日志] 原始标签 (上传): ${req.body.tags}`); // 添加日志
     // --- 新增：标签处理逻辑 ---
     const formattedTags = req.body.tags
         .trim() // 1. 去掉首尾空格
@@ -267,7 +279,7 @@ app.post('/api/materials', authenticateToken, upload.single('imageFile'), async 
 
     // 将这个安全的HTTPS地址存入数据库
     const sql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
-    const params = [name, fileUrl, tags, mediaType];
+    const params = [name, fileUrl, formattedTags, mediaType];
 
     db.run(sql, params, function(err) {
         if (err) {
@@ -341,7 +353,7 @@ app.post('/api/auth/validate', (req, res) => {
 app.put('/api/materials/:id', authenticateToken, (req, res) => {
   const id = req.params.id;
   const { name } = req.body;
-
+  console.log(`[日志] 原始标签 (上传): ${req.body.tags}`); // 添加日志
 // --- 新增：标签处理逻辑 (与上传接口完全相同) ---
     const formattedTags = req.body.tags
     .trim()
