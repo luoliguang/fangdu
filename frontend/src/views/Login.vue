@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../axiosConfig.js'; // 1. 引入我们的axios实例
+import FloatingLabelInput from '../components/FloatingLabelInput.vue'; // 引入 FloatingLabelInput 组件
 
 const tokenInput = ref('');
 const error = ref('');
@@ -40,13 +41,14 @@ const handleLogin = async () => {
   <div class="login-container">
   <h2>请止步，非管理员勿入</h2>
   <form @submit.prevent="handleLogin">
-    <input 
-      type="password" 
-      v-model="tokenInput" 
-      placeholder="请输入密码，访客不要到这里来哦"
+    <FloatingLabelInput
+      v-model="tokenInput"
+      label="请输入密码，访客不要到这里来哦"
+      type="password"
       :disabled="isLoading"
-    >
-    <button type="submit" :disabled="isLoading">
+      :hasError="!!error"
+    />
+    <button type="submit" :disabled="isLoading" class="login-button">
       {{ isLoading ? '验证中...' : '进入' }}
     </button>
     <p v-if="error" class="error">{{ error }}</p>
@@ -55,7 +57,10 @@ const handleLogin = async () => {
 </template>
 <style scoped>
 .login-container { max-width: 400px; margin: 5rem auto; padding: 2rem; background: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; }
-input { width: 90%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; }
-button { width: 95%; padding: 0.8rem; background-color: #42b983; color: white; border: none; cursor: pointer; border-radius: 4px; }
+/* 移除原来的input样式，因为现在使用组件内部的样式 */
+/* input { width: 90%; padding: 0.8rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; } */
+.login-button { width: 95%; padding: 0.8rem; background-color: #42b983; color: white; border: none; cursor: pointer; border-radius: 4px; }
+.login-button:hover:not(:disabled) { background-color: #36a374; }
+.login-button:disabled { opacity: 0.7; cursor: not-allowed; }
 .error { color: red; margin-top: 1rem; }
 </style>

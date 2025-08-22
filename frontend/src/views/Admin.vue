@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted,computed  } from 'vue'; // 引入 reactive
 import apiClient from '../axiosConfig.js';
 import { useToast } from 'vue-toastification'; // 1. 引入 useToast
+import FloatingLabelInput from '../components/FloatingLabelInput.vue'; // 引入 FloatingLabelInput 组件
 
 const toast = useToast(); // 2. 获取 toast 实例
 
@@ -162,20 +163,18 @@ onMounted(fetchMaterials);
         </label>
         
         <div class="form-grid">
-          <input 
-            type="text" 
+          <FloatingLabelInput 
             v-model="newMaterial.name" 
-            placeholder="素材名称"
-            :class="{ 'has-error': errors.name }"
+            label="素材名称"
+            :hasError="errors.name"
             @input="errors.name = false"
-          >
-          <input 
-            type="text" 
+          />
+          <FloatingLabelInput 
             v-model="newMaterial.tags" 
-            placeholder="标签,用空格或逗号隔开"
-            :class="{ 'has-error': errors.tags }"
+            label="标签,用空格或逗号隔开"
+            :hasError="errors.tags"
             @input="errors.tags = false"
-          >
+          />
         </div>
 
         <div v-if="isLoading" class="progress-bar-container">
@@ -201,13 +200,37 @@ onMounted(fetchMaterials);
         </thead>
         <tbody>
           <tr v-for="material in materials" :key="material.id">
-            <td><img :src="material.file_path" class="preview-img"></td>
             <td>
-              <input v-if="editingMaterial && editingMaterial.id === material.id" v-model="editingMaterial.name">
+              <img 
+                v-if="material.media_type === 'image'" 
+                :src="material.file_path" 
+                :alt="material.name" 
+                class="preview-img">
+              <img 
+                v-else-if="material.media_type === 'video' && material.cover_image_path"
+                :src="material.cover_image_path"
+                :alt="material.name + ' 封面'"
+                class="preview-img">
+              <div 
+                v-else-if="material.media_type === 'video' && !material.cover_image_path"
+                class="preview-img-placeholder">
+                ▶
+              </div>
+            </td>
+            <td>
+              <FloatingLabelInput 
+                v-if="editingMaterial && editingMaterial.id === material.id" 
+                v-model="editingMaterial.name"
+                label="名称" 
+              />
               <span v-else>{{ material.name }}</span>
             </td>
             <td>
-              <input v-if="editingMaterial && editingMaterial.id === material.id" v-model="editingMaterial.tags">
+              <FloatingLabelInput 
+                v-if="editingMaterial && editingMaterial.id === material.id" 
+                v-model="editingMaterial.tags"
+                label="标签" 
+              />
               <span v-else>{{ material.tags }}</span>
             </td>
             <td>
@@ -280,13 +303,14 @@ button { cursor: pointer; border: none; padding: 0.5rem 1rem; border-radius: 4px
   gap: 1.5rem;
   margin-bottom: 1.5rem;
 }
-.form-grid input {
-  width: 100%;
-  padding: 0.8rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-}
+/* 移除旧的form-grid input 样式，因为FloatingLabelInput有自己的样式 */
+/* .form-grid input { 
+  width: 100%; 
+  padding: 0.8rem; 
+  border: 1px solid #ccc; 
+  border-radius: 4px; 
+  box-sizing: border-box; 
+} */
 
 .progress-bar-container {
   width: 100%;

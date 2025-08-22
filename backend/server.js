@@ -50,7 +50,8 @@ const db = new sqlite3.Database(dbPath, (err) => { // <--- 关键修改2：使�
         name TEXT NOT NULL,
         file_path TEXT NOT NULL,
         tags TEXT,
-        media_type TEXT NOT NULL
+        media_type TEXT NOT NULL,
+        cover_image_path TEXT 
     )`, (err) => {
         if (err) {
             console.error("创建表格失败:", err);
@@ -117,6 +118,18 @@ const db = new sqlite3.Database(dbPath, (err) => { // <--- 关键修改2：使�
       // }
 
     });
+});
+
+// 新增：如果 materials 表格不存在 cover_image_path 字段，则添加它
+db.run("ALTER TABLE materials ADD COLUMN cover_image_path TEXT", (err) => {
+  if (err && !err.message.includes("duplicate column name")) {
+    // 如果不是重复列名的错误，说明是其他错误
+    console.error("添加 cover_image_path 列失败:", err);
+  } else if (err && err.message.includes("duplicate column name")) {
+    console.log("列 cover_image_path 已存在，跳过添加。");
+  } else {
+    console.log("列 cover_image_path 添加成功或已存在。");
+  }
 });
 
 // 新增：配置 Multer 用于文件上传
@@ -209,20 +222,20 @@ app.get('/api/materials', (req, res) => {
       const total = row.total;
 
       // 4. 再查询分页后的数据
-      const dataSql = `SELECT * FROM materials` + whereClause + ` ORDER BY id DESC LIMIT ? OFFSET ?`;
+      const dataSql = `SELECT id, name, file_path, tags, media_type, cover_image_path FROM materials` + whereClause + ` ORDER BY id DESC LIMIT ? OFFSET ?`;
       db.all(dataSql, [...params, limit, offset], (err, rows) => {
           if (err) {
               return res.status(500).json({ "error": err.message });
           }
-          // --- 新增: 为图片类型素材生成缩略图URL ---
+          // --- 新增: 为图片类型素材生成缩略图URL，为视频素材使用封面图URL作为缩略图URL ---
           const processedRows = rows.map(row => {
+            let thumbnailUrl = null;
             if (row.media_type === 'image') {
-                // 假设原始URL是这样的: https://your-bucket.oss-cn-hangzhou.aliyuncs.com/images/some-image.jpg
-                // 缩略图URL将是: https://your-bucket.oss-cn-hangzhou.aliyuncs.com/images/some-image.jpg?x-oss-process=image/resize,w_200
-                const thumbnailUrl = `${row.file_path}?x-oss-process=image/resize,w_200`;
-                return { ...row, thumbnail_url: thumbnailUrl };
+                thumbnailUrl = `${row.file_path}?x-oss-process=image/resize,w_200`;
+            } else if (row.media_type === 'video' && row.cover_image_path) {
+                thumbnailUrl = row.cover_image_path;
             }
-            return row;
+            return { ...row, thumbnail_url: thumbnailUrl };
           });
           // 5. 返回包含分页信息的数据结构
           res.json({
@@ -277,9 +290,17 @@ app.post('/api/materials', authenticateToken, upload.single('imageFile'), async 
         fileUrl = fileUrl.replace('http://', 'https://');
       }
 
-    // 将这个安全的HTTPS地址存入数据库
-    const sql = `INSERT INTO materials (name, file_path, tags, media_type) VALUES (?, ?, ?, ?)`;
-    const params = [name, fileUrl, formattedTags, mediaType];
+    let coverImageUrl = null; // 初始化封面图URL
+    if (mediaType === 'video') {
+        // 使用 OSS 视频截帧功能生成封面图URL
+        // 例如：在视频第 1 秒截取一帧，输出 JPG 格式，宽高自适应
+        coverImageUrl = `${fileUrl}?x-oss-process=video/snapshot,t_1000,f_jpg,w_0,h_0,m_fast`;
+        console.log(`[${new Date().toISOString()}] - [日志] 生成视频封面URL: ${coverImageUrl}`);
+    }
+
+    // 将这个安全的HTTPS地址和封面图地址存入数据库
+    const sql = `INSERT INTO materials (name, file_path, tags, media_type, cover_image_path) VALUES (?, ?, ?, ?, ?)`;
+    const params = [name, fileUrl, formattedTags, mediaType, coverImageUrl];
 
     db.run(sql, params, function(err) {
         if (err) {
