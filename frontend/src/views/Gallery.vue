@@ -938,4 +938,9 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   transform: none !important; /* 移除悬浮时的上移效果 */
 }
 
+/* 导航栏活跃状态按钮样式
+a.router-link-active.router-link-exact-active{
+  background-color: #20a94e;
+} */
+
 </style>
