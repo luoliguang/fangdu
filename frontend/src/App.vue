@@ -1,12 +1,13 @@
 <script setup>
 import { ref, onMounted, onUnmounted,watch,nextTick  } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter  } from 'vue-router';
 
 
 // --- 新增：导航栏滑动效果的逻辑 ---
 const navSlider = ref(null); // 滑块元素的引用
 const mainNav = ref(null);  // 导航容器的引用
 const route = useRoute();   // 获取当前路由信息
+const router = useRouter(); //获取 router 实例
 
 // --- “返回顶部”按钮的逻辑 ---
 // 1. 创建一个 ref 来控制按钮的显示和隐藏
@@ -54,10 +55,13 @@ const updateSlider = async () => {
 };
 
 // --- 生命周期钩子 ---
-onMounted(() => {
+onMounted(async () => { // 将 onMounted 变为 async 函数
   window.addEventListener('scroll', handleScroll);
-  window.addEventListener('resize', updateSlider); // 监听窗口大小变化
-  updateSlider(); // 初始加载时定位滑块
+  window.addEventListener('resize', updateSlider);
+  
+  // 等待路由准备就绪
+  await router.isReady();
+  updateSlider(); // 现在再执行，就能确保找到激活的链接了
 });
 
 onUnmounted(() => {
