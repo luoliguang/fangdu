@@ -20,6 +20,15 @@ const tags = ref([]);
 const activeTag = ref('');
 const isLoading = ref(false); // 初始为 false
 let debounceTimer = null;
+const isTagsExpanded = ref(false); //控制标签面板是否展开
+const visibleTags = computed(() => {
+  //如果是展开状态，或者标签总数小于等于20个，则全部显示
+  if (isTagsExpanded.value || tags.value.length <= 20){
+    return tags.value;
+  }
+  //否则只显示前20个
+  return tags.value.slice(0,20)
+})
 
 // --- 分页与无限滚动状态 ---
 const currentPage = ref(1);
@@ -231,16 +240,30 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   </header>
 
   <main>
-    <div class="tags-container">
-      <button @click="filterByTag('')" :class="{ active: activeTag === '' }">全部</button>
-      <button
-        v-for="tag in tags"
-        :key="tag"
-        @click="filterByTag(tag)"
-        :class="{ active: tag === activeTag }"
-      >
-        {{ tag }}
-      </button>
+    <div class="tags-container" :class="{ 'tags-expanded': isTagsExpanded }">
+      <TransitionGroup name="tag-list">
+        <button @click="filterByTag('')" :class="{ active: activeTag === '' }" key="all-btn">
+          全部
+        </button>
+        
+        <button
+          v-for="tag in visibleTags" 
+          :key="tag"
+          @click="filterByTag(tag)"
+          :class="{ active: tag === activeTag }"
+        >
+          {{ tag }}
+        </button>
+
+        <button 
+          v-if="tags.length > 20" 
+          @click="isTagsExpanded = !isTagsExpanded" 
+          class="tags-toggle-btn"
+          key="toggle-btn"
+        >
+          {{ isTagsExpanded ? '收起' : '展开更多' }}
+        </button>
+      </TransitionGroup>
     </div>
 
     <TransitionGroup name="gallery" tag="div" class="grid-container">
@@ -396,7 +419,53 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   transform: translateY(-2px); /* 略微上浮效果 */
 }
   
-.tags-container { margin-bottom: 2rem; text-align: center; padding: 1rem 0; background-color: #f5f5f5; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+.tags-container { 
+  margin-bottom: 2rem; 
+  text-align: center; padding: 1rem 0; 
+  background-color: #f5f5f5; 
+  border-radius: 12px; 
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
+      /* 关键：允许标签按钮自动换行 */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* 让换行后的标签也保持居中 */
+  /* 默认最多显示两行的高度，可以根据按钮大小微调 */
+  max-height: 110px; 
+  overflow: hidden;
+  transition: max-height 0.4s ease-in-out;
+}
+.tags-container.tags-expanded {
+  /* 一个足够大的值，确保能容纳所有标签 */
+  max-height: 1000px; 
+}
+
+/* --- 新增：为 TransitionGroup 内的标签按钮添加过渡动画 --- */
+
+/* 1. 定义过渡期间的动画效果 */
+.tag-list-move,
+.tag-list-enter-active,
+.tag-list-leave-active {
+  transition: all 0.4s ease;
+}
+
+/* 2. 定义进入动画的开始状态和离开动画的结束状态 */
+.tag-list-enter-from,
+.tag-list-leave-to {
+  opacity: 0;
+  transform: translateY(10px); /* 从下方轻微上浮进入 */
+}
+
+/* 3. 确保离开的元素脱离布局流，防止布局抖动 */
+.tag-list-leave-active {
+  position: absolute;
+}
+
+/* 4. TransitionGroup 需要一个容器来计算动画，我们让它继承父级样式 */
+.tags-container > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 .tags-container button { 
   background-color: #e0e0e0; 
   border: none; /* 移除边框 */
@@ -509,23 +578,22 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   .hero-content {
     /* 为内容区增加左右内边距，防止搜索框紧贴边缘 */
     padding-left: 1rem;
-    padding-right: 1rem;
+    padding-right: 1rem; 
   }
+  /* --- 新增：为移动端调整标签容器的高度 --- */
+  .tags-container {
+  /* 在移动端，由于每行能显示的标签更少，我们需要一个更大的默认高度来容纳大约3-4行 */
+     max-height: 100px; 
+}
   
   .hero-title {
-    font-size: 2.5rem; /* 在小屏幕上适当缩小标题字号 */
+    font-size: 2rem; /* 在小屏幕上适当缩小标题字号 */
   }
 
   .hero-subtitle {
     font-size: 1.1rem;
   }
 
-  .tags-container {
-    /* 关键：允许标签按钮自动换行 */
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center; /* 让换行后的标签也保持居中 */
-  }
 
   .grid-container {
     /* 在手机上使用更少的列数，让图片更大更清晰 */
@@ -855,6 +923,19 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   .feedback-form button:hover {
     animation: gradient-animation 10s ease infinite; /* 确保移动端按钮 hover 动画 */
   }
+}
+
+/* 新增标签切换按钮的样式 */
+.tags-toggle-btn {
+  background-color: transparent !important; /* !important 覆盖原有样式 */
+  color: #8a2be2 !important; /* 紫色主题色 */
+  font-weight: bold !important;
+  box-shadow: none !important;
+}
+
+.tags-toggle-btn:hover {
+  background-color: #f0e6fa !important; /* 悬浮时淡紫色背景 */
+  transform: none !important; /* 移除悬浮时的上移效果 */
 }
 
 </style>

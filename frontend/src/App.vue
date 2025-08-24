@@ -41,6 +41,7 @@ onUnmounted(() => {
   <div id="app">
     <nav class="main-nav">
       <router-link to="/">素材库</router-link>
+      <a href="https://fangdutex.cn/welcome" target="_blank">方度知识库</a>
       <router-link to="/admin">后台管理</router-link>
     </nav>
     <main>
@@ -80,7 +81,7 @@ onUnmounted(() => {
     padding: 0.5rem;
     border-radius: 4px;
   }
-  .main-nav a.router-link-exact-active {
+  .main-nav a.-link-exact-activerouter {
     background-color: #42b983;
   }
 
