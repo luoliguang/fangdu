@@ -274,14 +274,12 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
         @click="showMedia(material)" 
       >
         <img v-if="material.media_type === 'image'" :src="material.thumbnail_url || material.file_path" :alt="material.name" loading="lazy" >
-        <video 
-          v-else-if="material.media_type === 'video'" 
-          :src="material.file_path" 
-          :poster="material.cover_image_path || ''" 
-          muted 
-          loop 
-          playsinline>
-        </video>
+        <img 
+            v-else-if="material.media_type === 'video'"
+            :src="material.cover_image_path || material.thumbnail_url" 
+            :alt="material.name + ' 封面'"
+            loading="lazy"
+        >
         <p>{{ material.name }}</p>
         <div v-if="material.media_type === 'video'" class="media-icon">▶</div>
       </div>
