@@ -4,7 +4,7 @@
 
 Material Hub 是一个为服饰行业或任何需要管理视觉素材的创意工作者设计的、私有化部署的多媒体资产管理系统。它提供了一个美观、高效的界面来上传、搜索、筛选和预览图片及视频素材。
 
-![Material Hub预览图](/project-images/image.png)
+![Material Hub预览图](/project-images/image%20copy.png)
 
 ## ✨ 核心功能
 
