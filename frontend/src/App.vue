@@ -79,6 +79,7 @@ watch(() => route.path, updateSlider);
     <nav class="main-nav" ref="mainNav">
       <div class="nav-slider" ref="navSlider"></div>
       <router-link to="/">素材库</router-link>
+      <a href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank">面料细节</a>
       <a href="https://fangdutex.cn/welcome" target="_blank">📚方度知识库</a>
       <router-link to="/admin">后台管理</router-link>
     </nav>
