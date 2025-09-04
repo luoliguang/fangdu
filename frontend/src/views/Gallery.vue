@@ -3,6 +3,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import apiClient from '../axiosConfig.js';
 import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
+import TutorialGuide from '../components/TutorialGuide.vue';
+import tutorialManager from '../utils/tutorialManager.js';
 
 // 简单的 UUID 生成函数
 function generateUUID() {
@@ -45,6 +47,11 @@ const currentVideoUrl = ref('');
 const feedbackMessage = ref(''); // 新增：用户留言内容
 const showFeedbackForm = ref(false); // 新增：控制留言表单的显示
 const isWidgetHovered = ref(false); // 新增：控制留言时间线小部件的悬停状态
+
+// --- 教程相关状态 ---
+const showTutorial = ref(false); // 控制教程显示
+const tutorialTarget = ref('.search-input-cool'); // 教程聚焦目标
+const tutorialGuideRef = ref(null); // 教程组件引用
 
 const imageSources = computed(() =>
     materials.value
@@ -204,6 +211,7 @@ onMounted(() => {
     fetchTags();
     setupObserver();
     fetchUserFeedbacks(); // 页面加载时获取用户留言
+    initTutorial(); // 初始化教程
 });
 
 onUnmounted(() => {
@@ -221,6 +229,75 @@ const handleWidgetMouseEnter = () => {
 const handleWidgetMouseLeave = () => {
   isWidgetHovered.value = false;
 };
+
+// --- 教程相关函数 ---
+// 初始化教程
+const initTutorial = () => {
+  // 只在桌面端且首次访问时显示教程
+  if (tutorialManager.isDesktop() && tutorialManager.isFirstVisit()) {
+    // 延迟显示教程，确保页面完全加载
+    setTimeout(() => {
+      showTutorial.value = true;
+    }, 1000);
+  }
+};
+
+// 关闭教程
+const closeTutorial = () => {
+  showTutorial.value = false;
+  tutorialManager.markTutorialCompleted('cancelled');
+};
+
+// 跳过教程
+const skipTutorial = () => {
+  showTutorial.value = false;
+  tutorialManager.markTutorialCompleted('skipped');
+};
+
+// 完成教程
+const completeTutorial = () => {
+  showTutorial.value = false;
+  tutorialManager.markTutorialCompleted('completed');
+  // 可以添加一些引导用户开始搜索的逻辑
+  // 例如：聚焦搜索框
+  setTimeout(() => {
+    const searchInput = document.querySelector('.search-input-cool');
+    if (searchInput) {
+      searchInput.focus();
+    }
+  }, 300);
+};
+
+// 处理教程下一步事件
+const handleTutorialNextStep = (step) => {
+  console.log('教程进入步骤:', step);
+  // 在第二步时，可以添加一些额外的引导效果
+  if (step === 1) {
+    // 例如：轻微晃动搜索框来吸引注意
+    const searchInput = document.querySelector('.search-input-cool');
+    if (searchInput) {
+      searchInput.style.animation = 'gentle-shake 0.5s ease-in-out 3';
+      setTimeout(() => {
+        searchInput.style.animation = '';
+      }, 1500);
+    }
+  }
+};
+
+// 重置教程（用于测试，可以在控制台调用）
+const resetTutorial = () => {
+  tutorialManager.resetTutorial();
+  // 重置教程组件的步骤
+  if (tutorialGuideRef.value) {
+    tutorialGuideRef.value.resetStep();
+  }
+  console.log('教程状态已重置，刷新页面可重新显示教程');
+};
+
+// 将重置函数暴露到全局，方便测试
+if (typeof window !== 'undefined') {
+  window.resetTutorial = resetTutorial;
+}
 
 // 监听 materials 变化，在没有搜索结果时显示留言表单
 watch(materials, (newVal) => {
@@ -303,6 +380,17 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
     <div ref="observerEl" class="observer"></div>
 
   </main>
+
+  <!-- 教程引导组件 -->
+  <TutorialGuide
+    ref="tutorialGuideRef"
+    :visible="showTutorial"
+    :target-element="tutorialTarget"
+    @close="closeTutorial"
+    @skip="skipTutorial"
+    @complete="completeTutorial"
+    @next-step="handleTutorialNextStep"
+  />
 
   <vue-easy-lightbox
     :visible="lightboxVisible"
@@ -1035,5 +1123,18 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
 a.router-link-active.router-link-exact-active{
   background-color: #20a94e;
 } */
+
+/* 搜索框引导动画 */
+@keyframes gentle-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
 
 </style>
