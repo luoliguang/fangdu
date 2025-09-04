@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted,watch,nextTick  } from 'vue';
+import { ref, onMounted, onUnmounted,watch,nextTick, computed  } from 'vue';
 import { useRoute, useRouter  } from 'vue-router';
 
 
@@ -8,6 +8,17 @@ const navSlider = ref(null); // 滑块元素的引用
 const mainNav = ref(null);  // 导航容器的引用
 const route = useRoute();   // 获取当前路由信息
 const router = useRouter(); //获取 router 实例
+
+// 登录状态管理
+const loginState = ref(!!localStorage.getItem('authToken'));
+const isLoggedIn = computed(() => loginState.value);
+
+// 监听localStorage变化
+const updateLoginState = () => {
+  loginState.value = !!localStorage.getItem('authToken');
+};
+
+
 
 // --- “返回顶部”按钮的逻辑 ---
 // 1. 创建一个 ref 来控制按钮的显示和隐藏
@@ -68,6 +79,10 @@ const updateSlider = async () => {
     // 更新滑块的样式
     navSlider.value.style.width = `${offsetWidth}px`;
     navSlider.value.style.transform = `translateX(${offsetLeft}px)`;
+    navSlider.value.style.opacity = '1'; // 显示滑块
+  } else {
+    // 如果没有找到激活链接（比如在/login页面），隐藏滑块
+    navSlider.value.style.opacity = '0';
   }
 };
 
@@ -75,6 +90,10 @@ const updateSlider = async () => {
 onMounted(async () => { // 将 onMounted 变为 async 函数
   window.addEventListener('scroll', handleScroll);
   window.addEventListener('resize', updateSlider);
+  window.addEventListener('storage', updateLoginState); // 监听localStorage变化
+  
+  // 初始化登录状态
+  updateLoginState();
   
   // 等待路由准备就绪
   await router.isReady();
@@ -84,6 +103,7 @@ onMounted(async () => { // 将 onMounted 变为 async 函数
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll);
   window.removeEventListener('resize', updateSlider); // 移除监听
+  window.removeEventListener('storage', updateLoginState); // 移除storage监听
 });
 
 // 监听路由变化，当页面切换时，更新滑块位置
@@ -111,7 +131,12 @@ const handleNavClick = (event) => {
       <router-link to="/" @click="handleNavClick">素材库</router-link>
       <a href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank">面料细节</a>
       <a href="https://fangdutex.cn/welcome" target="_blank">📚方度知识库</a>
-      <router-link to="/admin" @click="handleNavClick">后台管理</router-link>
+      <!-- 未登录时显示登录链接 -->
+      <router-link v-if="!isLoggedIn" to="/login" @click="handleNavClick">登录</router-link>
+      <!-- 已登录时显示后台管理 -->
+      <template v-else>
+        <router-link to="/admin" @click="handleNavClick">后台管理</router-link>
+      </template>
     </nav>
     <main>
       <router-view></router-view>
@@ -151,8 +176,9 @@ const handleNavClick = (event) => {
     height: calc(100% - 1rem); /* 高度留出上下边距 */
     background-color: #42b983; /* 这是我们的"滑块"颜色 */
     border-radius: 4px;
-    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* 平滑过渡动画 */
+    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease; /* 添加opacity过渡动画 */
     z-index: 1; /* 置于底层 */
+    opacity: 1; /* 默认显示 */
   }
   .main-nav a {
     color: #fff;
@@ -164,7 +190,9 @@ const handleNavClick = (event) => {
     position: relative; /* 3. 链接设为相对定位 */
     z-index: 2; /* 置于上层，确保可点击 */
     transition: color 0.4s ease; /* 文字颜色也添加过渡效果 */
+    cursor: pointer; /* 确保退出登录链接有手型光标 */
   }
+
   /* 移除旧的激活样式，因为现在由滑块负责背景 */
   .main-nav a.router-link-exact-active {
     color: #fff; /* 确保激活时文字颜色不变或更突出 */

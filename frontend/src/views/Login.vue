@@ -25,6 +25,12 @@ const handleLogin = async () => {
     
     // 5. 如果上面的请求成功 (没有抛出错误)，说明令牌正确
     localStorage.setItem('authToken', tokenInput.value);
+    // 触发storage事件通知其他组件更新登录状态
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'authToken',
+      newValue: tokenInput.value,
+      storageArea: localStorage
+    }));
     router.push('/admin'); // 跳转到后台
 
   } catch (err) {

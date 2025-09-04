@@ -151,22 +151,54 @@ const updatePositions = () => {
   // 卡片位置 - 居中显示，但避开搜索框区域
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
-  const cardWidth = 400; // 预估卡片宽度
-  const cardHeight = 350; // 预估卡片高度
+  const cardWidth = 500; // 实际卡片宽度
+  const cardHeight = 420; // 实际卡片高度
   
   // 计算居中位置
   let cardLeft = (viewportWidth - cardWidth) / 2;
   let cardTop = (viewportHeight - cardHeight) / 2;
   
-  // 如果卡片会与搜索框重叠，则调整位置
-  const searchBoxBottom = rect.bottom + 20;
-  if (cardTop < searchBoxBottom && cardTop + cardHeight > rect.top - 20) {
-    // 如果有足够空间，放在搜索框下方
-    if (viewportHeight - searchBoxBottom > cardHeight + 40) {
+  // 搜索框区域边界
+  const searchBoxTop = rect.top - 30;
+  const searchBoxBottom = rect.bottom + 30;
+  const searchBoxLeft = rect.left - 30;
+  const searchBoxRight = rect.right + 30;
+  
+  // 检查卡片是否与搜索框重叠
+  const cardRight = cardLeft + cardWidth;
+  const cardBottom = cardTop + cardHeight;
+  
+  const isOverlapping = (
+    cardLeft < searchBoxRight &&
+    cardRight > searchBoxLeft &&
+    cardTop < searchBoxBottom &&
+    cardBottom > searchBoxTop
+  );
+  
+  if (isOverlapping) {
+    // 优先尝试放在搜索框下方
+    const spaceBelow = viewportHeight - searchBoxBottom;
+    const spaceAbove = searchBoxTop;
+    const spaceLeft = searchBoxLeft;
+    const spaceRight = viewportWidth - searchBoxRight;
+    
+    if (spaceBelow >= cardHeight + 40) {
+      // 放在搜索框下方
       cardTop = searchBoxBottom + 20;
+    } else if (spaceAbove >= cardHeight + 40) {
+      // 放在搜索框上方
+      cardTop = searchBoxTop - cardHeight - 20;
+    } else if (spaceRight >= cardWidth + 40) {
+      // 放在搜索框右侧
+      cardLeft = searchBoxRight + 20;
+      cardTop = Math.max(20, Math.min(cardTop, viewportHeight - cardHeight - 20));
+    } else if (spaceLeft >= cardWidth + 40) {
+      // 放在搜索框左侧
+      cardLeft = searchBoxLeft - cardWidth - 20;
+      cardTop = Math.max(20, Math.min(cardTop, viewportHeight - cardHeight - 20));
     } else {
-      // 否则放在搜索框上方
-      cardTop = Math.max(20, rect.top - cardHeight - 20);
+      // 如果空间都不够，强制放在下方并调整高度
+      cardTop = Math.min(searchBoxBottom + 20, viewportHeight - cardHeight - 20);
     }
   }
   
@@ -235,12 +267,19 @@ onUnmounted(() => {
 // 监听visible变化
 watch(() => props.visible, (newVisible) => {
   if (newVisible) {
+    // 多次延迟更新确保位置准确
+    setTimeout(() => {
+      updatePositions();
+    }, 100);
+    setTimeout(() => {
+      updatePositions();
+    }, 300);
     setTimeout(() => {
       updatePositions();
       window.addEventListener('resize', updatePositions);
       // 防止页面滚动
       document.body.style.overflow = 'hidden';
-    }, 100); // 延迟更新位置确保DOM渲染完成
+    }, 500);
   } else {
     window.removeEventListener('resize', updatePositions);
     // 恢复页面滚动

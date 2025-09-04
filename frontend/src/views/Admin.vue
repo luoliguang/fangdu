@@ -5,6 +5,7 @@ import apiClient from '../axiosConfig.js';
 
 const router = useRouter();
 const pendingFeedbacksCount = ref(0);
+const showLogoutConfirm = ref(false);
 
 // --- 获取未处理留言数量 ---
 const fetchPendingFeedbacksCount = async () => {
@@ -22,6 +23,29 @@ const fetchPendingFeedbacksCount = async () => {
 // 导航到指定路由
 const navigateTo = (routeName) => {
   router.push({ name: routeName });
+};
+
+// 显示退出登录确认对话框
+const showLogoutDialog = () => {
+  showLogoutConfirm.value = true;
+};
+
+// 确认退出登录
+const confirmLogout = () => {
+  localStorage.removeItem('authToken');
+  // 触发storage事件通知其他组件更新登录状态
+  window.dispatchEvent(new StorageEvent('storage', {
+    key: 'authToken',
+    newValue: null,
+    storageArea: localStorage
+  }));
+  router.push('/');
+  showLogoutConfirm.value = false;
+};
+
+// 取消退出登录
+const cancelLogout = () => {
+  showLogoutConfirm.value = false;
 };
 
 onMounted(() => {
@@ -76,11 +100,36 @@ onMounted(() => {
           <span v-if="pendingFeedbacksCount > 0" class="badge">{{ pendingFeedbacksCount }}</span>
         </div>
       </div>
+      
+      <!-- 退出登录按钮 -->
+      <div class="sidebar-footer">
+        <div class="nav-item logout-item" @click="showLogoutDialog">
+          <span class="nav-hover-effect"></span>
+          <i class="nav-icon">🚪</i>
+          <span class="nav-text">退出登录</span>
+        </div>
+      </div>
     </div>
     
     <!-- 内容区域 -->
     <div class="content-area">
       <router-view></router-view>
+    </div>
+    
+    <!-- 退出登录确认对话框 -->
+    <div v-if="showLogoutConfirm" class="logout-overlay" @click="cancelLogout">
+      <div class="logout-dialog" @click.stop>
+        <div class="dialog-header">
+          <h3>确认退出</h3>
+        </div>
+        <div class="dialog-content">
+          <p>您确定要退出管理后台吗？</p>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn-cancel" @click="cancelLogout">取消</button>
+          <button class="btn-confirm" @click="confirmLogout">确认退出</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -125,6 +174,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   padding: 1rem 0;
+  flex: 1;
 }
 
 .nav-item {
@@ -303,5 +353,104 @@ onMounted(() => {
   .content-area {
     padding: 0.75rem;
   }
+}
+
+/* 侧边栏底部样式 */
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 退出登录按钮样式 */
+.logout-item {
+  color: #ff6b6b !important;
+}
+
+.logout-item:hover {
+  background: rgba(255, 107, 107, 0.1) !important;
+}
+
+.logout-item .nav-hover-effect {
+  background: #ff6b6b !important;
+}
+
+/* 确认对话框样式 */
+.logout-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.logout-dialog {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  min-width: 320px;
+  max-width: 400px;
+  overflow: hidden;
+}
+
+.dialog-header {
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.dialog-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #333;
+}
+
+.dialog-content {
+  padding: 1.5rem;
+}
+
+.dialog-content p {
+  margin: 0;
+  color: #666;
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  padding: 1rem 1.5rem 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.btn-cancel,
+.btn-confirm {
+  padding: 0.5rem 1.2rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.btn-cancel:hover {
+  background: #e0e0e0;
+}
+
+.btn-confirm {
+  background: #ff6b6b;
+  color: white;
+}
+
+.btn-confirm:hover {
+  background: #ff5252;
 }
 </style>
