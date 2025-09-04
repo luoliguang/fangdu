@@ -223,28 +223,85 @@ onMounted(() => {
   .admin-container {
     flex-direction: column;
     height: auto;
-    padding: 0 1rem;
-    margin: 1rem auto;
+    padding: 0 0.5rem;
+    margin: 0.5rem auto;
+    gap: 1rem;
   }
   
   .sidebar {
     width: 100%;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0;
+  }
+  
+  .sidebar-header {
+    padding: 1rem;
+  }
+  
+  .sidebar-header h2 {
+    font-size: 1.3rem;
   }
   
   .sidebar-nav {
     flex-direction: row;
     overflow-x: auto;
     padding: 0.5rem 0;
+    scrollbar-width: thin;
+  }
+  
+  .sidebar-nav::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  .sidebar-nav::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
   }
   
   .nav-item {
     padding: 0.75rem 1rem;
     white-space: nowrap;
+    min-width: fit-content;
+  }
+  
+  .nav-icon {
+    margin-right: 0.5rem;
+    font-size: 1rem;
+  }
+  
+  .nav-text {
+    font-size: 0.9rem;
   }
   
   .content-area {
-    padding-right: 0;
+    padding: 1rem;
+    min-height: 400px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-container {
+    padding: 0 0.25rem;
+    margin: 0.25rem auto;
+  }
+  
+  .sidebar-header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .nav-item {
+    padding: 0.6rem 0.8rem;
+  }
+  
+  .nav-text {
+    font-size: 0.85rem;
+  }
+  
+  .content-area {
+    padding: 0.75rem;
   }
 }
 </style>

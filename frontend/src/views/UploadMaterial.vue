@@ -413,16 +413,64 @@ input[type="text"]:focus {
 }
 
 @media (max-width: 768px) {
+  .card {
+    padding: 1.5rem;
+  }
+  
+  .card h2 {
+    font-size: 1.5rem;
+  }
+  
   .form-grid {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
   
   .upload-drop-zone {
     min-height: 150px;
+    padding: 1.5rem;
+  }
+  
+  .upload-icon {
+    font-size: 2rem;
   }
   
   .btn-submit {
     width: 100%;
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 1rem;
+  }
+  
+  .card h2 {
+    font-size: 1.3rem;
+  }
+  
+  .form-grid {
+    gap: 0.8rem;
+  }
+  
+  .upload-drop-zone {
+    min-height: 120px;
+    padding: 1rem;
+  }
+  
+  .upload-icon {
+    font-size: 1.8rem;
+  }
+  
+  input[type="text"] {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+  }
+  
+  .btn-submit {
+    padding: 0.8rem;
+    font-size: 0.9rem;
   }
 }
 </style>

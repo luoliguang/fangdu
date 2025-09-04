@@ -208,4 +208,54 @@ const handleNavClick = (event) => {
   .fade-leave-to {
     opacity: 0;
   }
+
+  /* --- 移动端适配样式 --- */
+  @media (max-width: 768px) {
+    .main-nav {
+      padding: 0.8rem 1rem;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    .main-nav a {
+      font-size: 0.9rem;
+      padding: 0.4rem 0.8rem;
+      white-space: nowrap;
+    }
+    
+    .nav-slider {
+      display: none; /* 在移动端隐藏滑块，避免布局复杂 */
+    }
+    
+    .scroll-to-top-btn {
+      bottom: 20px;
+      right: 20px;
+      width: 45px;
+      height: 45px;
+      font-size: 20px;
+      line-height: 45px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .main-nav {
+      padding: 0.6rem 0.8rem;
+      gap: 0.5rem;
+    }
+    
+    .main-nav a {
+      font-size: 0.8rem;
+      padding: 0.3rem 0.6rem;
+    }
+    
+    .scroll-to-top-btn {
+      bottom: 15px;
+      right: 15px;
+      width: 40px;
+      height: 40px;
+      font-size: 18px;
+      line-height: 40px;
+    }
+  }
 </style>

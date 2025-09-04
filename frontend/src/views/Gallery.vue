@@ -863,6 +863,69 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
 }
 
 @media (max-width: 768px) {
+  /* 主要内容区域适配 */
+  main {
+    padding: 0.5rem;
+  }
+  
+  /* 英雄区域移动端适配 */
+  .hero-header {
+    padding: 2rem 1rem;
+  }
+  
+  .hero-title {
+    font-size: 2.5rem;
+    letter-spacing: 1px;
+  }
+  
+  .hero-subtitle {
+    font-size: 1.1rem;
+    margin: 0.8rem 0 2rem 0;
+  }
+  
+  .search-input-cool {
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+  }
+  
+  /* 标签容器移动端适配 */
+  .tags-container {
+    padding: 0.8rem 0;
+    margin-bottom: 1.5rem;
+  }
+  
+  .tags-container button {
+    padding: 0.5rem 1rem;
+    margin: 0.3rem;
+    font-size: 0.9rem;
+  }
+  
+  /* 网格布局移动端适配 */
+  .grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+    padding: 0.5rem 0;
+  }
+  
+  .grid-item {
+    padding: 1rem;
+  }
+  
+  .grid-item img, .grid-item video {
+    height: 120px;
+  }
+  
+  .grid-item p {
+    font-size: 1rem;
+  }
+  
+  .media-icon {
+    width: 30px;
+    height: 30px;
+    top: 10px;
+    right: 10px;
+  }
+  
   .feedback-timeline-widget {
     bottom: 15px;
     left: 8px; /* 移动端更靠近左侧 */
@@ -922,6 +985,36 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   }
   .feedback-form button:hover {
     animation: gradient-animation 10s ease infinite; /* 确保移动端按钮 hover 动画 */
+  }
+}
+
+/* 小屏幕设备进一步优化 */
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 2rem;
+  }
+  
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+  
+  .grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.8rem;
+  }
+  
+  .grid-item {
+    padding: 0.8rem;
+  }
+  
+  .grid-item img, .grid-item video {
+    height: 100px;
+  }
+  
+  .tags-container button {
+    padding: 0.4rem 0.8rem;
+    margin: 0.2rem;
+    font-size: 0.85rem;
   }
 }
 

@@ -328,6 +328,18 @@ tr:hover {
 }
 
 @media (max-width: 768px) {
+  .card {
+    padding: 1.5rem;
+  }
+  
+  .card h2 {
+    font-size: 1.5rem;
+  }
+  
+  table {
+    font-size: 0.9rem;
+  }
+  
   th, td {
     padding: 0.75rem 0.5rem;
   }
@@ -339,8 +351,39 @@ tr:hover {
   .btn-process, .btn-revert, .btn-delete {
     padding: 0.4rem 0.8rem;
     font-size: 0.8rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
     display: block;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 1rem;
+  }
+  
+  .card h2 {
+    font-size: 1.3rem;
+  }
+  
+  table {
+    font-size: 0.8rem;
+  }
+  
+  th, td {
+    padding: 0.5rem 0.25rem;
+  }
+  
+  .feedback-content {
+    max-width: 100px;
+  }
+  
+  .btn-process, .btn-revert, .btn-delete {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+    display: block;
+    width: 100%;
   }
 }
 </style>

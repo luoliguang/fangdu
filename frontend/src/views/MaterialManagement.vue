@@ -331,6 +331,18 @@ tr:hover {
 }
 
 @media (max-width: 768px) {
+  .card {
+    padding: 1.5rem;
+  }
+  
+  .card h2 {
+    font-size: 1.5rem;
+  }
+  
+  table {
+    font-size: 0.9rem;
+  }
+  
   th, td {
     padding: 0.75rem 0.5rem;
   }
@@ -343,6 +355,43 @@ tr:hover {
   .btn-edit, .btn-delete, .btn-save, .btn-cancel {
     padding: 0.4rem 0.8rem;
     font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .pagination-container {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 1rem;
+  }
+  
+  .card h2 {
+    font-size: 1.3rem;
+  }
+  
+  table {
+    font-size: 0.8rem;
+  }
+  
+  th, td {
+    padding: 0.5rem 0.25rem;
+  }
+  
+  .preview-img, .preview-img-placeholder {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .btn-edit, .btn-delete, .btn-save, .btn-cancel {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    display: block;
+    width: 100%;
+    margin-bottom: 0.25rem;
   }
 }
 </style>
