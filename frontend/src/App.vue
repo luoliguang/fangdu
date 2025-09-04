@@ -41,8 +41,25 @@ const updateSlider = async () => {
 
   if (!mainNav.value || !navSlider.value) return;
 
-  // 找到当前激活的链接元素
-  const activeLink = mainNav.value.querySelector('.router-link-exact-active');
+  // 找到当前激活的链接元素，尝试多种选择器
+  let activeLink = mainNav.value.querySelector('.router-link-exact-active');
+  if (!activeLink) {
+    activeLink = mainNav.value.querySelector('.router-link-active');
+  }
+  
+  // 如果还是没找到，根据当前路由手动查找
+  if (!activeLink) {
+    const currentPath = route.path;
+    const links = mainNav.value.querySelectorAll('router-link, a[href]');
+    for (const link of links) {
+      const linkTo = link.getAttribute('to');
+      // 精确匹配或者当前路径以链接路径开头（处理嵌套路由）
+      if (linkTo === currentPath || (linkTo && currentPath.startsWith(linkTo) && linkTo !== '/')) {
+        activeLink = link;
+        break;
+      }
+    }
+  }
 
   if (activeLink) {
     // 获取激活链接的位置和尺寸
@@ -72,16 +89,29 @@ onUnmounted(() => {
 // 监听路由变化，当页面切换时，更新滑块位置
 watch(() => route.path, updateSlider);
 
+// 处理导航链接点击事件
+const handleNavClick = (event) => {
+  // 延迟更长时间后更新滑块，确保路由状态和DOM都已更新
+  setTimeout(() => {
+    updateSlider();
+  }, 100);
+  
+  // 也可以立即尝试一次更新
+  nextTick(() => {
+    setTimeout(updateSlider, 50);
+  });
+};
+
 </script>
 
 <template>
   <div id="app">
     <nav class="main-nav" ref="mainNav">
       <div class="nav-slider" ref="navSlider"></div>
-      <router-link to="/">素材库</router-link>
+      <router-link to="/" @click="handleNavClick">素材库</router-link>
       <a href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank">面料细节</a>
       <a href="https://fangdutex.cn/welcome" target="_blank">📚方度知识库</a>
-      <router-link to="/admin">后台管理</router-link>
+      <router-link to="/admin" @click="handleNavClick">后台管理</router-link>
     </nav>
     <main>
       <router-view></router-view>
@@ -116,11 +146,10 @@ watch(() => route.path, updateSlider);
   /* 2. 定义滑块的样式和动画 */
   .nav-slider {
     position: absolute;
-    top: 22%; /* 垂直居中 */
-    transform: translateY(-50%); /* 确保精确垂直居中 */
+    top: 0.5rem; /* 直接设置顶部距离，避免transform冲突 */
     left: 0;
-    height: calc(100% - 2rem); /* 高度留出上下边距 */
-    background-color: #42b983; /* 这是我们的“滑块”颜色 */
+    height: calc(100% - 1rem); /* 高度留出上下边距 */
+    background-color: #42b983; /* 这是我们的"滑块"颜色 */
     border-radius: 4px;
     transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* 平滑过渡动画 */
     z-index: 1; /* 置于底层 */
@@ -137,7 +166,7 @@ watch(() => route.path, updateSlider);
     transition: color 0.4s ease; /* 文字颜色也添加过渡效果 */
   }
   /* 移除旧的激活样式，因为现在由滑块负责背景 */
-  .main-nav a.-link-exact-activerouter {
+  .main-nav a.router-link-exact-active {
     color: #fff; /* 确保激活时文字颜色不变或更突出 */
   }
 
