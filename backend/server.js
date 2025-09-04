@@ -278,21 +278,24 @@ app.get('/api/materials', (req, res) => {
 });
 
 // 上传接口（OSS版本）
-app.post('/api/materials', authenticateToken, upload.single('imageFile'), async (req, res) => {
+app.post('/api/materials', authenticateToken, upload.single('file'), async (req, res) => {
   try {
     const { name, tags } = req.body;
     // --- 新增：标签处理逻辑 ---
     console.log(`[日志] 原始标签 (上传): ${req.body.tags}`); // 添加日志
     // --- 新增：标签处理逻辑 ---
-    const formattedTags = req.body.tags
-        .trim() // 1. 去掉首尾空格
-        .replace(/\s+/g, ',') // 2. 将一个或多个连续的空格替换为单个逗号
-        .replace(/,+/g, ',') // 3. 将多个连续的逗号合并为一个
-        .split(',') // 4. 按逗号分割成数组
-        .filter(Boolean) // 5. 去掉可能产生的空字符串
-        .join(','); // 6. 重新用单个逗号拼接成最终的字符串
+    let formattedTags = '';
+    if (req.body.tags && req.body.tags.trim()) {
+        formattedTags = req.body.tags
+            .trim() // 1. 去掉首尾空格
+            .replace(/\s+/g, ',') // 2. 将一个或多个连续的空格替换为单个逗号
+            .replace(/,+/g, ',') // 3. 将多个连续的逗号合并为一个
+            .split(',') // 4. 按逗号分割成数组
+            .filter(Boolean) // 5. 去掉可能产生的空字符串
+            .join(','); // 6. 重新用单个逗号拼接成最终的字符串
+    }
 
-    if (!name || !formattedTags || !req.file) { // 注意这里也改成了 formattedTags
+    if (!name || !req.file) {
       return res.status(400).json({ error: '缺少必要信息！' });
     }
 

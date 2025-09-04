@@ -2,6 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router';
 import Gallery from '../views/Gallery.vue';
 import Admin from '../views/Admin.vue';
 import Login from '../views/Login.vue'; // 引入登录页
+import UploadMaterial from '../views/UploadMaterial.vue';
+import MaterialManagement from '../views/MaterialManagement.vue';
+import FeedbackManagement from '../views/FeedbackManagement.vue';
 
 const routes = [
     { path: '/', name: 'Gallery', component: Gallery },
@@ -12,13 +15,35 @@ const routes = [
         component: Admin,
         // 新增：路由守卫
         beforeEnter: (to, from, next) => {
-            const token = localStorage.getItem('accessToken');
+            const token = localStorage.getItem('authToken'); // 修改为authToken以保持一致性
             if (token) {
                 next(); // 有通行证，放行
             } else {
                 next('/login'); // 没有通行证，请去登录
             }
-        }
+        },
+        children: [
+            { 
+                path: '', 
+                name: 'AdminDefault',
+                redirect: { name: 'UploadMaterial' } 
+            },
+            { 
+                path: 'upload', 
+                name: 'UploadMaterial', 
+                component: UploadMaterial 
+            },
+            { 
+                path: 'materials', 
+                name: 'MaterialManagement', 
+                component: MaterialManagement 
+            },
+            { 
+                path: 'feedback', 
+                name: 'FeedbackManagement', 
+                component: FeedbackManagement 
+            }
+        ]
     }
 ];
 

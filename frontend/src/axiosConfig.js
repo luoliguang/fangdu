@@ -10,7 +10,7 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
     (config) => {
         // 1. 从 localStorage 获取令牌
-        const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem('authToken');
 
         // 2. 如果令牌存在
         if (token) {

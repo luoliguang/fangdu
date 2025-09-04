@@ -24,14 +24,14 @@ const handleLogin = async () => {
     await apiClient.post('/auth/validate', { token: tokenInput.value });
     
     // 5. 如果上面的请求成功 (没有抛出错误)，说明令牌正确
-    localStorage.setItem('accessToken', tokenInput.value);
+    localStorage.setItem('authToken', tokenInput.value);
     router.push('/admin'); // 跳转到后台
 
   } catch (err) {
     // 6. 如果请求失败 (比如后端返回401)，说明令牌错误
     error.value = '密码错了，去素材库看就可以啦。';
     // 清除可能存在的错误令牌
-    localStorage.removeItem('accessToken'); 
+    localStorage.removeItem('authToken'); 
   } finally {
     isLoading.value = false; // 7. 无论成功失败，都结束加载状态
   }
