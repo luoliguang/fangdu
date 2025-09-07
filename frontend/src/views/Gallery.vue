@@ -628,7 +628,7 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
 
 .media-icon { 
   position: absolute; 
-  top: 50%; 
+  top: 35%; 
   left: 50%; 
   transform: translate(-50%, -50%); 
   background-color: rgba(0, 0, 0, 0.6); 
@@ -1011,7 +1011,7 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   .media-icon {
     width: 30px;
     height: 30px;
-    top: 50%;
+    top: 35%;
     left: 50%;
     transform: translate(-50%, -50%);
   }
