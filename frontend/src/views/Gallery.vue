@@ -628,8 +628,9 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
 
 .media-icon { 
   position: absolute; 
-  top: 15px; 
-  right: 15px; 
+  top: 50%; 
+  left: 50%; 
+  transform: translate(-50%, -50%); 
   background-color: rgba(0, 0, 0, 0.6); 
   color: white; 
   border-radius: 50%; 
@@ -1010,8 +1011,9 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   .media-icon {
     width: 30px;
     height: 30px;
-    top: 10px;
-    right: 10px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
   }
   
   .feedback-timeline-widget {
