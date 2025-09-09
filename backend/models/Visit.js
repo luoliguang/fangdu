@@ -23,7 +23,7 @@ class Visit {
     }
 
     const sql = `
-      INSERT INTO visits (ip, user_agent, page, visited_at) 
+      INSERT INTO visits (ip_address, user_agent, page, visit_time) 
       VALUES (?, ?, ?, datetime('now'))
     `;
     
@@ -36,9 +36,9 @@ class Visit {
    */
   async getCurrentOnlineCount() {
     const sql = `
-      SELECT COUNT(DISTINCT ip) as count 
+      SELECT COUNT(DISTINCT ip_address) as count 
       FROM visits 
-      WHERE visited_at >= datetime('now', '-5 minutes')
+      WHERE visit_time >= datetime('now', '-5 minutes')
     `;
     
     const result = await this.queryOne(sql);
@@ -51,12 +51,12 @@ class Visit {
   async getVisitTrends(days = 7) {
     const sql = `
       SELECT 
-        DATE(visited_at) as date,
+        DATE(visit_time) as date,
         COUNT(*) as visits,
-        COUNT(DISTINCT ip) as unique_visitors
+        COUNT(DISTINCT ip_address) as unique_visitors
       FROM visits 
-      WHERE visited_at >= datetime('now', '-${days} days')
-      GROUP BY DATE(visited_at)
+      WHERE visit_time >= datetime('now', '-${days} days')
+      GROUP BY DATE(visit_time)
       ORDER BY date ASC
     `;
     
@@ -71,7 +71,7 @@ class Visit {
       SELECT 
         page,
         COUNT(*) as visits,
-        COUNT(DISTINCT ip) as unique_visitors
+        COUNT(DISTINCT ip_address) as unique_visitors
       FROM visits 
       GROUP BY page 
       ORDER BY visits DESC 
@@ -90,22 +90,22 @@ class Visit {
     const totalVisits = await this.queryOne(totalVisitsSql);
 
     // 唯一访客数
-    const uniqueVisitorsSql = `SELECT COUNT(DISTINCT ip) as unique_visitors FROM visits`;
+    const uniqueVisitorsSql = `SELECT COUNT(DISTINCT ip_address) as unique_visitors FROM visits`;
     const uniqueVisitors = await this.queryOne(uniqueVisitorsSql);
 
     // 今日访问量
     const todayVisitsSql = `
       SELECT COUNT(*) as today 
       FROM visits 
-      WHERE DATE(visited_at) = DATE('now')
+      WHERE DATE(visit_time) = DATE('now')
     `;
     const todayVisits = await this.queryOne(todayVisitsSql);
 
     // 今日唯一访客
     const todayUniqueVisitorsSql = `
-      SELECT COUNT(DISTINCT ip) as today_unique 
+      SELECT COUNT(DISTINCT ip_address) as today_unique 
       FROM visits 
-      WHERE DATE(visited_at) = DATE('now')
+      WHERE DATE(visit_time) = DATE('now')
     `;
     const todayUniqueVisitors = await this.queryOne(todayUniqueVisitorsSql);
 
@@ -113,7 +113,7 @@ class Visit {
     const weekVisitsSql = `
       SELECT COUNT(*) as week 
       FROM visits 
-      WHERE visited_at >= datetime('now', '-7 days')
+      WHERE visit_time >= datetime('now', '-7 days')
     `;
     const weekVisits = await this.queryOne(weekVisitsSql);
 
@@ -121,7 +121,7 @@ class Visit {
     const monthVisitsSql = `
       SELECT COUNT(*) as month 
       FROM visits 
-      WHERE visited_at >= datetime('now', 'start of month')
+      WHERE visit_time >= datetime('now', 'start of month')
     `;
     const monthVisits = await this.queryOne(monthVisitsSql);
 
@@ -151,10 +151,10 @@ class Visit {
       SELECT 
         page,
         COUNT(*) as visits,
-        COUNT(DISTINCT ip) as unique_visitors,
-        MAX(visited_at) as last_visit
+        COUNT(DISTINCT ip_address) as unique_visitors,
+        MAX(visit_time) as last_visit
       FROM visits 
-      WHERE visited_at >= datetime('now', '-30 days')
+      WHERE visit_time >= datetime('now', '-30 days')
       GROUP BY page 
       ORDER BY visits DESC 
       LIMIT ?
@@ -172,7 +172,7 @@ class Visit {
         '直接访问' as source,
         COUNT(*) as visits
       FROM visits 
-      WHERE visited_at >= datetime('now', '-30 days')
+      WHERE visit_time >= datetime('now', '-30 days')
       ORDER BY visits DESC 
       LIMIT ?
     `;
@@ -186,10 +186,10 @@ class Visit {
   async getHourlyDistribution() {
     const sql = `
       SELECT 
-        CAST(strftime('%H', visited_at) AS INTEGER) as hour,
+        CAST(strftime('%H', visit_time) AS INTEGER) as hour,
         COUNT(*) as visits
       FROM visits 
-      WHERE visited_at >= datetime('now', '-7 days')
+      WHERE visit_time >= datetime('now', '-7 days')
       GROUP BY hour 
       ORDER BY hour ASC
     `;
@@ -211,7 +211,7 @@ class Visit {
   async cleanupOldVisits(daysToKeep = 30) {
     const sql = `
       DELETE FROM visits 
-      WHERE visited_at < datetime('now', '-${daysToKeep} days')
+      WHERE visit_time < datetime('now', '-${daysToKeep} days')
     `;
     
     const result = await this.run(sql);
@@ -225,8 +225,8 @@ class Visit {
     const sql = `
       SELECT COUNT(*) as count 
       FROM visits 
-      WHERE ip = ? 
-      AND visited_at >= datetime('now', '-${minutes} minutes')
+      WHERE ip_address = ? 
+      AND visit_time >= datetime('now', '-${minutes} minutes')
     `;
     
     const result = await this.queryOne(sql, [ipAddress]);
@@ -240,8 +240,8 @@ class Visit {
     const sql = `
       SELECT COUNT(*) as count 
       FROM visits 
-      WHERE ip = ? 
-      AND visited_at >= datetime('now', '-${hours} hours')
+      WHERE ip_address = ? 
+      AND visit_time >= datetime('now', '-${hours} hours')
     `;
     
     const result = await this.queryOne(sql, [ipAddress]);
@@ -265,17 +265,17 @@ class Visit {
     const params = [];
 
     if (ipAddress) {
-      whereClause += ' AND ip = ?';
+      whereClause += ' AND ip_address = ?';
       params.push(ipAddress);
     }
 
     if (startDate) {
-      whereClause += ' AND visited_at >= ?';
+      whereClause += ' AND visit_time >= ?';
       params.push(startDate);
     }
 
     if (endDate) {
-      whereClause += ' AND visited_at <= ?';
+      whereClause += ' AND visit_time <= ?';
       params.push(endDate);
     }
 
@@ -287,7 +287,7 @@ class Visit {
     const dataSql = `
       SELECT * FROM visits
       ${whereClause} 
-      ORDER BY visited_at DESC 
+      ORDER BY visit_time DESC 
       LIMIT ? OFFSET ?
     `;
     
