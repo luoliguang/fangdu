@@ -11,12 +11,14 @@ const showLogoutConfirm = ref(false);
 const fetchPendingFeedbacksCount = async () => {
   try {
     const token = localStorage.getItem('authToken');
-    const response = await apiClient.get('/feedbacks/pending/count', {
+    const response = await apiClient.get('/api/v1/feedbacks/stats/unprocessed', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    pendingFeedbacksCount.value = response.data.count;
+    // 后端返回格式: { success: true, data: { count } }
+    pendingFeedbacksCount.value = response.data.data?.count || 0;
   } catch (error) {
     console.error('获取未处理留言数量失败:', error);
+    pendingFeedbacksCount.value = 0;
   }
 };
 
@@ -48,18 +50,31 @@ const cancelLogout = () => {
   showLogoutConfirm.value = false;
 };
 
+// 监听留言状态更新事件
+const handleFeedbackUpdate = () => {
+  fetchPendingFeedbacksCount();
+};
+
 onMounted(() => {
   fetchPendingFeedbacksCount();
   // 每60秒刷新一次未处理留言数量
   const interval = setInterval(fetchPendingFeedbacksCount, 60000);
+  
+  // 监听留言状态更新事件
+  window.addEventListener('feedbackStatusUpdated', handleFeedbackUpdate);
+  window.addEventListener('feedbackDeleted', handleFeedbackUpdate);
   
   // 确保当前路径是/admin时，重定向到默认子路由
   if (router.currentRoute.value.name === 'Admin' || router.currentRoute.value.name === 'AdminDefault') {
     router.push({ name: 'UploadMaterial' });
   }
   
-  // 组件卸载时清除定时器
-  return () => clearInterval(interval);
+  // 组件卸载时清除定时器和事件监听器
+  return () => {
+    clearInterval(interval);
+    window.removeEventListener('feedbackStatusUpdated', handleFeedbackUpdate);
+    window.removeEventListener('feedbackDeleted', handleFeedbackUpdate);
+  };
 });
 </script>
 
@@ -98,6 +113,15 @@ onMounted(() => {
           <i class="nav-icon">💬</i>
           <span class="nav-text">留言管理</span>
           <span v-if="pendingFeedbacksCount > 0" class="badge">{{ pendingFeedbacksCount }}</span>
+        </div>
+        <div 
+          class="nav-item" 
+          :class="{ active: $route.name === 'Statistics' }"
+          @click="navigateTo('Statistics')"
+        >
+          <span class="nav-hover-effect"></span>
+          <i class="nav-icon">📊</i>
+          <span class="nav-text">访问统计</span>
         </div>
       </div>
       
@@ -239,6 +263,24 @@ onMounted(() => {
   padding: 0.2rem 0.5rem;
   font-size: 0.8rem;
   margin-left: auto;
+  box-shadow: 0 2px 4px rgba(255, 71, 87, 0.3);
+  animation: pulse 2s infinite;
+}
+
+/* 脉冲动画效果 */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(255, 71, 87, 0.3);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(255, 71, 87, 0.5);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(255, 71, 87, 0.3);
+  }
 }
 
 /* 内容区域样式 */

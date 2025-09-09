@@ -5,6 +5,7 @@ import Login from '../views/Login.vue'; // 引入登录页
 import UploadMaterial from '../views/UploadMaterial.vue';
 import MaterialManagement from '../views/MaterialManagement.vue';
 import FeedbackManagement from '../views/FeedbackManagement.vue';
+import Statistics from '../views/Statistics.vue';
 
 const routes = [
     { path: '/', name: 'Gallery', component: Gallery },
@@ -42,6 +43,11 @@ const routes = [
                 path: 'feedback', 
                 name: 'FeedbackManagement', 
                 component: FeedbackManagement 
+            },
+            { 
+                path: 'statistics', 
+                name: 'Statistics', 
+                component: Statistics 
             }
         ]
     }

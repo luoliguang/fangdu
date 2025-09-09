@@ -1,102 +1,96 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import apiClient from '../axiosConfig.js';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { storeToRefs } from 'pinia';
+import { DataTable, ConfirmDialog } from '@/components/common';
+import { useFeedbackStore } from '@/stores/feedback';
 import { useToast } from 'vue-toastification';
 
 const toast = useToast();
+const feedbackStore = useFeedbackStore();
+const confirmDialog = ref(null);
+const deleteItemId = ref(null);
 
-// --- 留言相关状态 ---
-const feedbacks = ref([]);
-const isFeedbacksLoading = ref(false);
-const pendingFeedbacksCount = ref(0); // 未处理留言数量
+// 从store中获取状态 - 使用storeToRefs保持响应性
+const { feedbacks, isLoading: isFeedbacksLoading, pendingCount: pendingFeedbacksCount } = storeToRefs(feedbackStore); // 未处理留言数量
 
-// --- 获取未处理留言数量 ---
-const fetchPendingFeedbacksCount = async () => {
-  try {
-    const token = localStorage.getItem('authToken');
-    const response = await apiClient.get('/feedbacks/pending/count', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    pendingFeedbacksCount.value = response.data.count;
-  } catch (error) {
-    console.error('获取未处理留言数量失败:', error);
+// --- 表格列配置 ---
+const columns = [
+  {
+    key: 'message',
+    title: '留言内容',
+    width: '40%'
+  },
+  {
+    key: 'created_at',
+    title: '提交时间',
+    sortable: true,
+    width: '180px'
+  },
+  {
+    key: 'status',
+    title: '状态',
+    width: '120px',
+    align: 'center'
   }
-};
-
-// --- 获取留言列表 ---
-const fetchFeedbacks = async () => {
-  isFeedbacksLoading.value = true;
-  try {
-    const token = localStorage.getItem('authToken'); // 获取认证令牌
-    const response = await apiClient.get('/feedbacks', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    feedbacks.value = response.data.data;
-    fetchPendingFeedbacksCount(); // 刷新留言列表后更新未处理数量
-  } catch (error) {
-    console.error('获取留言列表失败:', error);
-    toast.error('获取留言失败');
-  } finally {
-    isFeedbacksLoading.value = false;
-  }
-};
+];
 
 // --- 更新留言状态 ---
 const updateFeedbackStatus = async (id, status) => {
-  try {
-    const token = localStorage.getItem('authToken');
-    await apiClient.put(`/feedbacks/${id}`, { status }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    
-    // 更新本地数据
-    const index = feedbacks.value.findIndex(f => f.id === id);
-    if (index !== -1) {
-      feedbacks.value[index].status = status;
-    }
-    
-    fetchPendingFeedbacksCount(); // 更新未处理数量
-    toast.success('留言状态更新成功');
-  } catch (error) {
-    console.error('更新留言状态失败:', error);
-    toast.error('更新留言状态失败');
-  }
+  await feedbackStore.updateFeedbackStatus(id, status);
+};
+
+// --- 显示删除确认对话框 ---
+const showDeleteConfirm = (id) => {
+  deleteItemId.value = id;
+  confirmDialog.value.show();
 };
 
 // --- 删除留言 ---
-const deleteFeedback = async (id) => {
-  if (!confirm('确定要删除这条留言吗？')) return;
+const deleteFeedback = async () => {
+  if (!deleteItemId.value) return;
   
   try {
-    const token = localStorage.getItem('authToken');
-    await apiClient.delete(`/feedbacks/${id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    
-    feedbacks.value = feedbacks.value.filter(f => f.id !== id);
-    fetchPendingFeedbacksCount(); // 更新未处理数量
-    toast.success('留言删除成功');
+    await feedbackStore.deleteFeedback(deleteItemId.value);
   } catch (error) {
-    console.error('删除留言失败:', error);
-    toast.error('删除留言失败');
+    throw error;
+  } finally {
+    deleteItemId.value = null;
   }
 };
 
-// --- 格式化日期 ---
+// --- 格式化时间 ---
 const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  return new Date(dateString).toLocaleString('zh-CN');
 };
 
+// --- 获取状态标签类型 ---
+const getStatusType = (status) => {
+  return status === 'pending' ? 'warning' : 'success';
+};
+
+// --- 获取状态文本 ---
+const getStatusText = (status) => {
+  return status === 'pending' ? '未处理' : '已处理';
+};
+
+// 定时器引用
+let refreshTimer = null;
+
 onMounted(() => {
-  fetchFeedbacks();
-  fetchPendingFeedbacksCount();
+  feedbackStore.fetchFeedbacks();
+  feedbackStore.fetchPendingCount();
+  
+  // 每30秒刷新一次数据
+  refreshTimer = setInterval(() => {
+    feedbackStore.fetchFeedbacks();
+    feedbackStore.fetchPendingCount();
+  }, 30000);
+});
+
+onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+  }
 });
 </script>
 
@@ -109,90 +103,112 @@ onMounted(() => {
       </span>
     </h2>
     
-    <div v-if="isFeedbacksLoading" class="loading-container">
-      <div class="loading-spinner"></div>
-      <p>加载中...</p>
-    </div>
+    <DataTable 
+      :data="feedbacks"
+      :columns="columns"
+      :loading="isFeedbacksLoading"
+      empty-text="暂无留言数据"
+    >
+      <!-- 留言内容列 -->
+      <template #column-message="{ item }">
+        <div class="feedback-content" :title="item.message">
+          {{ item.message }}
+        </div>
+      </template>
+      
+      <!-- 提交时间列 -->
+      <template #column-created_at="{ item }">
+        {{ formatDate(item.created_at) }}
+      </template>
+      
+      <!-- 状态列 -->
+      <template #column-status="{ item }">
+        <span 
+          class="status-badge" 
+          :class="{
+            'status-pending': item.status === 'pending',
+            'status-processed': item.status === 'approved' || item.status === 'replied'
+          }"
+        >
+          {{ item.status === 'pending' ? '未处理' : '已处理' }}
+        </span>
+      </template>
+      
+      <!-- 操作列 -->
+      <template #actions="{ item }">
+        <div class="action-buttons">
+          <button 
+            v-if="item.status === 'pending'"
+            @click="updateFeedbackStatus(item.id, 'approved')"
+            class="btn-process"
+          >
+            标记为已处理
+          </button>
+          <button 
+            v-else
+            @click="updateFeedbackStatus(item.id, 'pending')"
+            class="btn-revert"
+          >
+            恢复为未处理
+          </button>
+          <button @click="showDeleteConfirm(item.id)" class="btn-delete">删除</button>
+        </div>
+      </template>
+    </DataTable>
     
-    <div v-else-if="feedbacks.length === 0" class="no-data">
-      <p>暂无留言数据</p>
-    </div>
-    
-    <table v-else>
-      <thead>
-        <tr>
-          <th>用户</th>
-          <th>留言内容</th>
-          <th>提交时间</th>
-          <th>状态</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="feedback in feedbacks" :key="feedback.id">
-          <td>{{ feedback.name }}</td>
-          <td class="feedback-content">{{ feedback.message }}</td>
-          <td>{{ formatDate(feedback.created_at) }}</td>
-          <td>
-            <span 
-              class="status-badge" 
-              :class="{
-                'status-pending': feedback.status === 'pending',
-                'status-processed': feedback.status === 'resolved'
-              }"
-            >
-              {{ feedback.status === 'pending' ? '未处理' : '已处理' }}
-            </span>
-          </td>
-          <td>
-            <button 
-              v-if="feedback.status === 'pending'"
-              @click="updateFeedbackStatus(feedback.id, 'resolved')"
-              class="btn-process"
-            >
-              标记为已处理
-            </button>
-            <button 
-              v-else
-              @click="updateFeedbackStatus(feedback.id, 'pending')"
-              class="btn-revert"
-            >
-              恢复为未处理
-            </button>
-            <button @click="deleteFeedback(feedback.id)" class="btn-delete">删除</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- 确认删除对话框 -->
+    <ConfirmDialog 
+      ref="confirmDialog"
+      title="确认删除"
+      message="确定要删除这条留言吗？此操作不可撤销。"
+      type="danger"
+      @confirm="deleteFeedback"
+    />
   </div>
 </template>
 
 <style scoped>
 .card {
-  background: linear-gradient(-45deg, #f8f8f8, #f0f0f0);
-  background-size: 200% 200%;
-  animation: gradient-animation 20s ease infinite;
-  border-radius: 15px;
-  padding: 2.5rem;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.08);
-  border: 1px solid #e0e0e0;
-  transition: box-shadow 0.3s ease;
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  margin-bottom: 20px;
+  border: 1px solid #f0f0f0;
 }
 
-.card h2 {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 1.8rem;
-  color: #343a40;
-  margin-bottom: 2rem;
-  font-weight: 700;
+h2 {
+  color: #2c3e50;
+  margin-bottom: 24px;
   display: flex;
   align-items: center;
+  font-weight: 600;
+  font-size: 1.8rem;
 }
 
-@keyframes gradient-animation {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+/* 表格样式优化 */
+:deep(.data-table) {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e9ecef;
+}
+
+:deep(.data-table th) {
+  background-color: #f8f9fa;
+  color: #495057;
+  font-weight: 600;
+  padding: 16px 12px;
+  border-bottom: 2px solid #dee2e6;
+}
+
+:deep(.data-table td) {
+  padding: 16px 12px;
+  border-bottom: 1px solid #f1f3f4;
+  vertical-align: middle;
+}
+
+:deep(.data-table tr:hover) {
+  background-color: #f8f9fa;
 }
 
 .pending-badge {
@@ -205,70 +221,13 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 3rem 0;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-  border-top-color: #42b883;
-  animation: spin 1s ease-in-out infinite;
-  margin-bottom: 1rem;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.no-data {
-  text-align: center;
-  padding: 3rem 0;
-  color: #6c757d;
-  font-size: 1.1rem;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 2rem;
-  background-color: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-}
-
-th, td {
-  padding: 1rem;
-  text-align: left;
-  border-bottom: 1px solid #e9ecef;
-}
-
-th {
-  background-color: #f8f9fa;
-  font-weight: 600;
-  color: #495057;
-}
-
-tr:last-child td {
-  border-bottom: none;
-}
-
-tr:hover {
-  background-color: #f8f9fa;
-}
-
 .feedback-content {
-  max-width: 300px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: 100%;
+  word-wrap: break-word;
+  word-break: break-all;
+  line-height: 1.4;
+  cursor: help;
+  padding: 4px 0;
 }
 
 .status-badge {
@@ -289,15 +248,21 @@ tr:hover {
   color: white;
 }
 
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+}
+
 .btn-process, .btn-revert, .btn-delete {
-  padding: 0.5rem 1rem;
+  padding: 6px 12px;
   border: none;
-  border-radius: 6px;
-  font-weight: 500;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
-  margin-right: 0.5rem;
-  font-size: 0.9rem;
+  font-size: 14px;
+  transition: background-color 0.3s;
 }
 
 .btn-process {
@@ -327,62 +292,58 @@ tr:hover {
   background-color: #c82333;
 }
 
+/* 响应式设计 */
 @media (max-width: 768px) {
   .card {
-    padding: 1.5rem;
+    padding: 15px;
+    margin: 10px;
   }
   
-  .card h2 {
+  h2 {
     font-size: 1.5rem;
   }
   
-  table {
-    font-size: 0.9rem;
-  }
-  
-  th, td {
-    padding: 0.75rem 0.5rem;
-  }
-  
   .feedback-content {
-    max-width: 150px;
+    max-width: 200px;
+    font-size: 14px;
   }
   
   .btn-process, .btn-revert, .btn-delete {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.8rem;
-    margin-bottom: 0.25rem;
-    display: block;
-    width: 100%;
+    padding: 4px 8px;
+    font-size: 12px;
   }
 }
 
 @media (max-width: 480px) {
   .card {
-    padding: 1rem;
+    padding: 10px;
+    margin: 5px;
   }
   
-  .card h2 {
+  h2 {
     font-size: 1.3rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
   
-  table {
-    font-size: 0.8rem;
-  }
-  
-  th, td {
-    padding: 0.5rem 0.25rem;
+  .pending-badge {
+    margin-left: 0;
   }
   
   .feedback-content {
-    max-width: 100px;
+    max-width: 150px;
+    font-size: 13px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    gap: 4px;
   }
   
   .btn-process, .btn-revert, .btn-delete {
-    padding: 0.3rem 0.6rem;
-    font-size: 0.75rem;
-    margin-bottom: 0.25rem;
-    display: block;
+    padding: 3px 6px;
+    font-size: 11px;
     width: 100%;
   }
 }

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted,watch,nextTick, computed  } from 'vue';
 import { useRoute, useRouter  } from 'vue-router';
+import apiClient from './axiosConfig.js';
 
 
 // --- 新增：导航栏滑动效果的逻辑 ---
@@ -13,9 +14,38 @@ const router = useRouter(); //获取 router 实例
 const loginState = ref(!!localStorage.getItem('authToken'));
 const isLoggedIn = computed(() => loginState.value);
 
+// 未处理留言数量
+const pendingFeedbacksCount = ref(0);
+
 // 监听localStorage变化
 const updateLoginState = () => {
   loginState.value = !!localStorage.getItem('authToken');
+  
+  // 登录状态变化时，重新获取未处理留言数量
+  if (loginState.value) {
+    fetchPendingFeedbacksCount();
+  } else {
+    pendingFeedbacksCount.value = 0;
+  }
+};
+
+// 获取未处理留言数量
+const fetchPendingFeedbacksCount = async () => {
+  if (!loginState.value) return;
+  
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.get('/api/v1/feedbacks/stats/unprocessed', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    
+    // 确保正确解析响应数据
+    const count = response.data?.data?.count || response.data?.count || 0;
+    pendingFeedbacksCount.value = count;
+  } catch (error) {
+    console.error('获取未处理留言数量失败:', error);
+    pendingFeedbacksCount.value = 0;
+  }
 };
 
 
@@ -95,6 +125,15 @@ onMounted(async () => { // 将 onMounted 变为 async 函数
   // 初始化登录状态
   updateLoginState();
   
+  // 如果已登录，开始定期获取未处理留言数量
+  if (loginState.value) {
+    fetchPendingFeedbacksCount();
+    // 每60秒刷新一次未处理留言数量
+    setInterval(fetchPendingFeedbacksCount, 60000);
+  }
+  
+
+  
   // 等待路由准备就绪
   await router.isReady();
   updateSlider(); // 现在再执行，就能确保找到激活的链接了
@@ -135,7 +174,9 @@ const handleNavClick = (event) => {
       <router-link v-if="!isLoggedIn" to="/login" @click="handleNavClick">登录</router-link>
       <!-- 已登录时显示后台管理 -->
       <template v-else>
-        <router-link to="/admin" @click="handleNavClick">后台管理</router-link>
+        <router-link to="/admin" @click="handleNavClick">
+          后台管理
+        </router-link>
       </template>
     </nav>
     <main>
@@ -197,6 +238,8 @@ const handleNavClick = (event) => {
   .main-nav a.router-link-exact-active {
     color: #fff; /* 确保激活时文字颜色不变或更突出 */
   }
+
+
 
   /* --- 新增：“返回顶部”按钮的样式 --- */
   .scroll-to-top-btn {

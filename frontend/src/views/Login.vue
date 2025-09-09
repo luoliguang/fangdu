@@ -1,45 +1,47 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import apiClient from '../axiosConfig.js'; // 1. 引入我们的axios实例
+import { useUserStore } from '@/stores/user';
 import FloatingLabelInput from '../components/FloatingLabelInput.vue'; // 引入 FloatingLabelInput 组件
 
-const tokenInput = ref('');
+const usernameInput = ref('');
+const passwordInput = ref('');
 const error = ref('');
-const isLoading = ref(false); // 2. 增加一个加载状态，防止重复点击
 const router = useRouter();
+const userStore = useUserStore();
 
-// 3. 将函数改造为 async 异步函数
+// 从store获取加载状态
+const { isLoading } = userStore;
+
+// 登录处理函数
 const handleLogin = async () => {
-  if (!tokenInput.value) {
-    error.value = '请输入访问令牌！';
+  if (!usernameInput.value) {
+    error.value = '请输入用户名！';
+    return;
+  }
+  
+  if (!passwordInput.value) {
+    error.value = '请输入密码！';
     return;
   }
 
-  isLoading.value = true;
   error.value = '';
 
   try {
-    // 4. 调用后端的 /auth/validate 接口
-    await apiClient.post('/auth/validate', { token: tokenInput.value });
+    const credentials = {
+      username: usernameInput.value,
+      password: passwordInput.value
+    };
     
-    // 5. 如果上面的请求成功 (没有抛出错误)，说明令牌正确
-    localStorage.setItem('authToken', tokenInput.value);
-    // 触发storage事件通知其他组件更新登录状态
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'authToken',
-      newValue: tokenInput.value,
-      storageArea: localStorage
-    }));
-    router.push('/admin'); // 跳转到后台
-
+    const result = await userStore.login(credentials);
+    
+    if (result.success) {
+      router.push('/admin'); // 跳转到后台
+    } else {
+      error.value = result.message || '用户名或密码错误';
+    }
   } catch (err) {
-    // 6. 如果请求失败 (比如后端返回401)，说明令牌错误
-    error.value = '密码错了，去素材库看就可以啦。';
-    // 清除可能存在的错误令牌
-    localStorage.removeItem('authToken'); 
-  } finally {
-    isLoading.value = false; // 7. 无论成功失败，都结束加载状态
+    error.value = '用户名或密码错误';
   }
 };
 </script>
@@ -48,8 +50,15 @@ const handleLogin = async () => {
   <h2>请止步，非管理员勿入</h2>
   <form @submit.prevent="handleLogin">
     <FloatingLabelInput
-      v-model="tokenInput"
-      label="请输入密码，访客不要到这里来哦"
+      v-model="usernameInput"
+      label="请输入用户名"
+      type="text"
+      :disabled="isLoading"
+      :hasError="!!error"
+    />
+    <FloatingLabelInput
+      v-model="passwordInput"
+      label="请输入密码"
       type="password"
       :disabled="isLoading"
       :hasError="!!error"

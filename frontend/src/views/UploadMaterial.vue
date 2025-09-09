@@ -1,9 +1,10 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import apiClient from '../axiosConfig.js';
+import { useMaterialStore } from '@/stores/material';
 import { useToast } from 'vue-toastification';
 
 const toast = useToast();
+const materialStore = useMaterialStore();
 
 // --- State ---
 const newMaterial = ref({ name: '', tags: '', file: null });
@@ -89,31 +90,28 @@ const uploadMaterial = async () => {
   formData.append('file', newMaterial.value.file);
   
   try {
-    const response = await apiClient.post('/materials', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
-      onUploadProgress: (progressEvent) => {
-        uploadProgress.value = Math.round(
-          (progressEvent.loaded * 100) / progressEvent.total
-        );
-      }
+    const result = await materialStore.uploadMaterial(formData, (progressEvent) => {
+      uploadProgress.value = Math.round(
+        (progressEvent.loaded * 100) / progressEvent.total
+      );
     });
     
-    toast.success('素材上传成功');
-    message.value = '素材上传成功';
-    
-    // 重置表单
-    newMaterial.value = { name: '', tags: '', file: null };
-    uploadProgress.value = 0;
-    
-    // 重置文件输入框
-    const fileInput = document.getElementById('file-input');
-    if (fileInput) fileInput.value = '';
+    if (result.success) {
+      message.value = '素材上传成功';
+      
+      // 重置表单
+      newMaterial.value = { name: '', tags: '', file: null };
+      uploadProgress.value = 0;
+      
+      // 重置文件输入框
+      const fileInput = document.getElementById('file-input');
+      if (fileInput) fileInput.value = '';
+    } else {
+      message.value = result.message || '上传素材失败';
+    }
     
   } catch (error) {
     console.error('上传素材失败:', error);
-    toast.error('上传素材失败');
     message.value = '上传素材失败';
   } finally {
     isLoading.value = false;

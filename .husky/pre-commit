@@ -1,0 +1,54 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+
+# 检查前端代码
+echo "📦 Checking frontend code..."
+cd frontend
+
+# 运行ESLint检查
+echo "🔧 Running ESLint..."
+npm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ ESLint check failed. Please fix the issues before committing."
+  exit 1
+fi
+
+# 运行Prettier格式化检查
+echo "💅 Checking code formatting..."
+npm run format:check
+if [ $? -ne 0 ]; then
+  echo "❌ Code formatting check failed. Running auto-format..."
+  npm run format
+  echo "✅ Code formatted. Please review and commit again."
+  exit 1
+fi
+
+cd ..
+
+# 检查后端代码
+echo "🚀 Checking backend code..."
+cd backend
+
+# 运行ESLint检查
+echo "🔧 Running ESLint..."
+npm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ Backend ESLint check failed. Please fix the issues before committing."
+  exit 1
+fi
+
+# 运行Prettier格式化检查
+echo "💅 Checking code formatting..."
+npm run format:check
+if [ $? -ne 0 ]; then
+  echo "❌ Backend code formatting check failed. Running auto-format..."
+  npm run format
+  echo "✅ Code formatted. Please review and commit again."
+  exit 1
+fi
+
+cd ..
+
+echo "✅ All pre-commit checks passed!"

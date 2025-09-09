@@ -1,11 +1,13 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
+import pinia from './stores'
 import Toast from 'vue-toastification' // 引入库
 import 'vue-toastification/dist/index.css' // 引入样式
 
 const app = createApp(App)
 
+app.use(pinia)
 app.use(router)
 
 // 全局配置 Toast

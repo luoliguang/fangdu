@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 创建 axios 实例
 const apiClient = axios.create({
-    baseURL: `/api`, // 统一设置基础URL
+    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3002',
 });
 
 // 请求拦截器

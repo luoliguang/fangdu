@@ -1,52 +1,21 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import apiClient from '../axiosConfig.js';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useToast } from 'vue-toastification';
 import FloatingLabelInput from '../components/FloatingLabelInput.vue';
+import { DataTable, Pagination, ConfirmDialog } from '../components/common';
+import { useMaterialStore } from '@/stores/material';
 
 const toast = useToast();
-
-// --- State ---
-const materials = ref([]);
+const materialStore = useMaterialStore();
 const editingMaterial = ref(null); // 正在编辑的素材对象
-const isLoading = ref(false);
 
-// --- 分页状态 ---
-const currentPage = ref(1);
-const totalPages = ref(1);
-const limit = ref(20); // 和后端保持一致
+// 从store中获取状态 - 使用storeToRefs保持响应性
+const { materials, isLoading, currentPage, totalPages, totalCount, pageSize, isPrevDisabled, isNextDisabled } = storeToRefs(materialStore);
 
-// --- 计算属性来判断按钮是否应该禁用 ---
-const isPrevDisabled = computed(() => currentPage.value <= 1);
-const isNextDisabled = computed(() => currentPage.value >= totalPages.value);
-
-// --- 让 fetchMaterials 支持分页 ---
-const fetchMaterials = async () => {
-  isLoading.value = true;
-  try {
-    const response = await apiClient.get('/materials', {
-      params: {
-        page: currentPage.value,
-        limit: limit.value
-      }
-    });
-    materials.value = response.data.data;
-    // 更新总页数
-    totalPages.value = response.data.meta.totalPages;
-  } catch (error) {
-    console.error('获取后台素材列表失败:', error);
-    toast.error('获取素材失败');
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-// --- 处理分页的函数 ---
+// --- 分页跳转 ---
 const goToPage = (page) => {
-  if (page >= 1 && page <= totalPages.value) {
-    currentPage.value = page;
-    fetchMaterials();
-  }
+  materialStore.goToPage(page);
 };
 
 // --- 编辑素材 ---
@@ -58,223 +27,297 @@ const saveEdit = async () => {
   if (!editingMaterial.value) return;
   
   try {
-    await apiClient.put(`/materials/${editingMaterial.value.id}`, {
+    await materialStore.updateMaterial(editingMaterial.value.id, {
       name: editingMaterial.value.name,
       tags: editingMaterial.value.tags
     });
     
-    // 更新本地数据
-    const index = materials.value.findIndex(m => m.id === editingMaterial.value.id);
-    if (index !== -1) {
-      materials.value[index].name = editingMaterial.value.name;
-      materials.value[index].tags = editingMaterial.value.tags;
-    }
-    
     editingMaterial.value = null;
-    toast.success('素材更新成功');
   } catch (error) {
     console.error('更新素材失败:', error);
-    toast.error('更新素材失败');
   }
 };
 
-// --- 删除素材 ---
-const deleteMaterial = async (id) => {
-  if (!confirm('确定要删除这个素材吗？')) return;
+// --- 文件上传处理 ---
+const handleFileChange = async (event, item) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('name', item.name);
+  formData.append('tags', item.tags);
   
   try {
-    await apiClient.delete(`/materials/${id}`);
-    materials.value = materials.value.filter(m => m.id !== id);
-    toast.success('素材删除成功');
-    
-    // 如果当前页没有数据了，且不是第一页，则返回上一页
-    if (materials.value.length === 0 && currentPage.value > 1) {
-      goToPage(currentPage.value - 1);
-    } else {
-      // 否则刷新当前页
-      fetchMaterials();
+    toast.info('正在上传文件...');
+    const result = await materialStore.uploadMaterial(formData);
+    if (result.success) {
+      // 刷新当前页面数据
+      await materialStore.fetchMaterials(materialStore.currentPage);
+      editingMaterial.value = null;
     }
   } catch (error) {
-    console.error('删除素材失败:', error);
-    toast.error('删除素材失败');
+    console.error('文件上传失败:', error);
   }
 };
 
+// --- 确认对话框 ---
+const confirmDialog = ref(null);
+const deleteItemId = ref(null);
+
+// --- 删除素材 ---
+const showDeleteConfirm = (id) => {
+  deleteItemId.value = id;
+  confirmDialog.value.show();
+};
+
+const deleteMaterial = async () => {
+  if (!deleteItemId.value) return;
+  
+  try {
+    await materialStore.deleteMaterial(deleteItemId.value);
+  } catch (error) {
+    console.error('删除素材失败:', error);
+    throw error; // 重新抛出错误，让确认对话框知道操作失败
+  } finally {
+    deleteItemId.value = null;
+  }
+};
+
+// --- 表格列配置 ---
+const columns = [
+  {
+    key: 'preview',
+    title: '预览',
+    width: '100px',
+    align: 'center'
+  },
+  {
+    key: 'name',
+    title: '名称',
+    sortable: true
+  },
+  {
+    key: 'tags',
+    title: '标签'
+  }
+];
+
+// --- 分页配置 ---
+const paginationConfig = computed(() => ({
+  currentPage: currentPage.value || 1,
+  totalPages: totalPages.value || 1,
+  totalItems: totalCount.value || 0,
+  pageSize: pageSize.value || 10,
+  showPageNumbers: true,
+  showTotal: true
+}));
+
+// 定时器引用
+let refreshTimer = null;
+
 onMounted(() => {
-  fetchMaterials();
+  materialStore.fetchMaterials();
+  
+  // 每60秒刷新一次数据
+  refreshTimer = setInterval(() => {
+    materialStore.fetchMaterials(materialStore.currentPage);
+  }, 60000);
+});
+
+onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+  }
 });
 </script>
 
 <template>
   <div class="card">
     <h2>素材管理</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>预览</th>
-          <th>名称</th>
-          <th>标签</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="material in materials" :key="material.id">
-          <td>
-            <img 
-              v-if="material.media_type === 'image'" 
-              :src="material.file_path" 
-              :alt="material.name" 
-              class="preview-img">
-            <img 
-              v-else-if="material.media_type === 'video' && material.cover_image_path"
-              :src="material.cover_image_path"
-              :alt="material.name + ' 封面'"
-              class="preview-img">
-            <div 
-              v-else-if="material.media_type === 'video' && !material.cover_image_path"
-              class="preview-img-placeholder">
-              ▶
-            </div>
-          </td>
-          <td>
-            <FloatingLabelInput 
-              v-if="editingMaterial && editingMaterial.id === material.id" 
-              v-model="editingMaterial.name"
-              label="名称" 
-            />
-            <span v-else>{{ material.name }}</span>
-          </td>
-          <td>
-            <FloatingLabelInput 
-              v-if="editingMaterial && editingMaterial.id === material.id" 
-              v-model="editingMaterial.tags"
-              label="标签" 
-            />
-            <span v-else>{{ material.tags }}</span>
-          </td>
-          <td>
-            <div v-if="editingMaterial && editingMaterial.id === material.id">
-              <button @click="saveEdit" class="btn-save">保存</button>
-              <button @click="editingMaterial = null" class="btn-cancel">取消</button>
-            </div>
-            <div v-else>
-              <button @click="startEditing(material)" class="btn-edit">编辑</button>
-              <button @click="deleteMaterial(material.id)" class="btn-delete">删除</button>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div class="pagination-container">
-      <button @click="goToPage(currentPage - 1)" :disabled="isPrevDisabled" class="btn-page">
-        &lt; 上一页
-      </button>
-      <span>
-        第 {{ currentPage }} 页 / 共 {{ totalPages }} 页
-      </span>
-      <button @click="goToPage(currentPage + 1)" :disabled="isNextDisabled" class="btn-page">
-        下一页 &gt;
-      </button>
-    </div>
+    
+    <DataTable 
+      :data="materials"
+      :columns="columns"
+      :loading="isLoading"
+      :pagination="paginationConfig"
+      @page-change="goToPage"
+    >
+      <!-- 预览列 -->
+      <template #column-preview="{ item }">
+        <div class="preview-container">
+          <img 
+            v-if="item.media_type === 'image'" 
+            :src="item.file_path" 
+            :alt="item.name" 
+            class="preview-img">
+          <img 
+            v-else-if="item.media_type === 'video' && item.cover_image_path"
+            :src="item.cover_image_path"
+            :alt="item.name + ' 封面'"
+            class="preview-img">
+          <div 
+            v-else-if="item.media_type === 'video' && !item.cover_image_path"
+            class="preview-img-placeholder">
+            ▶
+          </div>
+          
+          <!-- 编辑模式下的图片上传 -->
+          <div v-if="editingMaterial && editingMaterial.id === item.id" class="image-upload-overlay">
+            <input 
+              type="file" 
+              accept="image/*,video/*"
+              @change="handleFileChange($event, item)"
+              class="file-input"
+              :id="`file-${item.id}`">
+            <label :for="`file-${item.id}`" class="upload-btn">
+              📷
+            </label>
+          </div>
+        </div>
+      </template>
+      
+      <!-- 名称列 -->
+      <template #column-name="{ item }">
+        <FloatingLabelInput 
+          v-if="editingMaterial && editingMaterial.id === item.id" 
+          v-model="editingMaterial.name"
+          label="名称" 
+        />
+        <span v-else>{{ item.name }}</span>
+      </template>
+      
+      <!-- 标签列 -->
+      <template #column-tags="{ item }">
+        <FloatingLabelInput 
+          v-if="editingMaterial && editingMaterial.id === item.id" 
+          v-model="editingMaterial.tags"
+          label="标签" 
+        />
+        <span v-else>{{ item.tags }}</span>
+      </template>
+      
+      <!-- 操作列 -->
+      <template #actions="{ item }">
+        <div v-if="editingMaterial && editingMaterial.id === item.id" class="action-buttons">
+          <button @click="saveEdit" class="btn-save">保存</button>
+          <button @click="editingMaterial = null" class="btn-cancel">取消</button>
+        </div>
+        <div v-else class="action-buttons">
+          <button @click="startEditing(item)" class="btn-edit">编辑</button>
+          <button @click="showDeleteConfirm(item.id)" class="btn-delete">删除</button>
+        </div>
+      </template>
+    </DataTable>
+    
+    <!-- 确认删除对话框 -->
+    <ConfirmDialog 
+      ref="confirmDialog"
+      title="确认删除"
+      message="确定要删除这个素材吗？此操作不可撤销。"
+      type="danger"
+      @confirm="deleteMaterial"
+    />
   </div>
 </template>
 
 <style scoped>
 .card {
-  background: linear-gradient(-45deg, #f8f8f8, #f0f0f0);
-  background-size: 200% 200%;
-  animation: gradient-animation 20s ease infinite;
-  border-radius: 15px;
-  padding: 2.5rem;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.08);
-  border: 1px solid #e0e0e0;
-  transition: box-shadow 0.3s ease;
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
 }
 
-.card h2 {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 1.8rem;
-  color: #343a40;
-  margin-bottom: 2rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
+h2 {
+  color: #333;
+  margin-bottom: 20px;
 }
 
-@keyframes gradient-animation {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 2rem;
-  background-color: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-}
-
-th, td {
-  padding: 1rem;
-  text-align: left;
-  border-bottom: 1px solid #e9ecef;
-}
-
-th {
-  background-color: #f8f9fa;
-  font-weight: 600;
-  color: #495057;
-}
-
-tr:last-child td {
-  border-bottom: none;
-}
-
-tr:hover {
-  background-color: #f8f9fa;
+.preview-container {
+  position: relative;
+  display: inline-block;
 }
 
 .preview-img {
-  width: 80px;
-  height: 80px;
+  width: 60px;
+  height: 60px;
   object-fit: cover;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  border: 1px solid #ddd;
 }
 
 .preview-img-placeholder {
-  width: 80px;
-  height: 80px;
+  width: 60px;
+  height: 60px;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #e9ecef;
-  border-radius: 8px;
-  font-size: 1.5rem;
-  color: #6c757d;
+  font-size: 24px;
+  color: #666;
+}
+
+.image-upload-overlay {
+  position: absolute;
+  top: 0;
+  right: -8px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-input {
+  display: none;
+}
+
+.upload-btn {
+  cursor: pointer;
+  font-size: 12px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.upload-btn:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
 }
 
 .btn-edit, .btn-delete, .btn-save, .btn-cancel {
-  padding: 0.5rem 1rem;
+  padding: 6px 12px;
   border: none;
-  border-radius: 6px;
-  font-weight: 500;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
-  margin-right: 0.5rem;
+  font-size: 14px;
+  transition: background-color 0.3s;
 }
 
 .btn-edit {
-  background-color: #42b883;
+  background-color: #007bff;
   color: white;
 }
 
 .btn-edit:hover {
-  background-color: #3aa876;
+  background-color: #0056b3;
 }
 
 .btn-delete {
@@ -287,12 +330,12 @@ tr:hover {
 }
 
 .btn-save {
-  background-color: #007bff;
+  background-color: #28a745;
   color: white;
 }
 
 .btn-save:hover {
-  background-color: #0069d9;
+  background-color: #218838;
 }
 
 .btn-cancel {
@@ -304,94 +347,79 @@ tr:hover {
   background-color: #5a6268;
 }
 
-.pagination-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
+/* 表格样式优化 */
+:deep(.data-table) {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
 }
 
-.btn-page {
-  padding: 0.5rem 1rem;
+:deep(.data-table th) {
   background-color: #f8f9fa;
-  border: 1px solid #ced4da;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
+  font-weight: 600;
+  color: #495057;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 2px solid #dee2e6;
 }
 
-.btn-page:hover:not(:disabled) {
-  background-color: #e9ecef;
+:deep(.data-table td) {
+  padding: 16px;
+  border-bottom: 1px solid #dee2e6;
+  vertical-align: middle;
 }
 
-.btn-page:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+:deep(.data-table tr:hover) {
+  background-color: #f8f9fa;
 }
 
+:deep(.actions-column) {
+  width: 120px;
+  text-align: center;
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
   .card {
-    padding: 1.5rem;
-  }
-  
-  .card h2 {
-    font-size: 1.5rem;
-  }
-  
-  table {
-    font-size: 0.9rem;
-  }
-  
-  th, td {
-    padding: 0.75rem 0.5rem;
+    padding: 15px;
+    margin: 10px;
   }
   
   .preview-img, .preview-img-placeholder {
-    width: 60px;
-    height: 60px;
+    width: 40px;
+    height: 40px;
   }
   
   .btn-edit, .btn-delete, .btn-save, .btn-cancel {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.9rem;
-    margin-bottom: 0.25rem;
-  }
-  
-  .pagination-container {
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    padding: 4px 8px;
+    font-size: 12px;
   }
 }
 
 @media (max-width: 480px) {
   .card {
-    padding: 1rem;
+    padding: 10px;
+    margin: 5px;
   }
   
-  .card h2 {
-    font-size: 1.3rem;
-  }
-  
-  table {
-    font-size: 0.8rem;
-  }
-  
-  th, td {
-    padding: 0.5rem 0.25rem;
+  h2 {
+    font-size: 18px;
+    margin-bottom: 15px;
   }
   
   .preview-img, .preview-img-placeholder {
-    width: 50px;
-    height: 50px;
+    width: 30px;
+    height: 30px;
   }
   
   .btn-edit, .btn-delete, .btn-save, .btn-cancel {
-    padding: 0.3rem 0.6rem;
-    font-size: 0.8rem;
-    display: block;
-    width: 100%;
-    margin-bottom: 0.25rem;
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    gap: 4px;
   }
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import apiClient from '../axiosConfig.js';
+import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
 import TutorialGuide from '../components/TutorialGuide.vue';
@@ -23,14 +24,73 @@ const activeTag = ref('');
 const isLoading = ref(false); // 初始为 false
 let debounceTimer = null;
 const isTagsExpanded = ref(false); //控制标签面板是否展开
+const tagsContainerRef = ref(null); // 标签容器引用
+const visibleTagsCount = ref(20); // 动态计算的可见标签数量
+
 const visibleTags = computed(() => {
-  //如果是展开状态，或者标签总数小于等于20个，则全部显示
-  if (isTagsExpanded.value || tags.value.length <= 20){
+  //如果tags.value不存在或不是数组，返回空数组
+  if (!tags.value || !Array.isArray(tags.value)) {
+    return [];
+  }
+  //如果是展开状态，或者标签总数小于等于可见数量，则全部显示
+  if (isTagsExpanded.value || tags.value.length <= visibleTagsCount.value){
     return tags.value;
   }
-  //否则只显示前20个
-  return tags.value.slice(0,20)
+  //否则只显示计算出的可见数量
+  return tags.value.slice(0, visibleTagsCount.value)
 })
+
+// 计算实际可见的标签数量
+const calculateVisibleTags = async () => {
+  if (!tagsContainerRef.value || !tags.value || tags.value.length === 0) {
+    return;
+  }
+  
+  const container = tagsContainerRef.value;
+  const maxHeight = 110; // 对应CSS中的max-height
+  
+  // 先显示所有标签来测试是否溢出
+  const originalExpanded = isTagsExpanded.value;
+  isTagsExpanded.value = true;
+  
+  await new Promise(resolve => setTimeout(resolve, 0)); // 等待DOM更新
+  
+  const fullHeight = container.scrollHeight;
+  
+  // 如果没有溢出，显示所有标签
+  if (fullHeight <= maxHeight) {
+    visibleTagsCount.value = tags.value.length;
+    isTagsExpanded.value = originalExpanded;
+    return;
+  }
+  
+  // 恢复原始状态
+  isTagsExpanded.value = originalExpanded;
+  
+  // 逐个减少标签数量直到不溢出
+  let testCount = tags.value.length - 1;
+  
+  while (testCount > 0) {
+    visibleTagsCount.value = testCount;
+    
+    await new Promise(resolve => setTimeout(resolve, 0)); // 等待DOM更新
+    
+    const currentHeight = container.scrollHeight;
+    
+    if (currentHeight <= maxHeight) {
+      // 找到合适的数量，但需要为"展开更多"按钮留出空间
+      // 所以再减少1-2个标签
+      visibleTagsCount.value = Math.max(1, testCount - 1);
+      break;
+    }
+    
+    testCount--;
+  }
+  
+  if (testCount === 0) {
+    visibleTagsCount.value = 1; // 至少显示1个标签
+  }
+}
 
 // --- 分页与无限滚动状态 ---
 const currentPage = ref(1);
@@ -47,20 +107,27 @@ const currentVideoUrl = ref('');
 const feedbackMessage = ref(''); // 新增：用户留言内容
 const showFeedbackForm = ref(false); // 新增：控制留言表单的显示
 const isWidgetHovered = ref(false); // 新增：控制留言时间线小部件的悬停状态
+const feedbackStore = useFeedbackStore(); // 反馈store
 
 // --- 教程相关状态 ---
 const showTutorial = ref(false); // 控制教程显示
 const tutorialTarget = ref('.search-input-cool'); // 教程聚焦目标
 const tutorialGuideRef = ref(null); // 教程组件引用
 
-const imageSources = computed(() =>
-    materials.value
+const imageSources = computed(() => {
+    if (!materials.value || !Array.isArray(materials.value)) {
+        return [];
+    }
+    return materials.value
         .filter(m => m.media_type === 'image')
-        .map(m => m.file_path)
-);
+        .map(m => m.file_path);
+});
 
 const showMedia = (material) => {
     if (material.media_type === 'image') {
+        if (!materials.value || !Array.isArray(materials.value)) {
+            return;
+        }
         const imageIndex = materials.value.filter(m => m.media_type === 'image').findIndex(m => m.id === material.id);
         lightboxIndex.value = imageIndex;
         lightboxVisible.value = true;
@@ -73,12 +140,13 @@ const showMedia = (material) => {
 };
 
 const fetchMaterials = async (isLoadMore = false) => {
-    // 关键：如果正在加载，并且不是加载更多（即是筛选触发的），则直接返回，防止重复请求
-    if (isLoading.value && !isLoadMore) return;
+    // 修复：移除可能导致首次加载失败的防重复请求逻辑
+    // 只在真正的加载更多操作时才检查loading状态
+    if (isLoadMore && isLoading.value) return;
     isLoading.value = true;
 
     try {
-        const response = await apiClient.get(`/materials`, {
+        const response = await apiClient.get(`/api/v1/materials`, {
             params: {
                 search: searchTerm.value,
                 tag: activeTag.value,
@@ -112,10 +180,27 @@ const fetchMaterials = async (isLoadMore = false) => {
     }
 };
 
+// 提示框状态
+const showToast = ref(false);
+const toastMessage = ref('');
+const toastType = ref('success'); // 'success' | 'error'
+
+// 显示高端提示框
+const showCustomToast = (message, type = 'success') => {
+    toastMessage.value = message;
+    toastType.value = type;
+    showToast.value = true;
+    
+    // 3秒后自动隐藏
+    setTimeout(() => {
+        showToast.value = false;
+    }, 2000);
+};
+
 // 新增：提交留言功能
 const submitFeedback = async () => {
 if (!feedbackMessage.value.trim()) {
-    alert('留言内容不能为空！');
+    showCustomToast('留言内容不能为空！', 'error');
     return;
 }
 
@@ -127,15 +212,21 @@ if (!userId) {
 }
 
 try {
-    // 这里需要调用后端API来保存留言，稍后实现
-    await apiClient.post('/feedback', { message: feedbackMessage.value, user_id: userId });
-    alert('留言成功，感谢您的反馈！');
-    feedbackMessage.value = ''; // 清空留言内容
-    showFeedbackForm.value = false; // 提交成功后隐藏表单
-    fetchUserFeedbacks(); // 提交成功后刷新用户留言列表
+    const result = await feedbackStore.submitFeedback({
+        message: feedbackMessage.value,
+        user_id: userId
+    });
+    
+    if (result.success) {
+        showCustomToast('留言成功，感谢您的反馈！', 'success');
+        feedbackMessage.value = ''; // 清空留言内容
+        fetchUserFeedbacks(); // 提交成功后刷新用户留言列表
+    } else {
+        showCustomToast(result.message || '提交留言失败，请稍后再试。', 'error');
+    }
 } catch (error) {
     console.error('提交留言失败:', error);
-    alert('提交留言失败，请稍后再试。');
+    showCustomToast('提交留言失败，请稍后再试。', 'error');
 }
 };
 
@@ -151,7 +242,7 @@ const fetchUserFeedbacks = async () => {
 
   isUserFeedbacksLoading.value = true;
   try {
-    const response = await apiClient.get(`/feedbacks/user/${userId}`);
+    const response = await apiClient.get(`/api/v1/feedbacks/user/${userId}`);
     userFeedbacks.value = response.data.data;
   } catch (error) {
     console.error('获取用户留言失败:', error);
@@ -167,8 +258,12 @@ const formatDateTime = (isoString) => {
 
 const fetchTags = async () => {
   try {
-    const response = await apiClient.get(`/tags`);
+    const response = await apiClient.get(`/api/v1/materials/tags/all`);
     tags.value = response.data.data;
+    // 标签加载完成后计算可见标签数量
+    setTimeout(async () => {
+      await calculateVisibleTags();
+    }, 100);
   } catch (error) {
     console.error('获取标签失败:', error);
   }
@@ -212,12 +307,21 @@ onMounted(() => {
     setupObserver();
     fetchUserFeedbacks(); // 页面加载时获取用户留言
     initTutorial(); // 初始化教程
+    
+    // 监听窗口大小变化
+    window.addEventListener('resize', () => {
+      setTimeout(async () => {
+        await calculateVisibleTags();
+      }, 100);
+    });
 });
 
 onUnmounted(() => {
     if (observer && observerEl.value) {
         observer.unobserve(observerEl.value);
     }
+    // 移除窗口大小变化监听器
+    window.removeEventListener('resize', calculateVisibleTags);
 });
 
 // 新增：处理小部件鼠标进入事件
@@ -299,14 +403,8 @@ if (typeof window !== 'undefined') {
   window.resetTutorial = resetTutorial;
 }
 
-// 监听 materials 变化，在没有搜索结果时显示留言表单
-watch(materials, (newVal) => {
-showFeedbackForm.value = newVal.length === 0 && !isLoading.value && searchTerm.value.length > 0;
-});
-
-watch(isLoading, (newVal) => {
-showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.value.length > 0;
-});
+// 留言表单始终显示
+showFeedbackForm.value = true;
 </script>
 
 <template>
@@ -319,7 +417,7 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   </header>
 
   <main>
-    <div class="tags-container" :class="{ 'tags-expanded': isTagsExpanded }">
+    <div class="tags-container" :class="{ 'tags-expanded': isTagsExpanded }" ref="tagsContainerRef">
       <TransitionGroup name="tag-list">
         <button @click="filterByTag('')" :class="{ active: activeTag === '' }" key="all-btn">
           全部
@@ -335,7 +433,7 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
         </button>
 
         <button 
-          v-if="tags.length > 20" 
+          v-if="tags && tags.length > visibleTagsCount" 
           @click="isTagsExpanded = !isTagsExpanded" 
           class="tags-toggle-btn"
           key="toggle-btn"
@@ -366,20 +464,40 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
 
     <div class="load-more-container">
         <div v-if="isLoading" class="loader"></div>
-        <p v-if="!hasMore && materials.length > 0">已加载全部内容</p>
-        <p v-if="materials.length === 0 && !isLoading && searchTerm.length === 0" class="no-results">输入关键词探索素材。</p>
-        <div v-if="materials.length === 0 && !isLoading && searchTerm.length > 0" class="no-results">
-            <p>私密马赛，暂未找到匹配的素材。</p>
-            <p>没有找到您想要的素材？请告诉我们您的需求，我们会尽快处理！</p>
-            <div class="feedback-form" v-if="showFeedbackForm">
-                <textarea v-model="feedbackMessage" placeholder="请描述您想要的素材，例如：复合双层拉链风衣" rows="4"></textarea>
-                <button @click="submitFeedback">提交留言</button>
+        <p v-if="!hasMore && materials && materials.length > 0 && !isLoading" class="load-complete">已加载全部素材</p>
+        <p v-if="(!materials || materials.length === 0) && !isLoading && (!searchTerm || searchTerm.trim().length === 0) && (!activeTag || activeTag === '')" class="no-results">输入关键词探索素材</p>
+        <div v-if="(!materials || materials.length === 0) && !isLoading && ((searchTerm && searchTerm.trim().length > 0) || (activeTag && activeTag !== ''))" class="no-results">
+            <p>私密马赛~ 暂未找到匹配的素材</p>
+            <p>如果找到您想要的素材？请告诉我们您的需求，我们会尽快处理！</p>
+            <div class="feedback-form">
+                <textarea v-model="feedbackMessage" placeholder="请描述您想要的素材，例如：复合双层拉链风衣" rows="3"></textarea>
+                <button @click="submitFeedback" class="feedback-btn">提交留言</button>
             </div>
         </div>
     </div>
     <div ref="observerEl" class="observer"></div>
 
   </main>
+
+  <!-- 高端提示框 -->
+  <div v-if="showToast" class="custom-toast" :class="`toast-${toastType}`">
+    <div class="toast-content">
+      <div class="toast-icon">
+        <svg v-if="toastType === 'success'" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="toast-message">{{ toastMessage }}</span>
+      <button @click="showToast = false" class="toast-close">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
 
   <!-- 教程引导组件 -->
   <TutorialGuide
@@ -406,7 +524,7 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   />
 
   <!-- 新增：用户留言时间线小部件 -->
-  <div v-if="userFeedbacks.length > 0" 
+  <div v-if="userFeedbacks && userFeedbacks.length > 0" 
     :class="{ 'feedback-timeline-widget': true, 'expanded': isWidgetHovered }"
     @mouseenter="handleWidgetMouseEnter" 
     @mouseleave="handleWidgetMouseLeave"
@@ -416,8 +534,8 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
       <transition name="fade" mode="out-in">
         <span v-if="isWidgetHovered" class="title">我的实拍图请求</span>
       </transition>
-      <span v-if="userFeedbacks.filter(f => f.status === 'pending').length > 0" class="pending-badge">
-        <span v-if="isWidgetHovered">{{ userFeedbacks.filter(f => f.status === 'pending').length }}</span>
+      <span v-if="(userFeedbacks && Array.isArray(userFeedbacks)) && userFeedbacks.filter(f => f.status === 'pending').length > 0" class="pending-badge">
+        <span v-if="isWidgetHovered">{{ (userFeedbacks && Array.isArray(userFeedbacks)) ? userFeedbacks.filter(f => f.status === 'pending').length : 0 }}</span>
         <span v-else class="dot"></span> <!-- 红点占位 -->
       </span>
       <transition name="fade" mode="out-in">
@@ -427,7 +545,7 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
     <div v-if="isWidgetHovered" class="widget-content">
       <div v-if="isUserFeedbacksLoading" class="loading-message">加载中...</div>
       <div v-else class="feedback-list">
-        <div v-for="feedback in userFeedbacks" :key="feedback.id" class="feedback-item">
+        <div v-for="feedback in (userFeedbacks || [])" :key="feedback.id" class="feedback-item">
           <div class="feedback-meta">
             <span :class="{ 'status-tag': true, 'status-pending': feedback.status === 'pending', 'status-resolved': feedback.status === 'resolved' }">
               {{ feedback.status === 'pending' ? '待处理' : '已处理' }}
@@ -645,11 +763,50 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   
 .load-more-container { 
   display: flex; 
+  flex-direction: column;
   justify-content: center; 
   align-items: center; 
-  /* padding: 3rem;  */
+  /* padding: 2rem 1rem; */
+  margin-top: -50px;
   color: #6c757d; 
   font-size: 1.1em;
+  text-align: center;
+}
+
+.load-complete {
+  color: #28a745;
+  font-weight: 500;
+  margin: 1rem 0;
+}
+
+.no-results {
+  color: #6c757d;
+  text-align: center;
+  margin: 2rem 0;
+}
+
+.no-results p {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+.feedback-btn {
+  background: linear-gradient(45deg, #8a2be2, #4b0082);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 0.8rem 2rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 1rem;
+  box-shadow: 0 4px 15px rgba(138, 43, 226, 0.3);
+}
+
+.feedback-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(138, 43, 226, 0.4);
 }
 .loader { 
   border: 4px solid #f3f3f3; 
@@ -696,15 +853,22 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
 }
 
 .feedback-form {
-  margin-top: 1.5rem; /* 调整距离 */
-  padding: 2rem;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
   background-color: #ffffff;
-  border-radius: 15px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
-  max-width: 550px;
-  margin-left: auto;
-  margin-right: auto;
-  border: 1px solid #e0e0e0; /* 柔和边框 */
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  max-width: 100%;
+  border: 1px solid #e0e0e0;
+}
+
+.no-results .feedback-form {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: none;
+  border: 1px solid #dee2e6;
 }
 
 .feedback-form textarea {
@@ -1114,11 +1278,123 @@ showFeedbackForm.value = materials.value.length === 0 && !newVal && searchTerm.v
   color: #8a2be2 !important; /* 紫色主题色 */
   font-weight: bold !important;
   box-shadow: none !important;
+  flex-shrink: 0 !important; /* 防止按钮被压缩 */
+  white-space: nowrap !important; /* 防止文字换行 */
+  order: 999 !important; /* 确保按钮排在最后 */
 }
 
 .tags-toggle-btn:hover {
   background-color: #f0e6fa !important; /* 悬浮时淡紫色背景 */
   transform: none !important; /* 移除悬浮时的上移效果 */
+}
+
+/* 高端提示框样式 */
+.custom-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  min-width: 320px;
+  max-width: 500px;
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  gap: 12px;
+}
+
+.toast-success {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(21, 128, 61, 0.95) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.toast-error {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(185, 28, 28, 0.95) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.toast-icon {
+  width: 24px;
+  height: 24px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.toast-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.toast-message {
+  color: white;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  flex: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.toast-close {
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  transform: scale(1.1);
+}
+
+.toast-close svg {
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes toastSlideIn {
+  from {
+    transform: translateX(100%) scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .custom-toast {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    max-width: none;
+  }
+  
+  .toast-content {
+    padding: 14px 16px;
+  }
+  
+  .toast-message {
+    font-size: 14px;
+  }
 }
 
 /* 导航栏活跃状态按钮样式
