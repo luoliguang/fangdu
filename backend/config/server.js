@@ -36,13 +36,17 @@ class ServerConfig {
    */
   initializeOSS() {
     try {
+      const region = process.env.ALI_OSS_REGION;
+      const endpoint = `https://${region}.aliyuncs.com`;
+      
       this.ossClient = new OSS({
-        region: process.env.ALI_OSS_REGION,
+        region: region,
+        endpoint: endpoint,
         accessKeyId: process.env.ALI_OSS_ACCESS_KEY_ID,
         accessKeySecret: process.env.ALI_OSS_ACCESS_KEY_SECRET,
         bucket: process.env.ALI_OSS_BUCKET,
       });
-      console.log('阿里云OSS客户端初始化成功');
+      console.log(`阿里云OSS客户端初始化成功，endpoint: ${endpoint}`);
     } catch (error) {
       console.error('阿里云OSS客户端初始化失败:', error.message);
       process.exit(1);
@@ -63,7 +67,7 @@ class ServerConfig {
       },
       upload: {
         maxFileSize: process.env.MAX_FILE_SIZE || '10MB',
-        allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/avi']
+        allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'video/mp4', 'video/avi']
       }
     };
   }
