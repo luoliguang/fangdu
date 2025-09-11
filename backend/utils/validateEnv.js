@@ -3,6 +3,9 @@
  * 用于验证阿里云OSS相关环境变量的配置
  */
 
+// 加载环境变量
+require('dotenv').config()
+
 const fs = require('fs')
 const path = require('path')
 const https = require('https')
@@ -330,6 +333,9 @@ class EnvValidator {
 
     // 生成报告
     this.generateReport()
+    
+    // 返回验证结果
+    return this.result
   }
 
   /**
