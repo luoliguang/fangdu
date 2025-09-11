@@ -31,15 +31,24 @@ log_error() {
 
 # 检查是否在正确的目录
 check_directory() {
-    if [ ! -f "package.json" ]; then
-        log_error "请在项目根目录下运行此脚本"
+    # 检查是否存在backend和frontend目录（项目特征目录）
+    if [ ! -d "backend" ]; then
+        log_error "未找到backend目录，请在项目根目录下运行此脚本"
         exit 1
     fi
     
-    if [ ! -d "backend" ]; then
-        log_error "未找到backend目录"
+    if [ ! -d "frontend" ]; then
+        log_error "未找到frontend目录，请在项目根目录下运行此脚本"
         exit 1
     fi
+    
+    # 检查backend目录下是否有package.json
+    if [ ! -f "backend/package.json" ]; then
+        log_error "backend目录下未找到package.json文件"
+        exit 1
+    fi
+    
+    log_info "项目目录检查通过"
 }
 
 # 备份现有配置
