@@ -194,7 +194,7 @@ class DatabaseConfig {
   setupCleanupTask() {
     const cleanupOldVisits = () => {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      this.db.run(`DELETE FROM visits WHERE visited_at < ?`, [thirtyDaysAgo], function(err) {
+      this.db.run(`DELETE FROM visits WHERE visit_time < ?`, [thirtyDaysAgo], function(err) {
         if (err) {
           console.error('清理过期访问记录失败:', err.message);
         } else if (this.changes > 0) {
