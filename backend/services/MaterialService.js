@@ -9,7 +9,8 @@ class MaterialService {
   constructor(db) {
     this.materialModel = new Material(db);
     const config = ServerConfig.getConfig();
-    this.ossClient = new ServerConfig().getOSSClient();
+    // 获取全局单例的OSS客户端实例
+    this.ossClient = ServerConfig.getConfig().ossClient || new ServerConfig().getOSSClient();
     this.ossConfig = config.oss;
   }
 

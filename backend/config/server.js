@@ -173,7 +173,10 @@ const serverConfig = new ServerConfig();
 
 // 添加静态方法以保持向后兼容
 ServerConfig.getConfig = () => {
-  return serverConfig.getAllConfig();
+  const config = serverConfig.getAllConfig();
+  // 添加OSS客户端实例到配置中
+  config.ossClient = serverConfig.getOSSClient();
+  return config;
 };
 
 module.exports = ServerConfig;
