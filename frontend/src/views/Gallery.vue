@@ -767,7 +767,7 @@ showFeedbackForm.value = true;
   justify-content: center; 
   align-items: center; 
   /* padding: 2rem 1rem; */
-  margin-top: -50px;
+  margin-top: 0px;
   color: #6c757d; 
   font-size: 1.1em;
   text-align: center;

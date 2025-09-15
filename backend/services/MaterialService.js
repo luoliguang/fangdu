@@ -80,8 +80,15 @@ class MaterialService {
       // 确定媒体类型
       const mediaType = file.mimetype.startsWith('image/') ? 'image' : 'video';
       
-      // 上传到OSS
-      const uploadResult = await this.ossClient.put(fileName, file.buffer);
+      // 上传到OSS，设置正确的Content-Disposition头部
+      const uploadOptions = {
+        headers: {
+          'Content-Type': file.mimetype,
+          'Content-Disposition': 'inline' // 设置为inline，允许在浏览器中直接显示
+        }
+      };
+      
+      const uploadResult = await this.ossClient.put(fileName, file.buffer, uploadOptions);
       const fileUrl = this.ensureHttpsUrl(uploadResult.url);
       
       let coverImagePath = null;
