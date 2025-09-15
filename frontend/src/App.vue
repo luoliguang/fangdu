@@ -180,7 +180,11 @@ const handleNavClick = (event) => {
       </template>
     </nav>
     <main>
-      <router-view></router-view>
+      <router-view v-slot="{ Component }">
+        <keep-alive>
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
     </main>
 
     <Transition name="fade">
@@ -202,12 +206,23 @@ const handleNavClick = (event) => {
     background-color: #f0f2f5;
     margin: 0;
   }
+  
+  /* 为main元素添加上边距，避免被固定导航栏遮挡 */
+  main {
+    margin-top: 80px; /* 根据导航栏高度调整，大约是padding(1rem*2) + 文字高度 + gap */
+  }
   .main-nav {
     background-color: #2c3e50;
     padding: 1rem 2rem;
     display: flex;
     gap: 1.5rem;
-    position: relative; /* 1. 父容器设为相对定位 */
+    position: fixed; /* 固定定位 */
+    top: 0; /* 固定在顶部 */
+    left: 0; /* 从左边开始 */
+    right: 0; /* 到右边结束 */
+    width: 100%; /* 占满整个宽度 */
+    z-index: 1000; /* 确保在最顶层 */
+    box-sizing: border-box; /* 确保padding不会影响总宽度 */
   }
   /* 2. 定义滑块的样式和动画 */
   .nav-slider {

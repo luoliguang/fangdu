@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, onActivated } from 'vue';
 import apiClient from '../axiosConfig.js';
 import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
@@ -269,6 +269,9 @@ const fetchTags = async () => {
   }
 };
 
+// --- 数据缓存状态 ---
+const isDataLoaded = ref(false); // 标记数据是否已加载
+
 const handleFilterChange = () => {
     currentPage.value = 1;
     totalPages.value = 1;
@@ -302,11 +305,15 @@ const setupObserver = () => {
 };
 
 onMounted(() => {
-    handleFilterChange();
-    fetchTags();
+    // 只在首次挂载时加载数据
+    if (!isDataLoaded.value) {
+        handleFilterChange();
+        fetchTags();
+        fetchUserFeedbacks(); // 页面加载时获取用户留言
+        initTutorial(); // 初始化教程
+        isDataLoaded.value = true;
+    }
     setupObserver();
-    fetchUserFeedbacks(); // 页面加载时获取用户留言
-    initTutorial(); // 初始化教程
     
     // 监听窗口大小变化
     window.addEventListener('resize', () => {
@@ -314,6 +321,12 @@ onMounted(() => {
         await calculateVisibleTags();
       }, 100);
     });
+});
+
+// keep-alive组件激活时的逻辑
+onActivated(() => {
+    // 重新设置观察器，因为组件可能被缓存
+    setupObserver();
 });
 
 onUnmounted(() => {
