@@ -123,6 +123,15 @@ onMounted(() => {
           <i class="nav-icon">📊</i>
           <span class="nav-text">访问统计</span>
         </div>
+        <div 
+          class="nav-item" 
+          :class="{ active: $route.name === 'DrawerConfig' }"
+          @click="navigateTo('DrawerConfig')"
+        >
+          <span class="nav-hover-effect"></span>
+          <i class="nav-icon">🎛️</i>
+          <span class="nav-text">抽屉配置</span>
+        </div>
       </div>
       
       <!-- 退出登录按钮 -->

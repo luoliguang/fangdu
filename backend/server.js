@@ -6,6 +6,7 @@ const fs = require('fs');
 // 导入配置
 const ServerConfig = require('./config/server');
 const DatabaseConfig = require('./config/database');
+const { sequelize, testConnection, syncDatabase } = require('./config/sequelize');
 
 // 导入路由
 const createRoutes = require('./routes');
@@ -72,9 +73,15 @@ class Server {
    */
   async initializeDatabase() {
     try {
+      // 初始化原有的SQLite数据库
       const dbConfig = new DatabaseConfig(this.config.database);
       this.db = await dbConfig.initialize();
-      console.log('✅ 数据库初始化完成');
+      console.log('✅ 原有数据库初始化完成');
+      
+      // 初始化Sequelize数据库（用于抽屉配置）
+      await testConnection();
+      await syncDatabase();
+      console.log('✅ Sequelize数据库初始化完成');
     } catch (error) {
       console.error('❌ 数据库初始化失败:', error);
       throw error;

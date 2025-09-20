@@ -5,6 +5,7 @@ import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
 import TutorialGuide from '../components/TutorialGuide.vue';
+import SideDrawer from '../components/SideDrawer.vue';
 import tutorialManager from '../utils/tutorialManager.js';
 
 // 简单的 UUID 生成函数
@@ -26,6 +27,53 @@ let debounceTimer = null;
 const isTagsExpanded = ref(false); //控制标签面板是否展开
 const tagsContainerRef = ref(null); // 标签容器引用
 const visibleTagsCount = ref(20); // 动态计算的可见标签数量
+
+// --- 收藏夹状态 ---
+const favorites = ref([]);
+
+// 快速筛选处理方法
+const handleQuickFilter = (filterValue) => {
+  // 根据快速筛选应用不同的逻辑
+  switch(filterValue) {
+    case 'video':
+      // 筛选视频素材
+      activeTag.value = '';
+      searchTerm.value = '';
+      // 这里可以添加视频筛选逻辑
+      break;
+    case 'latest':
+      // 按最新排序
+      activeTag.value = '';
+      searchTerm.value = '';
+      // 这里可以添加最新排序逻辑
+      break;
+    case 'popular':
+      // 按热门排序
+      activeTag.value = '';
+      searchTerm.value = '';
+      break;
+    default:
+      // 其他筛选可以设置为搜索词
+      searchTerm.value = filterValue;
+      activeTag.value = '';
+  }
+};
+
+const addToFavorites = (material) => {
+  const exists = favorites.value.find(fav => fav.id === material.id);
+  if (!exists) {
+    favorites.value.push(material);
+    showCustomToast('已添加到收藏夹', 'success');
+  }
+};
+
+const removeFromFavorites = (materialId) => {
+  const index = favorites.value.findIndex(fav => fav.id === materialId);
+  if (index > -1) {
+    favorites.value.splice(index, 1);
+    showCustomToast('已从收藏夹移除', 'success');
+  }
+};
 
 const visibleTags = computed(() => {
   //如果tags.value不存在或不是数组，返回空数组
@@ -104,7 +152,43 @@ const lightboxVisible = ref(false);
 const lightboxIndex = ref(0);
 const videoModalVisible = ref(false);
 const currentVideoUrl = ref('');
-const feedbackMessage = ref(''); // 新增：用户留言内容
+const feedbackMessage = ref(''); // 用户留言内容（页面底部）
+
+// 新增：提交留言功能（页面底部）
+const submitFeedback = async () => {
+  // 确保留言内容非空且去除首尾空格
+  const trimmedMessage = feedbackMessage.value.trim();
+  if (!trimmedMessage) {
+    showCustomToast('留言内容不能为空！', 'error');
+    return;
+  }
+
+  // 获取或生成用户ID
+  let userId = localStorage.getItem('user_id');
+  if (!userId) {
+    userId = generateUUID();
+    localStorage.setItem('user_id', userId);
+  }
+
+  try {
+    // 确保提交的数据格式正确
+    const result = await feedbackStore.submitFeedback({
+      message: trimmedMessage, // 使用去除空格后的内容
+      user_id: userId
+    });
+    
+    if (result.success) {
+      showCustomToast('留言成功，感谢您的反馈！', 'success');
+      feedbackMessage.value = ''; // 清空留言内容
+      fetchUserFeedbacks(); // 提交成功后刷新用户留言列表
+    } else {
+      showCustomToast(result.message || '提交留言失败，请稍后再试。', 'error');
+    }
+  } catch (error) {
+    console.error('提交留言失败:', error);
+    showCustomToast('提交留言失败，请稍后再试。', 'error');
+  }
+};
 const showFeedbackForm = ref(false); // 新增：控制留言表单的显示
 const isWidgetHovered = ref(false); // 新增：控制留言时间线小部件的悬停状态
 const feedbackStore = useFeedbackStore(); // 反馈store
@@ -197,37 +281,34 @@ const showCustomToast = (message, type = 'success') => {
     }, 2000);
 };
 
-// 新增：提交留言功能
-const submitFeedback = async () => {
-if (!feedbackMessage.value.trim()) {
-    showCustomToast('留言内容不能为空！', 'error');
-    return;
-}
-
-// 获取或生成用户ID
-let userId = localStorage.getItem('user_id');
-if (!userId) {
+// 处理抽屉组件的反馈提交
+const handleFeedbackSubmit = async (feedbackData) => {
+  // 获取或生成用户ID
+  let userId = localStorage.getItem('user_id');
+  if (!userId) {
     userId = generateUUID();
     localStorage.setItem('user_id', userId);
-}
+  }
 
-try {
+  try {
+    // 处理从SideDrawer传来的字符串或对象格式
+    const message = typeof feedbackData === 'string' ? feedbackData : feedbackData.message;
+    
     const result = await feedbackStore.submitFeedback({
-        message: feedbackMessage.value,
-        user_id: userId
+      message: message,
+      user_id: userId
     });
     
     if (result.success) {
-        showCustomToast('留言成功，感谢您的反馈！', 'success');
-        feedbackMessage.value = ''; // 清空留言内容
-        fetchUserFeedbacks(); // 提交成功后刷新用户留言列表
+      showCustomToast('留言成功，感谢您的反馈！', 'success');
+      fetchUserFeedbacks(); // 提交成功后刷新用户留言列表
     } else {
-        showCustomToast(result.message || '提交留言失败，请稍后再试。', 'error');
+      showCustomToast(result.message || '提交留言失败，请稍后再试。', 'error');
     }
-} catch (error) {
+  } catch (error) {
     console.error('提交留言失败:', error);
     showCustomToast('提交留言失败，请稍后再试。', 'error');
-}
+  }
 };
 
 // 新增：用户留言列表和相关状态
@@ -421,6 +502,16 @@ showFeedbackForm.value = true;
 </script>
 
 <template>
+  <!-- 左侧抽屉触发按钮 -->
+  <!-- 左侧抽屉组件 -->
+  <SideDrawer 
+    :favorites="favorites"
+    @showMedia="showMedia"
+    @removeFromFavorites="removeFromFavorites"
+    @applyFilter="handleQuickFilter"
+    @submitFeedback="handleFeedbackSubmit"
+  />
+
   <header class="hero-header">
     <div class="hero-content">
       <h1 class="hero-title">方度实拍图</h1>
@@ -472,6 +563,12 @@ showFeedbackForm.value = true;
         >
         <p>{{ material.name }}</p>
         <div v-if="material.media_type === 'video'" class="media-icon">▶</div>
+        <!-- 收藏按钮 -->
+        <button @click.stop="addToFavorites(material)" class="favorite-btn" :class="{ 'favorited': favorites.find(fav => fav.id === material.id) }">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20.84 4.61C20.3292 4.099 19.7228 3.69364 19.0554 3.41708C18.3879 3.14052 17.6725 2.99817 16.95 2.99817C16.2275 2.99817 15.5121 3.14052 14.8446 3.41708C14.1772 3.69364 13.5708 4.099 13.06 4.61L12 5.67L10.94 4.61C9.9083 3.5783 8.50903 2.9987 7.05 2.9987C5.59096 2.9987 4.19169 3.5783 3.16 4.61C2.1283 5.6417 1.5487 7.04097 1.5487 8.5C1.5487 9.95903 2.1283 11.3583 3.16 12.39L4.22 13.45L12 21.23L19.78 13.45L20.84 12.39C21.351 11.8792 21.7563 11.2728 22.0329 10.6053C22.3095 9.93789 22.4518 9.22248 22.4518 8.5C22.4518 7.77752 22.3095 7.06211 22.0329 6.39467C21.7563 5.72723 21.351 5.1208 20.84 4.61V4.61Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     </TransitionGroup>
 
@@ -1425,6 +1522,55 @@ a.router-link-active.router-link-exact-active{
   }
   75% {
     transform: translateX(3px);
+  }
+}
+
+/* === 抽屉相关样式已移至SideDrawer.vue组件 === */
+
+/* === 收藏按钮样式 === */
+.favorite-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: #6c757d;
+  backdrop-filter: blur(4px);
+}
+
+.favorite-btn:hover {
+  background: white;
+  transform: scale(1.1);
+  color: #dc3545;
+}
+
+.favorite-btn.favorited {
+  background: #dc3545;
+  color: white;
+}
+
+.favorite-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .favorites-grid {
+    grid-template-columns: 1fr;
   }
 }
 

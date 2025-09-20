@@ -125,13 +125,25 @@ export const useFeedbackStore = defineStore('feedback', () => {
   // 提交新反馈
   const submitFeedback = async (feedbackData) => {
     try {
-      const response = await apiClient.post('/api/v1/feedbacks', feedbackData)
+      // 确保feedbackData包含必要的message字段
+      if (!feedbackData.message || !feedbackData.message.trim()) {
+        return { success: false, message: '留言内容不能为空' };
+      }
       
-      return { success: true, feedback: response.data.feedback }
+      // 确保数据格式正确
+      const formattedData = {
+        message: feedbackData.message.trim(),
+        user_id: feedbackData.user_id || null,
+        materialId: feedbackData.materialId || null
+      };
+      
+      const response = await apiClient.post('/api/v1/feedbacks', formattedData);
+      
+      return { success: true, feedback: response.data.data };
     } catch (error) {
-      console.error('提交反馈失败:', error)
-      const message = error.response?.data?.message || '提交反馈失败'
-      return { success: false, message }
+      console.error('提交反馈失败:', error);
+      const message = error.response?.data?.message || '提交反馈失败';
+      return { success: false, message };
     }
   }
   

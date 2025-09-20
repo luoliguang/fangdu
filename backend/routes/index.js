@@ -3,6 +3,7 @@ const createMaterialRoutes = require('./materialRoutes');
 const createFeedbackRoutes = require('./feedbackRoutes');
 const createVisitRoutes = require('./visitRoutes');
 const createAuthRoutes = require('./authRoutes');
+const drawerConfigRoutes = require('./drawerConfigRoutes');
 
 /**
  * 主路由配置
@@ -25,6 +26,9 @@ function createRoutes(db) {
 
   // 访问统计相关路由
   apiV1.use('/visits', createVisitRoutes(db));
+
+  // 抽屉配置相关路由
+  apiV1.use('/drawer-config', drawerConfigRoutes);
 
   // 健康检查路由
   apiV1.get('/health', (req, res) => {

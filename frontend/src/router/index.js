@@ -6,6 +6,7 @@ import UploadMaterial from '../views/UploadMaterial.vue';
 import MaterialManagement from '../views/MaterialManagement.vue';
 import FeedbackManagement from '../views/FeedbackManagement.vue';
 import Statistics from '../views/Statistics.vue';
+import DrawerConfig from '../views/admin/DrawerConfig.vue';
 
 const routes = [
     { path: '/', name: 'Gallery', component: Gallery },
@@ -48,6 +49,11 @@ const routes = [
                 path: 'statistics', 
                 name: 'Statistics', 
                 component: Statistics 
+            },
+            { 
+                path: 'drawer-config', 
+                name: 'DrawerConfig', 
+                component: DrawerConfig 
             }
         ]
     }
