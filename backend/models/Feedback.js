@@ -140,7 +140,7 @@ class Feedback {
       throw new Error('无效的状态值');
     }
 
-    let sql = `UPDATE feedbacks SET status = ?, updated_at = datetime('now')`;
+    let sql = `UPDATE feedbacks SET status = ?`;
     const params = [status];
 
     if (adminReply) {
@@ -160,8 +160,7 @@ class Feedback {
     // 直接返回更新后的数据，避免额外查询
     const updatedData = {
       id: parseInt(id),
-      status: status,
-      updated_at: new Date().toISOString()
+      status: status
     };
     
     if (adminReply) {
@@ -247,7 +246,7 @@ class Feedback {
     const placeholders = ids.map(() => '?').join(',');
     const sql = `
       UPDATE feedbacks 
-      SET status = ?, updated_at = datetime('now') 
+      SET status = ? 
       WHERE id IN (${placeholders})
     `;
     

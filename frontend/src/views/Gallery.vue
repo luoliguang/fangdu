@@ -657,7 +657,7 @@ showFeedbackForm.value = true;
       <div v-else class="feedback-list">
         <div v-for="feedback in (userFeedbacks || [])" :key="feedback.id" class="feedback-item">
           <div class="feedback-meta">
-            <span :class="{ 'status-tag': true, 'status-pending': feedback.status === 'pending', 'status-resolved': feedback.status === 'resolved' }">
+            <span :class="{ 'status-tag': true, 'status-pending': feedback.status === 'pending', 'status-resolved': feedback.status === 'resolved' || feedback.status === 'approved' }">
               {{ feedback.status === 'pending' ? '待处理' : '已处理' }}
             </span>
             <span class="timestamp">{{ formatDateTime(feedback.created_at) }}</span>
@@ -1033,11 +1033,11 @@ showFeedbackForm.value = true;
 .feedback-timeline-widget {
   position: fixed;
   bottom: 30px; /* 调整位置 */
-  left: 10px; /* 调整位置，更靠近左侧 */
+  left: 20px; /* 调整位置，更靠近左侧 */
   width: 60px; /* 默认收起宽度 */
   background-color: #ffffff;
-  border-radius: 15px; /* 更大圆角 */
-  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15); /* 更柔和更深阴影 */
+  border-radius: 18px; /* 更大圆角 */
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18); /* 更柔和更深阴影 */
   overflow: hidden;
   z-index: 1000;
   transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* 更平滑的过渡 */
@@ -1046,6 +1046,8 @@ showFeedbackForm.value = true;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  backdrop-filter: blur(10px); /* 毛玻璃效果 */
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .feedback-timeline-widget.expanded {
