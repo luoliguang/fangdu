@@ -266,12 +266,50 @@
               </button>
             </div>
             
-            <div class="global-note">
-              <label>全局备注 (这是必须的)</label>
-              <textarea 
-                v-model="globalNote" 
-                placeholder="这里必须要备注，不然找不到是哪一个客户。"
-              ></textarea>
+            <div class="export-settings-row">
+              <div class="global-note">
+                <label>备注 (这是必须的)</label>
+                <textarea 
+                  v-model="globalNote" 
+                  placeholder="这里必须要备注，不然找不到是哪一个客户。"
+                ></textarea>
+              </div>
+              
+              <div class="export-material-setting">
+                <label>面料 (这是必须的)</label>
+                <div class="material-select-container">
+                  <input
+                    type="text"
+                    v-model="materialSearchText"
+                    class="material-search-input"
+                    placeholder="搜索面料..."
+                    @focus="showMaterialDropdown = true"
+                    @blur="handleMaterialBlur"
+                  />
+                  <div class="material-dropdown" v-if="showMaterialDropdown">
+                    <div 
+                      v-for="material in filteredMaterials" 
+                      :key="material"
+                      class="material-option"
+                      @mousedown="selectMaterial(material)"
+                    >
+                      {{ material }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="export-row-setting">
+              <label>导出每行色卡数量:</label>
+              <div class="row-count-input">
+                <select 
+                  v-model.number="cardsPerRowExport" 
+                  class="styled-select"
+                >
+                  <option v-for="n in 10" :key="n" :value="n">{{ n }} 个</option>
+                </select>
+              </div>
             </div>
             
             <div class="export-control">
@@ -371,6 +409,40 @@ const showToast = (message, type = 'success') => {
   setTimeout(() => {
     showToastState.value = false;
   }, 2000);
+};
+
+// 导出设置
+const cardsPerRowExport = ref(5); // 默认每行5个色卡
+const materialSearchText = ref('');
+const selectedMaterial = ref('');
+const showMaterialDropdown = ref(false);
+const materialOptions = [
+  '速干', '莫代尔', '210克速干', '珠地', '仿棉',  '260克莫代尔', 
+  '260克珠地', '冰丝蝴蝶网', '小方格', '水蜜桃', 
+  '复合', 'T400', '斜纹', '健康布', '银狐绒'
+];
+
+// 过滤面料选项
+const filteredMaterials = computed(() => {
+  if (!materialSearchText.value) return materialOptions;
+  return materialOptions.filter(material => 
+    material.toLowerCase().includes(materialSearchText.value.toLowerCase())
+  );
+});
+
+// 选择面料
+const selectMaterial = (material) => {
+  selectedMaterial.value = material;
+  materialSearchText.value = material;
+  showMaterialDropdown.value = false;
+};
+
+// 处理面料输入框失焦事件
+const handleMaterialBlur = () => {
+  // 延迟关闭下拉列表，以便点击选项能够生效
+  setTimeout(() => {
+    showMaterialDropdown.value = false;
+  }, 150);
 };
 
 // 基础色时钟数据
@@ -777,6 +849,7 @@ const exportColorCards = () => {
   header.innerHTML = `
     <h1>🎨 色卡</h1>
     ${globalNote.value ? `<p class="export-note">${globalNote.value}</p>` : ''}
+    ${selectedMaterial.value ? `<p class="export-material">面料: ${selectedMaterial.value}</p>` : ''}
     <p class="export-date">导出时间: ${new Date().toLocaleString()}</p>
   `;
   exportContainer.appendChild(header);
@@ -786,7 +859,7 @@ const exportColorCards = () => {
   cardsContainer.className = 'export-cards';
   
   // 计算每行显示的色卡数量
-  const cardsPerRow = 5; // 每行最多显示5个色卡
+  const cardsPerRow = cardsPerRowExport.value; // 使用用户设置的每行色卡数量
   
   // 创建行容器
   let currentRow = null;
@@ -834,6 +907,12 @@ const exportColorCards = () => {
   
   exportContainer.appendChild(cardsContainer);
   
+  // 计算容器宽度
+  const cardWidth = 160; // 每个色卡的宽度
+  const cardGap = 20; // 色卡之间的间距
+  const containerPadding = 60; // 左右各30px的padding
+  const containerWidth = cardWidth * cardsPerRow + (cardsPerRow - 1) * cardGap + containerPadding;
+  
   // 添加样式
   const style = document.createElement('style');
   style.textContent = `
@@ -841,7 +920,7 @@ const exportColorCards = () => {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       padding: 30px;
       background-color: white;
-      max-width: 1000px;
+      width: ${containerWidth}px;
       margin: 0 auto;
     }
     .export-header {
@@ -858,6 +937,11 @@ const exportColorCards = () => {
       color: #666;
       margin-bottom: 10px;
     }
+    .export-material {
+      font-weight: 500;
+      color: #555;
+      margin-bottom: 10px;
+    }
     .export-date {
       font-size: 0.8em;
       color: #999;
@@ -869,9 +953,10 @@ const exportColorCards = () => {
     }
     .export-row {
       display: flex;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 20px;
       flex-wrap: wrap;
+      width: 100%;
     }
     .export-card {
       width: 160px;
@@ -1263,10 +1348,21 @@ h2 {
   color: white;
 }
 
+.export-settings-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 15px;
+}
+
 .global-note {
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 10px;
+  flex: 1;
+}
+
+.export-material-setting {
+  flex: 1;
 }
 
 .global-note textarea {
@@ -1278,7 +1374,8 @@ h2 {
   font-family: inherit;
 }
 
-.global-note label::after {
+.global-note label::after,
+.export-material-setting label::after {
   content: ' *';
   color: #e74c3c;
   font-weight: bold;
@@ -1303,6 +1400,96 @@ h2 {
   padding: 4px;
   border: 1px solid #ddd;
   border-radius: 4px;
+}
+
+/* 导出设置样式 */
+.export-row-setting,
+.export-material-setting {
+  margin-bottom: 15px;
+}
+
+.export-row-setting label,
+.export-material-setting label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.styled-select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background-color: white;
+  font-size: 14px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.styled-select:hover {
+  border-color: #aaa;
+}
+
+.styled-select:focus {
+  border-color: #9b59b6;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.2);
+}
+
+.material-select-container {
+  position: relative;
+}
+
+.material-search-input {
+  width: 90%;
+  padding: 10px 0px;
+  padding-left: 15px; /* 增加左侧内边距 */
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.material-search-input::placeholder {
+  color: #999; /* 设置placeholder颜色 */
+}
+
+.material-search-input:hover {
+  border-color: #aaa;
+}
+
+.material-search-input:focus {
+  border-color: #9b59b6;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.2);
+}
+
+.material-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
+.material-option {
+  padding: 10px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.material-option:hover {
+  background-color: #f0f0f0;
 }
 
 .export-control {
