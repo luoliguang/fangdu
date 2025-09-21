@@ -114,19 +114,19 @@ class Visit {
     const uniqueVisitorsSql = `SELECT COUNT(DISTINCT ip_address) as unique_visitors FROM visits`;
     const uniqueVisitors = await this.queryOne(uniqueVisitorsSql);
 
-    // 今日访问量
+    // 今日访问量 - 使用当天的00:00作为起始时间
     const todayVisitsSql = `
       SELECT COUNT(*) as today 
       FROM visits 
-      WHERE DATE(visit_time) = DATE('now')
+      WHERE visit_time >= datetime('now', 'start of day')
     `;
     const todayVisits = await this.queryOne(todayVisitsSql);
 
-    // 今日唯一访客
+    // 今日唯一访客 - 使用当天的00:00作为起始时间
     const todayUniqueVisitorsSql = `
       SELECT COUNT(DISTINCT ip_address) as today_unique 
       FROM visits 
-      WHERE DATE(visit_time) = DATE('now')
+      WHERE visit_time >= datetime('now', 'start of day')
     `;
     const todayUniqueVisitors = await this.queryOne(todayUniqueVisitorsSql);
 
