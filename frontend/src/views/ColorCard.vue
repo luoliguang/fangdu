@@ -240,8 +240,8 @@
                 <div class="custom-count-input">
                   <input 
                     type="text" 
-                    v-model.number="colorCount" 
-                    placeholder="自定义"
+                    v-model="colorCount" 
+                    placeholder="自定义数量（最多100个）"
                     class="custom-input"
                     @input="validateColorCount"
                   />
@@ -511,10 +511,14 @@ const setColorCount = (count) => {
 
 // 验证色卡数量输入
 const validateColorCount = () => {
+  // 允许空字符串或删除操作
+  if (colorCount.value === '' || colorCount.value === null) {
+    return;
+  }
+  
   // 确保输入是数字
   const value = parseInt(colorCount.value);
   if (isNaN(value)) {
-    colorCount.value = 5; // 默认值
     return;
   }
   
@@ -523,6 +527,9 @@ const validateColorCount = () => {
     colorCount.value = 1;
   } else if (value > 100) {
     colorCount.value = 100;
+  } else {
+    // 确保存储为数字类型
+    colorCount.value = value;
   }
 };
 
