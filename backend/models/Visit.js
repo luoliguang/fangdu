@@ -67,18 +67,39 @@ class Visit {
    * 获取页面访问统计
    */
   async getPageStats(limit = 10) {
+    // 确保返回所有主要页面，即使没有访问记录
+    const mainPages = ['/', '/admin', '/login', '/color-card'];
+    
+    // 先获取有访问记录的页面统计
     const sql = `
       SELECT 
         page,
         COUNT(*) as visits,
         COUNT(DISTINCT ip_address) as unique_visitors
       FROM visits 
+      WHERE page IN (?, ?, ?, ?)
       GROUP BY page 
-      ORDER BY visits DESC 
-      LIMIT ?
+      ORDER BY visits DESC
     `;
     
-    return await this.queryAll(sql, [limit]);
+    const results = await this.queryAll(sql, mainPages);
+    
+    // 检查是否所有主要页面都有数据
+    const existingPages = results.map(item => item.page);
+    
+    // 为没有访问记录的页面添加默认数据
+    const finalResults = [...results];
+    mainPages.forEach(page => {
+      if (!existingPages.includes(page)) {
+        finalResults.push({
+          page: page,
+          visits: 0,
+          unique_visitors: 0
+        });
+      }
+    });
+    
+    return finalResults;
   }
 
   /**

@@ -14,6 +14,7 @@ class VisitController {
    */
   async recordVisit(req, res) {
     try {
+      // 从请求体或URL获取页面路径
       const { page, referrer } = req.body;
       const visitData = {
         ipAddress: this.getClientIP(req),
@@ -444,9 +445,10 @@ class VisitController {
     
     // 只记录主要页面路径
     const mainPaths = [
-      '/',           // 首页
-      '/admin',      // 管理后台主页
-      '/login'       // 登录页
+      '/',                // 首页
+      '/admin',           // 管理后台主页
+      '/login',           // 登录页
+      '/color-card'       // 打色卡页面
     ];
     
     // 精确匹配主要路径
@@ -474,6 +476,11 @@ class VisitController {
     // 登录页
     if (path === '/login') {
       return '/login';
+    }
+    
+    // 打色卡页面
+    if (path === '/color-card') {
+      return '/color-card';
     }
     
     // 管理后台及其子路由都记录为 /admin
