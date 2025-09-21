@@ -229,7 +229,7 @@
           <div class="panel-section">
             <h2>色卡设置</h2>
             <div class="color-count-control">
-              <label>色卡数量:</label>
+              <label>色卡数量（最多100个）:</label>
               <div class="preset-container">
                 <div class="preset-buttons">
                   <button class="preset-btn" @click="setColorCount(3)">3</button>
@@ -518,11 +518,11 @@ const validateColorCount = () => {
     return;
   }
   
-  // 限制范围在1-20之间
+  // 限制范围在1-100之间
   if (value < 1) {
     colorCount.value = 1;
-  } else if (value > 20) {
-    colorCount.value = 20;
+  } else if (value > 100) {
+    colorCount.value = 100;
   }
 };
 
@@ -784,7 +784,22 @@ const exportColorCards = () => {
   // 创建行容器
   let currentRow = null;
   
-  colorCards.value.forEach((card, index) => {
+  // 创建要导出的色卡数组，首先添加基础色
+  const cardsToExport = [
+    {
+      id: 0,
+      hex: currentColor.hex,
+      rgb: currentColor.rgb,
+      cmyk: currentColor.cmyk,
+      lab: currentColor.lab,
+      note: '基础色',
+      locked: false,
+      alpha: currentColor.alpha
+    },
+    ...colorCards.value
+  ];
+  
+  cardsToExport.forEach((card, index) => {
     // 每行开始时创建新的行容器
     if (index % cardsPerRow === 0) {
       currentRow = document.createElement('div');
