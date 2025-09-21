@@ -170,6 +170,7 @@ const handleNavClick = (event) => {
       <router-link to="/" @click="handleNavClick">素材库</router-link>
       <a href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank">面料细节</a>
       <a href="https://fangdutex.cn/welcome" target="_blank">📚方度知识库</a>
+      <router-link to="/color-card" @click="handleNavClick">🎨 给设计写的</router-link>
       <!-- 未登录时显示登录链接 -->
       <router-link v-if="!isLoggedIn" to="/login" @click="handleNavClick">登录</router-link>
       <!-- 已登录时显示后台管理 -->

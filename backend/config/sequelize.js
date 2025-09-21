@@ -26,7 +26,9 @@ async function testConnection() {
 // 同步数据库表结构
 async function syncDatabase() {
   try {
-    await sequelize.sync({ alter: true });
+    // 使用 force: false 只会在表不存在时创建表，不会每次都修改结构
+    // 这样可以大大加快启动速度
+    await sequelize.sync({ force: false });
     console.log('数据库表结构同步成功');
   } catch (error) {
     console.error('数据库表结构同步失败:', error);
