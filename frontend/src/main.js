@@ -4,11 +4,14 @@ import router from './router'
 import pinia from './stores'
 import Toast from 'vue-toastification' // 引入库
 import 'vue-toastification/dist/index.css' // 引入样式
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
 
 const app = createApp(App)
 
 app.use(pinia)
 app.use(router)
+app.use(ElementPlus)
 
 // 全局配置 Toast
 app.use(Toast, {

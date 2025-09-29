@@ -1,6 +1,6 @@
 <template>
   <div class="color-card-container">
-    <h1>🎨 快速打色卡</h1>
+    <h1>打色块</h1>
     
     <div class="main-layout">
       <!-- 左侧面板：色值输入和设置 -->
@@ -278,24 +278,19 @@
               <div class="export-material-setting">
                 <label>面料 (这是必须的)</label>
                 <div class="material-select-container">
-                  <input
-                    type="text"
-                    v-model="materialSearchText"
-                    class="material-search-input"
-                    placeholder="搜索面料..."
-                    @focus="showMaterialDropdown = true"
-                    @blur="handleMaterialBlur"
-                  />
-                  <div class="material-dropdown" v-if="showMaterialDropdown">
-                    <div 
-                      v-for="material in filteredMaterials" 
+                  <el-select
+                    v-model="selectedMaterial"
+                    filterable
+                    placeholder="选择面料"
+                    class="material-select"
+                  >
+                    <el-option
+                      v-for="material in materialOptions"
                       :key="material"
-                      class="material-option"
-                      @mousedown="selectMaterial(material)"
-                    >
-                      {{ material }}
-                    </div>
-                  </div>
+                      :label="material"
+                      :value="material"
+                    />
+                  </el-select>
                 </div>
               </div>
             </div>
@@ -303,12 +298,18 @@
             <div class="export-row-setting">
               <label>导出每行色卡数量:</label>
               <div class="row-count-input">
-                <select 
-                  v-model.number="cardsPerRowExport" 
-                  class="styled-select"
+                <el-select
+                  v-model.number="cardsPerRowExport"
+                  placeholder="选择每行色卡数量"
+                  class="row-count-select"
                 >
-                  <option v-for="n in 10" :key="n" :value="n">{{ n }} 个</option>
-                </select>
+                  <el-option
+                    v-for="n in 10"
+                    :key="n"
+                    :label="`${n} 个`"
+                    :value="n"
+                  />
+                </el-select>
               </div>
             </div>
             
