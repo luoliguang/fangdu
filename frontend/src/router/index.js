@@ -8,11 +8,13 @@ import FeedbackManagement from '../views/FeedbackManagement.vue';
 import Statistics from '../views/Statistics.vue';
 import DrawerConfig from '../views/admin/DrawerConfig.vue';
 import ColorCard from '../views/ColorCard.vue'; // 引入打色卡组件
+import SizeConverter from '../views/SizeConverter.vue'; // 引入尺码工具组件
 
 const routes = [
     { path: '/', name: 'Gallery', component: Gallery },
     { path: '/login', name: 'Login', component: Login }, // 添加登录路由
     { path: '/color-card', name: 'ColorCard', component: ColorCard }, // 添加打色卡路由
+    { path: '/size-converter', name: 'SizeConverter', component: SizeConverter }, // 添加尺码工具路由
     {
         path: '/admin',
         name: 'Admin',
