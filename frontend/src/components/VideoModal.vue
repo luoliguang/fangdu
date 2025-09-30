@@ -834,26 +834,21 @@ const retryVideo = () => {
 
 // 使用FFmpeg转码视频
 const transcodeVideo = async () => {
-  if (!ffmpeg.value) {
-    // 初始化FFmpeg
-    try {
+  try {
+    isTranscoding.value = true;
+    transcodingProgress.value = 0;
+    
+    // 初始化FFmpeg - 使用兼容的0.10.x版本API
+    if (!ffmpeg.value) {
       ffmpeg.value = createFFmpeg({
         log: true,
         progress: ({ ratio }) => {
           transcodingProgress.value = Math.floor(ratio * 100);
         },
+        corePath: 'https://unpkg.com/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js' // 指定Core库路径
       });
       await ffmpeg.value.load();
-    } catch (error) {
-      console.error('FFmpeg加载失败:', error);
-      errorMessage.value = 'FFmpeg加载失败: ' + error.message;
-      return;
     }
-  }
-  
-  try {
-    isTranscoding.value = true;
-    transcodingProgress.value = 0;
     
     // 获取视频文件名
     const fileName = props.src.split('/').pop() || 'video.mp4';
@@ -879,8 +874,8 @@ const transcodeVideo = async () => {
     // 从FFmpeg文件系统读取转码后的文件
     const data = ffmpeg.value.FS('readFile', outputFileName);
     
-    // 创建Blob URL
-    const blob = new Blob([data.buffer], { type: 'video/mp4' });
+    // 创建Blob URL - 在0.10.x版本中，data已经是Uint8Array
+    const blob = new Blob([data], { type: 'video/mp4' });
     const transcodedUrl = URL.createObjectURL(blob);
     
     // 重新初始化播放器使用转码后的视频
