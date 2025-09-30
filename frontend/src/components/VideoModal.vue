@@ -127,68 +127,134 @@ const initVideoPlayer = async () => {
   // 创建video元素
   const videoElement = document.createElement('video');
   videoElement.className = 'video-js vjs-big-play-centered';
-  videoContainer.value.appendChild(videoElement);
+  // 先不强制设置跨域，待确定源是否同源后再设置
+  // videoContainer.value.appendChild(videoElement);
   
   // 准备多个不同格式的视频源
   const sources = [];
   
+  // 判断是否跨域
+  const isCrossOrigin = (url) => {
+    try {
+      if (!url) return false;
+      if (url.startsWith('blob:') || url.startsWith('data:')) return false;
+      const u = new URL(url, window.location.href);
+      return u.origin !== window.location.origin;
+    } catch (_) {
+      return true;
+    }
+  };
+  
+  // 添加一个URL可用性探测方法（优先HEAD，其次Range GET），公司网络/CORS下更稳健
+  const urlReachable = async (url, signal) => {
+    if (!url) return false;
+    try {
+      // 同源或 blob:/data: 直接认为可达，避免本地/开发环境被误判
+      if (url.startsWith('blob:') || url.startsWith('data:')) return true;
+      try {
+        const test = new URL(url, window.location.href);
+        if (test.origin === window.location.origin) return true;
+        // 对跨域资源不做主动探测，避免触发CORS错误日志
+        return false;
+      } catch (_) {}
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const headResp = await fetch(url, {
+        method: 'HEAD',
+        mode: 'cors',
+        credentials: 'omit',
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (headResp.ok || headResp.status === 206) return true;
+    } catch (_) {}
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const getResp = await fetch(url, {
+        method: 'GET',
+        headers: { 'Range': 'bytes=0-1' },
+        mode: 'cors',
+        credentials: 'omit',
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      return getResp.ok || getResp.status === 206;
+    } catch (_) {
+      return false;
+    }
+  };
+  
   // 添加主源
   if (props.src) {
-    // 检查视频编码兼容性
     const mainSrcPath = normalizePath(props.src);
-    const compatibilityResult = await checkVideoCodecCompatibility(mainSrcPath);
+    const cross = isCrossOrigin(mainSrcPath);
     
-    if (compatibilityResult.compatible) {
-      sources.push({
-        src: mainSrcPath,
-        type: getVideoType(props.src)
-      });
-    } else {
-      console.warn(`视频编码兼容性问题: ${compatibilityResult.reason}`);
-      // 记录错误信息，但仍然添加源，让video.js尝试播放
-      sources.push({
-        src: mainSrcPath,
-        type: getVideoType(props.src)
-      });
-    }
-    
-    // 添加备用源（如果原始源是mp4，添加webm备用，反之亦然）
-    const extension = props.src.split('.').pop().toLowerCase();
-    const baseSrc = props.src.substring(0, props.src.lastIndexOf('.'));
-    
-    if (extension === 'mp4') {
-      // 添加webm备用源
-      const webmSrc = normalizePath(`${baseSrc}.webm`);
-      sources.push({
-        src: webmSrc,
-        type: 'video/webm'
-      });
-      hasAlternativeSource.value = true;
-    } else if (extension === 'webm') {
-      // 添加mp4备用源
-      const mp4Src = normalizePath(`${baseSrc}.mp4`);
-      sources.push({
-        src: mp4Src,
-        type: 'video/mp4'
-      });
-      hasAlternativeSource.value = true;
-    }
-    
-    // 添加低分辨率备用源（适合网络受限环境）
-    const lowResSrc = normalizePath(`${baseSrc}_low.${extension}`);
+    // 始终加入主源
     sources.push({
-      src: lowResSrc,
+      src: mainSrcPath,
       type: getVideoType(props.src)
     });
-    hasLowResSource.value = true;
     
-    // 添加HLS格式源（如果存在）
-    const hlsSrc = normalizePath(`${baseSrc}.m3u8`);
-    sources.push({
-      src: hlsSrc,
-      type: 'application/x-mpegURL'
-    });
+    // 可达性探测仅用于同源备用策略与日志；跨域不探测，避免CORS报错
+    if (!cross) {
+      if (!(await urlReachable(mainSrcPath))) {
+        console.warn('主视频源可用性探测失败(同源):', mainSrcPath);
+      }
+    }
+    
+    // 仅同源时构造备用源，避免跨域环境下生成404/触发CORS
+    if (!cross) {
+      const extension = props.src.split('.').pop().toLowerCase();
+      const baseSrc = props.src.substring(0, props.src.lastIndexOf('.'));
+      
+      if (extension === 'mp4') {
+        const webmSrc = normalizePath(`${baseSrc}.webm`);
+        if (await urlReachable(webmSrc)) {
+          sources.push({ src: webmSrc, type: 'video/webm' });
+          hasAlternativeSource.value = true;
+        }
+      } else if (extension === 'webm') {
+        const mp4Src = normalizePath(`${baseSrc}.mp4`);
+        if (await urlReachable(mp4Src)) {
+          sources.push({ src: mp4Src, type: 'video/mp4' });
+          hasAlternativeSource.value = true;
+        }
+      }
+      
+      const lowResSrc = normalizePath(`${baseSrc}_low.${extension}`);
+      if (await urlReachable(lowResSrc)) {
+        sources.push({ src: lowResSrc, type: getVideoType(props.src) });
+        hasLowResSource.value = true;
+      }
+      
+      const hlsSrc = normalizePath(`${baseSrc}.m3u8`);
+      if (await urlReachable(hlsSrc)) {
+        sources.push({ src: hlsSrc, type: 'application/x-mpegURL' });
+      }
+    } else {
+      hasAlternativeSource.value = false;
+      hasLowResSource.value = false;
+    }
   }
+  
+  // 根据首个源是否同源决定是否设置 crossorigin
+  if (sources.length > 0) {
+    try {
+      const first = new URL(sources[0].src, window.location.href);
+      if (first.origin === window.location.origin || first.origin === 'null') {
+        videoElement.setAttribute('crossorigin', 'anonymous');
+      } else {
+        videoElement.removeAttribute('crossorigin');
+      }
+    } catch (_) {
+      videoElement.removeAttribute('crossorigin');
+    }
+  }
+  
+  // 将元素挂载到容器
+  videoContainer.value.appendChild(videoElement);
   
   // 检测设备环境并准备播放器配置
   console.log('设备环境检测结果:', deviceInfo.value);
@@ -209,6 +275,9 @@ const initVideoPlayer = async () => {
         smoothQualityChange: !deviceInfo.value.isLowEndDevice,
         bandwidth: deviceInfo.value.isLowEndDevice ? 1000000 : undefined // 低端设备限制带宽
       },
+      // 关键：关闭凭据，跨域以匿名方式请求
+      vhs: { withCredentials: false },
+      xhr: { withCredentials: false },
       nativeVideoTracks: false,
       nativeAudioTracks: false,
       nativeTextTracks: false
@@ -735,25 +804,26 @@ const checkOssCompatibility = () => {
 };
 
 // 尝试使用低分辨率视频源
-const tryLowResolutionSource = () => {
+const tryLowResolutionSource = async () => {
   if (!props.src || !player.value) return;
   
   const extension = props.src.split('.').pop().toLowerCase();
   const baseSrc = props.src.substring(0, props.src.lastIndexOf('.'));
   const lowResSrc = normalizePath(`${baseSrc}_low.${extension}`);
   
+  if (!(await urlReachable(lowResSrc))) {
+    console.warn('低清视频不可达，放弃切换:', lowResSrc);
+    return;
+  }
+  
   console.log('尝试切换到低分辨率视频源:', lowResSrc);
   
   // 更新错误提示
   errorMessage.value += ' 正在尝试使用低分辨率版本...';
   
-  // 延迟一下再切换源，让用户看到提示
   setTimeout(() => {
     if (player.value) {
-      player.value.src({
-        src: lowResSrc,
-        type: getVideoType(lowResSrc)
-      });
+      player.value.src({ src: lowResSrc, type: getVideoType(lowResSrc) });
       player.value.load();
       player.value.play().catch(err => {
         console.error('低分辨率视频播放失败:', err);
@@ -763,7 +833,7 @@ const tryLowResolutionSource = () => {
 };
 
 // 尝试使用替代格式
-const tryAlternativeFormat = () => {
+const tryAlternativeFormat = async () => {
   if (!props.src || !player.value) return;
   
   const extension = props.src.split('.').pop().toLowerCase();
@@ -780,22 +850,22 @@ const tryAlternativeFormat = () => {
     alternativeType = 'video/mp4';
   }
   
+  if (!(await urlReachable(alternativeSrc))) {
+    console.warn('替代格式视频不可达，放弃切换:', alternativeSrc);
+    // 如果替代也不可达，尝试低清
+    return tryLowResolutionSource();
+  }
+  
   console.log('尝试切换到替代格式:', alternativeSrc);
   
-  // 更新错误提示
   errorMessage.value += ' 正在尝试使用替代格式...';
   
-  // 延迟一下再切换源，让用户看到提示
   setTimeout(() => {
     if (player.value) {
-      player.value.src({
-        src: alternativeSrc,
-        type: alternativeType
-      });
+      player.value.src({ src: alternativeSrc, type: alternativeType });
       player.value.load();
       player.value.play().catch(err => {
         console.error('替代格式视频播放失败:', err);
-        // 如果替代格式也失败，尝试低分辨率版本
         tryLowResolutionSource();
       });
     }
