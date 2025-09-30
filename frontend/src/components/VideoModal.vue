@@ -5,7 +5,7 @@
         <div ref="videoContainer" class="video-container"></div>
         
         <!-- 视频播放错误提示 -->
-        <div v-if="showErrorTip" class="video-error-tip">
+        <div v-if="showErrorTip" class="error-content">
           <div class="error-icon">⚠️</div>
           <div class="error-content">
             <h4>视频播放遇到问题</h4>
@@ -20,6 +20,7 @@
                 <li>如果在办公区域，可能受网络限制，请尝试使用手机热点</li>
                 <li v-if="deviceInfo.isLowEndDevice">您的设备配置较低，建议关闭其他应用程序</li>
                 <li v-if="deviceInfo.isOldDevice">您的浏览器版本较旧，建议升级到最新版本</li>
+                <li v-if="isOssVideo">阿里云OSS视频可能需要转码处理，建议使用阿里云视频点播服务</li>
                 <li>如果问题持续，请联系技术支持</li>
               </ul>
             </div>
@@ -27,9 +28,16 @@
               <button class="btn-retry" @click="retryVideo">重试播放</button>
               <button v-if="hasAlternativeSource" class="btn-alternative" @click="tryAlternativeFormat">尝试其他格式</button>
               <button v-if="hasLowResSource" class="btn-lowres" @click="tryLowResolutionSource">尝试低清版本</button>
+              <button v-if="isOssVideo && !isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
               <button class="btn-close" @click="$emit('close')">关闭</button>
             </div>
           </div>
+        </div>
+        
+        <!-- 转码进度提示 -->
+        <div v-if="isTranscoding" class="transcoding-tip">
+          <div class="loading-spinner"></div>
+          <p>正在转码视频，请稍候... {{ transcodingProgress }}%</p>
         </div>
         
         <button class="close-button" @click="$emit('close')">&times;</button>
@@ -42,6 +50,7 @@
 import { watch, onMounted, onUnmounted, ref, nextTick } from 'vue';
 import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
+import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
 
 const props = defineProps({
   visible: Boolean,
@@ -66,6 +75,10 @@ const deviceInfo = ref({
 });
 const hasAlternativeSource = ref(false);
 const hasLowResSource = ref(false);
+const isOssVideo = ref(false);
+const isTranscoding = ref(false);
+const transcodingProgress = ref(0);
+const ffmpeg = ref(null);
 
 // 监听 visible 变化，控制 body 滚动和重置错误状态
 watch(() => props.visible, (newValue) => {
@@ -102,7 +115,7 @@ watch(() => props.visible, (newValue) => {
 });
 
 // 初始化视频播放器
-const initVideoPlayer = () => {
+const initVideoPlayer = async () => {
   if (!videoContainer.value) return;
   
   // 检查网络状态和环境
@@ -121,10 +134,23 @@ const initVideoPlayer = () => {
   
   // 添加主源
   if (props.src) {
-    sources.push({
-      src: normalizePath(props.src),
-      type: getVideoType(props.src)
-    });
+    // 检查视频编码兼容性
+    const mainSrcPath = normalizePath(props.src);
+    const compatibilityResult = await checkVideoCodecCompatibility(mainSrcPath);
+    
+    if (compatibilityResult.compatible) {
+      sources.push({
+        src: mainSrcPath,
+        type: getVideoType(props.src)
+      });
+    } else {
+      console.warn(`视频编码兼容性问题: ${compatibilityResult.reason}`);
+      // 记录错误信息，但仍然添加源，让video.js尝试播放
+      sources.push({
+        src: mainSrcPath,
+        type: getVideoType(props.src)
+      });
+    }
     
     // 添加备用源（如果原始源是mp4，添加webm备用，反之亦然）
     const extension = props.src.split('.').pop().toLowerCase();
@@ -132,26 +158,36 @@ const initVideoPlayer = () => {
     
     if (extension === 'mp4') {
       // 添加webm备用源
+      const webmSrc = normalizePath(`${baseSrc}.webm`);
       sources.push({
-        src: normalizePath(`${baseSrc}.webm`),
+        src: webmSrc,
         type: 'video/webm'
       });
       hasAlternativeSource.value = true;
     } else if (extension === 'webm') {
       // 添加mp4备用源
+      const mp4Src = normalizePath(`${baseSrc}.mp4`);
       sources.push({
-        src: normalizePath(`${baseSrc}.mp4`),
+        src: mp4Src,
         type: 'video/mp4'
       });
       hasAlternativeSource.value = true;
     }
     
     // 添加低分辨率备用源（适合网络受限环境）
+    const lowResSrc = normalizePath(`${baseSrc}_low.${extension}`);
     sources.push({
-      src: normalizePath(`${baseSrc}_low.${extension}`),
+      src: lowResSrc,
       type: getVideoType(props.src)
     });
     hasLowResSource.value = true;
+    
+    // 添加HLS格式源（如果存在）
+    const hlsSrc = normalizePath(`${baseSrc}.m3u8`);
+    sources.push({
+      src: hlsSrc,
+      type: 'application/x-mpegURL'
+    });
   }
   
   // 检测设备环境并准备播放器配置
@@ -518,6 +554,80 @@ const getVideoType = (src) => {
   }
 };
 
+// 检查视频编码兼容性
+const checkVideoCodecCompatibility = (src) => {
+  return new Promise((resolve) => {
+    // 创建一个临时视频元素来测试编码兼容性
+    const testVideo = document.createElement('video');
+    testVideo.style.display = 'none';
+    document.body.appendChild(testVideo);
+    
+    // 设置测试源
+    const source = document.createElement('source');
+    source.src = src;
+    source.type = getVideoType(src);
+    testVideo.appendChild(source);
+    
+    // 设置超时，避免长时间等待
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve({
+        compatible: false,
+        reason: '视频加载超时，可能是格式不兼容或网络问题'
+      });
+    }, 5000);
+    
+    // 视频可以播放
+    testVideo.oncanplay = () => {
+      clearTimeout(timeout);
+      cleanup();
+      resolve({
+        compatible: true
+      });
+    };
+    
+    // 视频错误
+    testVideo.onerror = () => {
+      clearTimeout(timeout);
+      const errorCode = testVideo.error ? testVideo.error.code : 0;
+      let reason = '未知错误';
+      
+      switch (errorCode) {
+        case 1:
+          reason = '视频加载被中断';
+          break;
+        case 2:
+          reason = '网络错误，无法加载视频';
+          break;
+        case 3:
+          reason = '视频解码失败，编码格式可能不兼容';
+          break;
+        case 4:
+          reason = '视频格式不受支持';
+          break;
+      }
+      
+      cleanup();
+      resolve({
+        compatible: false,
+        reason,
+        errorCode
+      });
+    };
+    
+    // 清理函数
+    function cleanup() {
+      if (testVideo.parentNode) {
+        testVideo.pause();
+        document.body.removeChild(testVideo);
+      }
+    }
+    
+    // 开始加载视频
+    testVideo.load();
+  });
+};
+
 // 设置加载超时检测
 const setupLoadingTimeout = () => {
   clearLoadingTimeout();
@@ -559,7 +669,7 @@ const handleSuspend = () => {
 };
 
 // 处理视频错误
-const handleVideoError = (event) => {
+const handleVideoError = async (event) => {
   clearLoadingTimeout();
   showErrorTip.value = true;
   
@@ -580,11 +690,15 @@ const handleVideoError = (event) => {
         break;
       case 3: // MEDIA_ERR_DECODE
         errorMessage.value = '视频解码失败，可能是格式不支持或文件损坏。';
+        // 检查是否是阿里云OSS兼容性问题
+        checkOssCompatibility();
         // 尝试切换到其他格式
         tryAlternativeFormat();
         break;
       case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
-        errorMessage.value = '视频格式不支持或文件路径无效，可能是办公网络限制导致。';
+        errorMessage.value = '视频格式不支持或文件路径无效，可能是阿里云OSS格式兼容性问题。';
+        // 检查是否是阿里云OSS兼容性问题
+        checkOssCompatibility();
         // 尝试切换到其他格式
         tryAlternativeFormat();
         break;
@@ -605,6 +719,19 @@ const handleVideoError = (event) => {
   }
   
   console.error('视频播放错误:', event, player.value?.error());
+};
+
+// 检查是否是阿里云OSS兼容性问题
+const checkOssCompatibility = () => {
+  // 检查视频URL是否来自阿里云OSS
+  if (props.src && (props.src.includes('aliyuncs.com') || props.src.includes('oss-cn'))) {
+    console.warn('检测到阿里云OSS视频源，可能存在格式兼容性问题');
+    errorMessage.value += ' 检测到阿里云OSS视频源，可能需要转码处理。';
+    isOssVideo.value = true;
+    
+    // 添加OSS特定的错误提示到控制台
+    console.log('阿里云OSS视频可能需要通过转码服务处理，建议使用阿里云的视频点播服务');
+  }
 };
 
 // 尝试使用低分辨率视频源
@@ -702,6 +829,84 @@ const retryVideo = () => {
     });
     
     setupLoadingTimeout();
+  }
+};
+
+// 使用FFmpeg转码视频
+const transcodeVideo = async () => {
+  if (!ffmpeg.value) {
+    // 初始化FFmpeg
+    try {
+      ffmpeg.value = createFFmpeg({
+        log: true,
+        progress: ({ ratio }) => {
+          transcodingProgress.value = Math.floor(ratio * 100);
+        },
+      });
+      await ffmpeg.value.load();
+    } catch (error) {
+      console.error('FFmpeg加载失败:', error);
+      errorMessage.value = 'FFmpeg加载失败: ' + error.message;
+      return;
+    }
+  }
+  
+  try {
+    isTranscoding.value = true;
+    transcodingProgress.value = 0;
+    
+    // 获取视频文件名
+    const fileName = props.src.split('/').pop() || 'video.mp4';
+    const outputFileName = 'transcoded_' + fileName;
+    
+    // 获取视频文件
+    const videoData = await fetchFile(props.src);
+    
+    // 写入FFmpeg文件系统
+    ffmpeg.value.FS('writeFile', fileName, videoData);
+    
+    // 执行转码，转为H.264编码的MP4
+    await ffmpeg.value.run(
+      '-i', fileName,
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-crf', '22',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      outputFileName
+    );
+    
+    // 从FFmpeg文件系统读取转码后的文件
+    const data = ffmpeg.value.FS('readFile', outputFileName);
+    
+    // 创建Blob URL
+    const blob = new Blob([data.buffer], { type: 'video/mp4' });
+    const transcodedUrl = URL.createObjectURL(blob);
+    
+    // 重新初始化播放器使用转码后的视频
+    if (player.value) {
+      player.value.src({
+        src: transcodedUrl,
+        type: 'video/mp4'
+      });
+      player.value.load();
+      player.value.play().catch(err => {
+        console.error('转码后视频播放失败:', err);
+      });
+    }
+    
+    // 清理FFmpeg文件系统
+    ffmpeg.value.FS('unlink', fileName);
+    ffmpeg.value.FS('unlink', outputFileName);
+    
+    showErrorTip.value = false;
+    
+  } catch (error) {
+    console.error('视频转码失败:', error);
+    errorMessage.value = '视频转码失败: ' + error.message;
+    showErrorTip.value = true;
+  } finally {
+    isTranscoding.value = false;
   }
 };
 
