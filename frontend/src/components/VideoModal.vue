@@ -1,7 +1,7 @@
 <template>
   <Transition name="modal">
     <div v-if="visible" class="modal-mask" @click.self="$emit('close')">
-      <div class="modal-container">
+      <div class="modal-container" @click.stop>
         <div ref="videoContainer" class="video-container"></div>
         
         <!-- 视频播放错误提示 -->
@@ -30,9 +30,8 @@
                 <button v-if="hasAlternativeSource" class="btn-alternative" @click="tryAlternativeFormat">尝试其他格式</button>
                 <button v-if="hasLowResSource" class="btn-lowres" @click="tryLowResolutionSource">尝试低清版本</button>
                 <button v-if="isOssVideo && !isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
-                <a :href="downloadUrl" class="btn-download" download>下载到本地</a>
-                <button class="btn-close" @click="$emit('close')">关闭</button>
-              </div>
+                              <a :href="downloadUrl" class="btn-download" download target="_blank" rel="noopener" @click.stop>下载到本地</a>
+              <button class="btn-close" @click="$emit('close')">关闭</button>
             </div>
           </div>
         </div>
@@ -44,13 +43,13 @@
         </div>
         
         <!-- 常规视频控制按钮区域 -->
-        <div v-if="!showErrorTip && !isTranscoding" class="video-controls">
+        <div v-if="!showErrorTip && !isTranscoding" class="video-controls" @click.stop>
           <div class="control-buttons">
-            <button class="btn-download-normal" @click="downloadVideo" title="下载视频">
+            <button class="btn-download-normal" @click.stop="downloadVideo" title="下载视频" type="button">
               <span class="download-icon">⬇</span>
               下载
             </button>
-            <button v-if="hasAlternativeSource" class="btn-format" @click="tryAlternativeFormat" title="尝试其他格式">
+            <button v-if="hasAlternativeSource" class="btn-format" @click.stop="tryAlternativeFormat" title="尝试其他格式" type="button">
               <span class="format-icon">🔄</span>
               切换格式
             </button>
@@ -368,6 +367,11 @@ const initVideoPlayer = async () => {
     },
     // 启用重播功能（使用内置功能）
     loop: false
+  });
+  
+  // 阻止点击视频触发任何外层默认行为（例如某些全局click监听导致跳转）
+  videoElement.addEventListener('click', (e) => {
+    e.stopPropagation();
   });
   
   // 关闭 video.js 内置错误提示，由我们自定义层接管
