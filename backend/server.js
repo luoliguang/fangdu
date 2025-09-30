@@ -10,6 +10,7 @@ const { sequelize, testConnection, syncDatabase } = require('./config/sequelize'
 
 // 导入路由
 const createRoutes = require('./routes');
+const createProxyRoutes = require('./routes/proxyRoutes');
 
 // 导入控制器（用于访问记录中间件）
 const VisitController = require('./controllers/VisitController');
@@ -145,6 +146,9 @@ class Server {
     // 主路由
     const routes = createRoutes(this.db);
     this.app.use('/', routes);
+    // 直接在应用层挂载代理路由，防止生产环境路由前缀/反向代理导致的匹配问题
+    this.app.use('/api/proxy', createProxyRoutes());
+    this.app.use('/api/v1/proxy', createProxyRoutes());
     
     console.log('✅ 路由配置完成');
   }
