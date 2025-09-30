@@ -17,6 +17,7 @@
                 <li>检查网络连接</li>
                 <li>尝试使用其他浏览器（推荐Chrome、Edge）</li>
                 <li>更新浏览器到最新版本</li>
+                <li>如果在办公区域，可能受网络限制，请尝试使用手机热点</li>
                 <li>如果问题持续，请联系技术支持</li>
               </ul>
             </div>
@@ -79,24 +80,60 @@ const initVideoPlayer = () => {
   videoElement.className = 'video-js vjs-big-play-centered';
   videoContainer.value.appendChild(videoElement);
   
-  // 初始化video.js播放器
+  // 准备多个不同格式的视频源
+  const sources = [];
+  
+  // 添加主源
+  if (props.src) {
+    sources.push({
+      src: props.src,
+      type: getVideoType(props.src)
+    });
+    
+    // 添加备用源（如果原始源是mp4，添加webm备用，反之亦然）
+    const extension = props.src.split('.').pop().toLowerCase();
+    const baseSrc = props.src.substring(0, props.src.lastIndexOf('.'));
+    
+    if (extension === 'mp4') {
+      // 添加webm备用源
+      sources.push({
+        src: `${baseSrc}.webm`,
+        type: 'video/webm'
+      });
+    } else if (extension === 'webm') {
+      // 添加mp4备用源
+      sources.push({
+        src: `${baseSrc}.mp4`,
+        type: 'video/mp4'
+      });
+    }
+    
+    // 添加低分辨率备用源（适合网络受限环境）
+    sources.push({
+      src: `${baseSrc}_low.${extension}`,
+      type: getVideoType(props.src)
+    });
+  }
+  
+  // 初始化video.js播放器，使用多源配置
   player.value = videojs(videoElement, {
     controls: true,
     autoplay: true,
     preload: 'auto',
     fluid: true,
-    sources: [{
-      src: props.src,
-      type: getVideoType(props.src)
-    }],
+    sources: sources,
     html5: {
       hls: {
-        overrideNative: true
+        overrideNative: true,
+        enableLowInitialPlaylist: true,
+        limitRenditionByPlayerDimensions: false,
+        smoothQualityChange: true
       },
       nativeVideoTracks: false,
       nativeAudioTracks: false,
       nativeTextTracks: false
-    }
+    },
+    techOrder: ["html5"]
   });
   
   // 设置事件监听
@@ -105,6 +142,9 @@ const initVideoPlayer = () => {
   player.value.on('canplay', handleCanPlay);
   player.value.on('stalled', handleStalled);
   player.value.on('suspend', handleSuspend);
+  
+  // 添加网络状态检测
+  checkNetworkStatus();
   
   // 设置超时检测
   setupLoadingTimeout();
@@ -116,6 +156,59 @@ const disposeVideoPlayer = () => {
     player.value.dispose();
     player.value = null;
   }
+};
+
+// 添加网络状态检测函数
+const checkNetworkStatus = () => {
+  // 检测网络连接状态
+  if (!navigator.onLine) {
+    handleVideoError({ type: 'network', message: '网络连接已断开' });
+    return;
+  }
+  
+  // 检测网络速度
+  if (window.performance && window.performance.navigation) {
+    const navTiming = window.performance.timing;
+    const loadTime = navTiming.domContentLoadedEventEnd - navTiming.navigationStart;
+    
+    // 如果页面加载时间过长，可能是网络较慢
+    if (loadTime > 5000) {
+      console.warn('网络连接较慢，可能影响视频播放');
+    }
+  }
+  
+  // 尝试检测是否在企业网络环境
+  checkCorporateNetwork();
+};
+
+// 检测是否在企业网络环境
+const checkCorporateNetwork = () => {
+  // 创建一个图像对象来测试外部资源加载
+  const testImage = new Image();
+  let isBlocked = false;
+  
+  // 设置超时
+  const timeoutId = setTimeout(() => {
+    isBlocked = true;
+    console.warn('可能处于受限网络环境，某些资源可能被阻止');
+  }, 3000);
+  
+  // 图像加载成功
+  testImage.onload = () => {
+    clearTimeout(timeoutId);
+    if (!isBlocked) {
+      console.log('网络环境正常');
+    }
+  };
+  
+  // 图像加载失败
+  testImage.onerror = () => {
+    clearTimeout(timeoutId);
+    console.warn('可能处于受限网络环境，某些资源可能被阻止');
+  };
+  
+  // 尝试加载一个常见的外部资源
+  testImage.src = 'https://www.google.com/favicon.ico';
 };
 
 // 根据文件扩展名获取视频类型
@@ -186,6 +279,8 @@ const handleVideoError = (event) => {
   
   if (event.type === 'timeout') {
     errorMessage.value = '视频加载超时，可能是网络问题或文件过大。';
+  } else if (event.type === 'network') {
+    errorMessage.value = event.message || '网络连接问题，请检查您的网络设置。';
   } else if (player.value && player.value.error()) {
     const error = player.value.error();
     switch (error.code) {
@@ -193,35 +288,124 @@ const handleVideoError = (event) => {
         errorMessage.value = '视频播放被中断。';
         break;
       case 2: // MEDIA_ERR_NETWORK
-        errorMessage.value = '网络错误导致视频下载失败。';
+        errorMessage.value = '网络错误导致视频下载失败，可能是办公网络限制导致。';
+        // 尝试切换到低分辨率版本
+        tryLowResolutionSource();
         break;
       case 3: // MEDIA_ERR_DECODE
         errorMessage.value = '视频解码失败，可能是格式不支持或文件损坏。';
+        // 尝试切换到其他格式
+        tryAlternativeFormat();
         break;
       case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
-        errorMessage.value = '视频格式不支持或文件路径无效。';
+        errorMessage.value = '视频格式不支持或文件路径无效，可能是办公网络限制导致。';
+        // 尝试切换到其他格式
+        tryAlternativeFormat();
         break;
       default:
         errorMessage.value = '视频播放出现未知错误。';
     }
   } else {
-    errorMessage.value = '视频播放出现问题，请尝试刷新页面。';
+    errorMessage.value = '视频播放出现问题，请尝试刷新页面或检查办公网络设置。';
   }
   
   console.error('视频播放错误:', event, player.value?.error());
+};
+
+// 尝试使用低分辨率视频源
+const tryLowResolutionSource = () => {
+  if (!props.src || !player.value) return;
+  
+  const extension = props.src.split('.').pop().toLowerCase();
+  const baseSrc = props.src.substring(0, props.src.lastIndexOf('.'));
+  const lowResSrc = `${baseSrc}_low.${extension}`;
+  
+  console.log('尝试切换到低分辨率视频源:', lowResSrc);
+  
+  // 更新错误提示
+  errorMessage.value += ' 正在尝试使用低分辨率版本...';
+  
+  // 延迟一下再切换源，让用户看到提示
+  setTimeout(() => {
+    if (player.value) {
+      player.value.src({
+        src: lowResSrc,
+        type: getVideoType(lowResSrc)
+      });
+      player.value.load();
+      player.value.play().catch(err => {
+        console.error('低分辨率视频播放失败:', err);
+      });
+    }
+  }, 2000);
+};
+
+// 尝试使用替代格式
+const tryAlternativeFormat = () => {
+  if (!props.src || !player.value) return;
+  
+  const extension = props.src.split('.').pop().toLowerCase();
+  const baseSrc = props.src.substring(0, props.src.lastIndexOf('.'));
+  
+  let alternativeSrc = '';
+  let alternativeType = '';
+  
+  if (extension === 'mp4') {
+    alternativeSrc = `${baseSrc}.webm`;
+    alternativeType = 'video/webm';
+  } else {
+    alternativeSrc = `${baseSrc}.mp4`;
+    alternativeType = 'video/mp4';
+  }
+  
+  console.log('尝试切换到替代格式:', alternativeSrc);
+  
+  // 更新错误提示
+  errorMessage.value += ' 正在尝试使用替代格式...';
+  
+  // 延迟一下再切换源，让用户看到提示
+  setTimeout(() => {
+    if (player.value) {
+      player.value.src({
+        src: alternativeSrc,
+        type: alternativeType
+      });
+      player.value.load();
+      player.value.play().catch(err => {
+        console.error('替代格式视频播放失败:', err);
+        // 如果替代格式也失败，尝试低分辨率版本
+        tryLowResolutionSource();
+      });
+    }
+  }, 2000);
 };
 
 // 重试播放视频
 const retryVideo = () => {
   if (player.value) {
     showErrorTip.value = false;
+    errorMessage.value = '';
+    
+    // 检查网络状态
+    checkNetworkStatus();
+    
+    // 重置播放器
     player.value.reset();
+    
+    // 尝试使用原始源
     player.value.src({
       src: props.src,
       type: getVideoType(props.src)
     });
+    
     player.value.load();
-    player.value.play();
+    player.value.play().catch(err => {
+      console.error('重试播放失败:', err);
+      handleVideoError({ type: 'retry_failed', message: '重试播放失败，尝试使用其他格式...' });
+      // 如果重试失败，尝试其他格式
+      tryAlternativeFormat();
+    });
+    
     setupLoadingTimeout();
   }
 };
