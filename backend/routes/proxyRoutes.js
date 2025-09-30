@@ -23,6 +23,29 @@ function isHostAllowed(targetUrl) {
 function createProxyRoutes() {
   const router = express.Router();
 
+  // 处理OPTIONS预检请求
+  router.options('/media', (req, res) => {
+    res.set({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': 'Range, Accept, User-Agent',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+      'Cross-Origin-Embedder-Policy': 'unsafe-none'
+    });
+    res.status(200).end();
+  });
+
+  router.options('/download', (req, res) => {
+    res.set({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': 'Range, Accept, User-Agent',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+      'Cross-Origin-Embedder-Policy': 'unsafe-none'
+    });
+    res.status(200).end();
+  });
+
   // 代理媒体：仅允许 GET/HEAD，必须提供完整 https/http 资源 URL
   router.all('/media', async (req, res) => {
     try {
@@ -65,8 +88,12 @@ function createProxyRoutes() {
         passthrough.forEach(h => {
           if (proxyRes.headers[h]) headers[h] = proxyRes.headers[h];
         });
-        // 明确允许跨域（虽然同源访问，不妨显式暴露）
+        // 设置CORS头和ORB相关头
         headers['Access-Control-Allow-Origin'] = '*';
+        headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS';
+        headers['Access-Control-Allow-Headers'] = 'Range, Accept, User-Agent';
+        headers['Cross-Origin-Resource-Policy'] = 'cross-origin';
+        headers['Cross-Origin-Embedder-Policy'] = 'unsafe-none';
         res.writeHead(proxyRes.statusCode || 502, headers);
         if (req.method === 'HEAD') return res.end();
         proxyRes.pipe(res);
@@ -121,7 +148,12 @@ function createProxyRoutes() {
         passthrough.forEach(h => {
           if (proxyRes.headers[h]) headers[h] = proxyRes.headers[h];
         });
+        // 设置CORS头和ORB相关头
         headers['Access-Control-Allow-Origin'] = '*';
+        headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS';
+        headers['Access-Control-Allow-Headers'] = 'Range, Accept, User-Agent';
+        headers['Cross-Origin-Resource-Policy'] = 'cross-origin';
+        headers['Cross-Origin-Embedder-Policy'] = 'unsafe-none';
         // 强制下载
         headers['Content-Disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`;
         res.writeHead(proxyRes.statusCode || 200, headers);
@@ -143,4 +175,4 @@ function createProxyRoutes() {
   return router;
 }
 
-module.exports = createProxyRoutes; 
+module.exports = createProxyRoutes;

@@ -106,11 +106,13 @@ const toProxyUrl = (rawUrl) => {
     
     // 根据API基础URL构建代理路径
     if (apiBaseUrl.startsWith('http')) {
-      // 开发环境：使用完整URL
-      proxyPath = `${apiBaseUrl}/v1/proxy/media`;
+      // 开发环境：使用完整URL，注意后端路由配置
+      // 后端配置：router.use('/api/v1', apiV1) 和 router.use('/api', apiV1)
+      // 所以开发环境也应该使用 /api/proxy/media
+      proxyPath = `${apiBaseUrl}/api/proxy/media`;
     } else {
       // 生产环境：使用相对路径
-      proxyPath = `${apiBaseUrl}/v1/proxy/media`;
+      proxyPath = `${apiBaseUrl}/proxy/media`;
     }
     
     const proxied = new URL(proxyPath, window.location.origin);
@@ -215,14 +217,21 @@ watch(() => props.visible, (newValue) => {
       
       // 根据API基础URL构建下载代理路径
       if (apiBaseUrl.startsWith('http')) {
-        // 开发环境：使用完整URL
-        downloadProxyPath = `${apiBaseUrl}/v1/proxy/download`;
+        // 开发环境：使用完整URL，注意后端路由配置
+        // 后端配置：router.use('/api/v1', apiV1) 和 router.use('/api', apiV1)
+        // 所以开发环境也应该使用 /api/proxy/download
+        downloadProxyPath = `${apiBaseUrl}/api/proxy/download`;
       } else {
         // 生产环境：使用相对路径
-        downloadProxyPath = `${apiBaseUrl}/v1/proxy/download`;
+        downloadProxyPath = `${apiBaseUrl}/proxy/download`;
       }
       
-      downloadUrl.value = isCrossOrigin(src) ? toProxyUrl(src).replace('/proxy/media', '/proxy/download') : src;
+      downloadUrl.value = isCrossOrigin(src) ? 
+        (() => {
+          const proxied = new URL(downloadProxyPath, window.location.origin);
+          proxied.searchParams.set('url', src);
+          return proxied.toString();
+        })() : src;
     });
   } else {
     document.body.style.overflow = '';
