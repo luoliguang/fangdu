@@ -5,31 +5,33 @@
         <div ref="videoContainer" class="video-container"></div>
         
         <!-- 视频播放错误提示 -->
-        <div v-if="showErrorTip" class="error-content">
-          <div class="error-icon">⚠️</div>
+        <div v-if="showErrorTip" class="error-overlay">
           <div class="error-content">
-            <h4>视频播放遇到问题</h4>
-            <p>{{ errorMessage }}</p>
-            <div class="error-suggestions">
-              <p><strong>可能的解决方案：</strong></p>
-              <ul>
-                <li>刷新页面重试</li>
-                <li>检查网络连接</li>
-                <li>尝试使用其他浏览器（推荐Chrome、Edge）</li>
-                <li>更新浏览器到最新版本</li>
-                <li>如果在办公区域，可能受网络限制，请尝试使用手机热点</li>
-                <li v-if="deviceInfo.isLowEndDevice">您的设备配置较低，建议关闭其他应用程序</li>
-                <li v-if="deviceInfo.isOldDevice">您的浏览器版本较旧，建议升级到最新版本</li>
-                <li v-if="isOssVideo">阿里云OSS视频可能需要转码处理，建议使用阿里云视频点播服务</li>
-                <li>如果问题持续，请联系技术支持</li>
-              </ul>
-            </div>
-            <div class="error-actions">
-              <button class="btn-retry" @click="retryVideo">重试播放</button>
-              <button v-if="hasAlternativeSource" class="btn-alternative" @click="tryAlternativeFormat">尝试其他格式</button>
-              <button v-if="hasLowResSource" class="btn-lowres" @click="tryLowResolutionSource">尝试低清版本</button>
-              <button v-if="isOssVideo && !isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
-              <button class="btn-close" @click="$emit('close')">关闭</button>
+            <div class="error-icon">⚠️</div>
+            <div class="error-message">
+              <h4>视频播放遇到问题</h4>
+              <p>{{ errorMessage }}</p>
+              <div class="error-suggestions">
+                <p><strong>可能的解决方案：</strong></p>
+                <ul>
+                  <li>刷新页面重试</li>
+                  <li>检查网络连接</li>
+                  <li>尝试使用其他浏览器（推荐Chrome、Edge）</li>
+                  <li>更新浏览器到最新版本</li>
+                  <li>如果在办公区域，可能受网络限制，请尝试使用手机热点</li>
+                  <li v-if="deviceInfo.isLowEndDevice">您的设备配置较低，建议关闭其他应用程序</li>
+                  <li v-if="deviceInfo.isOldDevice">您的浏览器版本较旧，建议升级到最新版本</li>
+                  <li v-if="isOssVideo">阿里云OSS视频可能需要转码处理，建议使用阿里云视频点播服务</li>
+                  <li>如果问题持续，请联系技术支持</li>
+                </ul>
+              </div>
+              <div class="error-actions">
+                <button class="btn-retry" @click="retryVideo">重试播放</button>
+                <button v-if="hasAlternativeSource" class="btn-alternative" @click="tryAlternativeFormat">尝试其他格式</button>
+                <button v-if="hasLowResSource" class="btn-lowres" @click="tryLowResolutionSource">尝试低清版本</button>
+                <button v-if="isOssVideo && !isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
+                <button class="btn-close" @click="$emit('close')">关闭</button>
+              </div>
             </div>
           </div>
         </div>
@@ -274,12 +276,19 @@ const initVideoPlayer = async () => {
   console.log('设备环境检测结果:', deviceInfo.value);
 
   // 初始化video.js播放器，使用多源配置和环境适配
+  const posterUrl = props.poster ? (isCrossOrigin(props.poster) ? toProxyUrl(props.poster) : normalizePath(props.poster)) : null;
+  console.log('封面处理结果:', {
+    原始poster: props.poster,
+    是否跨域: props.poster ? isCrossOrigin(props.poster) : false,
+    最终posterUrl: posterUrl
+  });
+  
   player.value = videojs(videoElement, {
     controls: true,
     autoplay: !deviceInfo.value.isLowEndDevice, // 低端设备不自动播放
     preload: deviceInfo.value.isLowEndDevice ? 'metadata' : 'auto', // 低端设备只预加载元数据
     fluid: true,
-    poster: props.poster ? (isCrossOrigin(props.poster) ? toProxyUrl(props.poster) : normalizePath(props.poster)) : null,
+    poster: posterUrl,
     sources: sources,
     html5: {
       hls: {
@@ -1042,96 +1051,191 @@ onUnmounted(() => {
 }
 
 /* 视频错误提示样式 */
-.video-error-tip {
+.error-overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: rgba(0, 0, 0, 0.9);
   display: flex;
-  flex-direction: column;
   justify-content: center;
   align-items: center;
-  color: white;
-  padding: 20px;
-  text-align: center;
   z-index: 10;
-}
-
-.error-icon {
-  font-size: 48px;
-  margin-bottom: 20px;
+  border-radius: 8px;
 }
 
 .error-content {
-  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  padding: 30px;
+  text-align: center;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
-.error-content h4 {
-  font-size: 24px;
-  margin-bottom: 10px;
+.error-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.error-message h4 {
+  font-size: 28px;
+  margin-bottom: 15px;
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.error-message p {
+  font-size: 16px;
+  margin-bottom: 20px;
+  color: #e0e0e0;
+  line-height: 1.5;
 }
 
 .error-suggestions {
-  margin: 20px 0;
+  margin: 25px 0;
   text-align: left;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #4caf50;
+}
+
+.error-suggestions p {
+  font-weight: 600;
+  color: #4caf50;
+  margin-bottom: 15px;
 }
 
 .error-suggestions ul {
   margin-left: 20px;
+  color: #f0f0f0;
+}
+
+.error-suggestions li {
+  margin-bottom: 8px;
+  line-height: 1.4;
 }
 
 .error-actions {
-  margin-top: 20px;
+  margin-top: 25px;
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
-.btn-retry, .btn-close, .btn-alternative, .btn-lowres {
-  padding: 8px 16px;
+.btn-retry, .btn-close, .btn-alternative, .btn-lowres, .btn-transcode {
+  padding: 12px 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  font-weight: bold;
-  transition: background-color 0.3s;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  min-width: 100px;
 }
 
 .btn-retry {
-  background-color: #4caf50;
+  background: linear-gradient(135deg, #4caf50, #45a049);
   color: white;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
 
 .btn-retry:hover {
-  background-color: #45a049;
+  background: linear-gradient(135deg, #45a049, #3d8b40);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
 }
 
 .btn-alternative {
-  background-color: #2196F3;
+  background: linear-gradient(135deg, #2196F3, #0b7dda);
   color: white;
+  box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
 }
 
 .btn-alternative:hover {
-  background-color: #0b7dda;
+  background: linear-gradient(135deg, #0b7dda, #0a6bc2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
 }
 
 .btn-lowres {
-  background-color: #ff9800;
+  background: linear-gradient(135deg, #ff9800, #e68a00);
   color: white;
+  box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
 }
 
 .btn-lowres:hover {
-  background-color: #e68a00;
+  background: linear-gradient(135deg, #e68a00, #cc7a00);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+}
+
+.btn-transcode {
+  background: linear-gradient(135deg, #9c27b0, #7b1fa2);
+  color: white;
+  box-shadow: 0 4px 15px rgba(156, 39, 176, 0.3);
+}
+
+.btn-transcode:hover {
+  background: linear-gradient(135deg, #7b1fa2, #6a1b9a);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(156, 39, 176, 0.4);
 }
 
 .btn-close {
-  background-color: #f44336;
+  background: linear-gradient(135deg, #f44336, #d32f2f);
   color: white;
+  box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
 }
 
 .btn-close:hover {
-  background-color: #d32f2f;
+  background: linear-gradient(135deg, #d32f2f, #b71c1c);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
+}
+
+/* 转码进度提示样式 */
+.transcoding-tip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 20px 30px;
+  border-radius: 10px;
+  text-align: center;
+  z-index: 15;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid #4caf50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Video.js 自定义样式 */
@@ -1149,7 +1253,12 @@ onUnmounted(() => {
 }
 
 :deep(.vjs-poster) {
-  background-size: contain;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* 过渡动画 */
