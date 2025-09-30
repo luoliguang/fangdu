@@ -35,6 +35,7 @@
             </div>
           </div>
         </div>
+      </div>
         
         <!-- 转码进度提示 -->
         <div v-if="isTranscoding" class="transcoding-tip">
