@@ -99,7 +99,21 @@ const toProxyUrl = (rawUrl) => {
     if (!rawUrl) return rawUrl;
     const full = normalizePath(rawUrl);
     if (!isCrossOrigin(full)) return full;
-    const proxied = new URL('/api/v1/proxy/media', window.location.origin);
+    
+    // 获取API基础URL，确保在生产环境中使用正确的路径
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+    let proxyPath;
+    
+    // 根据API基础URL构建代理路径
+    if (apiBaseUrl.startsWith('http')) {
+      // 开发环境：使用完整URL
+      proxyPath = `${apiBaseUrl}/v1/proxy/media`;
+    } else {
+      // 生产环境：使用相对路径
+      proxyPath = `${apiBaseUrl}/v1/proxy/media`;
+    }
+    
+    const proxied = new URL(proxyPath, window.location.origin);
     proxied.searchParams.set('url', full);
     return proxied.toString();
   } catch (_) {
@@ -191,12 +205,24 @@ watch(() => props.visible, (newValue) => {
       console.log('检测到低端设备，将应用优化设置');
     }
     
-    // 初始化视频播放器
+    // 初始化下载链接（跨域时走代理）
     nextTick(() => {
       initVideoPlayer();
       // 初始化下载链接（跨域时走代理）
       const src = normalizePath(props.src);
-      downloadUrl.value = isCrossOrigin(src) ? toProxyUrl(src).replace('/proxy/media','/proxy/download') : src;
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+      let downloadProxyPath;
+      
+      // 根据API基础URL构建下载代理路径
+      if (apiBaseUrl.startsWith('http')) {
+        // 开发环境：使用完整URL
+        downloadProxyPath = `${apiBaseUrl}/v1/proxy/download`;
+      } else {
+        // 生产环境：使用相对路径
+        downloadProxyPath = `${apiBaseUrl}/v1/proxy/download`;
+      }
+      
+      downloadUrl.value = isCrossOrigin(src) ? toProxyUrl(src).replace('/proxy/media', '/proxy/download') : src;
     });
   } else {
     document.body.style.overflow = '';
