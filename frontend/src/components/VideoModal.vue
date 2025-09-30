@@ -2,17 +2,7 @@
   <Transition name="modal">
     <div v-if="visible" class="modal-mask" @click.self="$emit('close')">
       <div class="modal-container">
-        <video 
-          ref="videoRef"
-          :src="src" 
-          controls 
-          autoplay
-          @error="handleVideoError"
-          @loadstart="handleLoadStart"
-          @canplay="handleCanPlay"
-          @stalled="handleStalled"
-          @suspend="handleSuspend"
-        ></video>
+        <div ref="videoContainer" class="video-container"></div>
         
         <!-- 视频播放错误提示 -->
         <div v-if="showErrorTip" class="video-error-tip">
@@ -45,6 +35,8 @@
 
 <script setup>
 import { watch, onMounted, onUnmounted, ref, nextTick } from 'vue';
+import videojs from 'video.js';
+import 'video.js/dist/video-js.css';
 
 const props = defineProps({
   visible: Boolean,
@@ -53,7 +45,8 @@ const props = defineProps({
 const emit = defineEmits(['close']);
 
 // 视频相关的响应式数据
-const videoRef = ref(null);
+const videoContainer = ref(null);
+const player = ref(null);
 const showErrorTip = ref(false);
 const errorMessage = ref('');
 const loadingTimeout = ref(null);
@@ -65,19 +58,92 @@ watch(() => props.visible, (newValue) => {
     // 重置错误状态
     showErrorTip.value = false;
     errorMessage.value = '';
-    // 设置超时检测
-    setupLoadingTimeout();
+    // 初始化视频播放器
+    nextTick(() => {
+      initVideoPlayer();
+    });
   } else {
     document.body.style.overflow = '';
     clearLoadingTimeout();
+    // 销毁视频播放器
+    disposeVideoPlayer();
   }
 });
+
+// 初始化视频播放器
+const initVideoPlayer = () => {
+  if (!videoContainer.value) return;
+  
+  // 创建video元素
+  const videoElement = document.createElement('video');
+  videoElement.className = 'video-js vjs-big-play-centered';
+  videoContainer.value.appendChild(videoElement);
+  
+  // 初始化video.js播放器
+  player.value = videojs(videoElement, {
+    controls: true,
+    autoplay: true,
+    preload: 'auto',
+    fluid: true,
+    sources: [{
+      src: props.src,
+      type: getVideoType(props.src)
+    }],
+    html5: {
+      hls: {
+        overrideNative: true
+      },
+      nativeVideoTracks: false,
+      nativeAudioTracks: false,
+      nativeTextTracks: false
+    }
+  });
+  
+  // 设置事件监听
+  player.value.on('error', handleVideoError);
+  player.value.on('loadstart', handleLoadStart);
+  player.value.on('canplay', handleCanPlay);
+  player.value.on('stalled', handleStalled);
+  player.value.on('suspend', handleSuspend);
+  
+  // 设置超时检测
+  setupLoadingTimeout();
+};
+
+// 销毁视频播放器
+const disposeVideoPlayer = () => {
+  if (player.value) {
+    player.value.dispose();
+    player.value = null;
+  }
+};
+
+// 根据文件扩展名获取视频类型
+const getVideoType = (src) => {
+  if (!src) return 'video/mp4';
+  
+  const extension = src.split('.').pop().toLowerCase();
+  switch (extension) {
+    case 'mp4':
+      return 'video/mp4';
+    case 'webm':
+      return 'video/webm';
+    case 'ogg':
+      return 'video/ogg';
+    case 'm3u8':
+      return 'application/x-mpegURL';
+    case 'mpd':
+      return 'application/dash+xml';
+    default:
+      return 'video/mp4';
+  }
+};
 
 // 设置加载超时检测
 const setupLoadingTimeout = () => {
   clearLoadingTimeout();
   loadingTimeout.value = setTimeout(() => {
-    if (videoRef.value && videoRef.value.readyState < 2) {
+    if (player.value && !player.value.readyState() || player.value.readyState() < 2) {
       handleVideoError({ type: 'timeout' });
     }
   }, 10000); // 10秒超时
@@ -120,19 +186,19 @@ const handleVideoError = (event) => {
   
   if (event.type === 'timeout') {
     errorMessage.value = '视频加载超时，可能是网络问题或文件过大。';
-  } else if (videoRef.value && videoRef.value.error) {
-    const error = videoRef.value.error;
+  } else if (player.value && player.value.error()) {
+    const error = player.value.error();
     switch (error.code) {
-      case error.MEDIA_ERR_ABORTED:
+      case 1: // MEDIA_ERR_ABORTED
         errorMessage.value = '视频播放被中断。';
         break;
-      case error.MEDIA_ERR_NETWORK:
+      case 2: // MEDIA_ERR_NETWORK
         errorMessage.value = '网络错误导致视频下载失败。';
         break;
-      case error.MEDIA_ERR_DECODE:
+      case 3: // MEDIA_ERR_DECODE
         errorMessage.value = '视频解码失败，可能是格式不支持或文件损坏。';
         break;
-      case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+      case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
         errorMessage.value = '视频格式不支持或文件路径无效。';
         break;
       default:
@@ -142,14 +208,20 @@ const handleVideoError = (event) => {
     errorMessage.value = '视频播放出现问题，请尝试刷新页面。';
   }
   
-  console.error('视频播放错误:', event, videoRef.value?.error);
+  console.error('视频播放错误:', event, player.value?.error());
 };
 
 // 重试播放视频
 const retryVideo = () => {
-  if (videoRef.value) {
+  if (player.value) {
     showErrorTip.value = false;
-    videoRef.value.load(); // 重新加载视频
+    player.value.reset();
+    player.value.src({
+      src: props.src,
+      type: getVideoType(props.src)
+    });
+    player.value.load();
+    player.value.play();
     setupLoadingTimeout();
   }
 };
@@ -168,6 +240,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
   clearLoadingTimeout();
+  disposeVideoPlayer();
   // 确保组件卸载时恢复 body 滚动
   document.body.style.overflow = '';
 });
@@ -175,8 +248,8 @@ onUnmounted(() => {
 
 <style scoped>
 .modal-mask { position: fixed; z-index: 9998; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; }
-.modal-container { position: relative; max-width: 80vw; max-height: 80vh;   display: flex; justify-content: center; align-items: center;}
-.modal-container video { max-width: 100%; max-height: 100%; width: auto; height: 90vh; object-fit: contain; /* 保持比例完整显示 */ display: block; }
+.modal-container { position: relative; max-width: 80vw; max-height: 80vh; display: flex; justify-content: center; align-items: center;}
+.video-container { width: 100%; height: 100%; min-width: 640px; min-height: 360px; }
 .close-button { 
   position: absolute; 
   top: -40px; 
@@ -203,115 +276,102 @@ onUnmounted(() => {
 /* 视频错误提示样式 */
 .video-error-tip {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  max-width: 500px;
-  width: 90%;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  padding: 20px;
+  text-align: center;
   z-index: 10;
-  text-align: left;
 }
 
 .error-icon {
-  font-size: 3rem;
-  text-align: center;
-  margin-bottom: 16px;
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+.error-content {
+  max-width: 500px;
 }
 
 .error-content h4 {
-  margin: 0 0 12px 0;
-  color: #e74c3c;
-  font-size: 1.2rem;
-  font-weight: 600;
-}
-
-.error-content p {
-  margin: 0 0 16px 0;
-  color: #666;
-  line-height: 1.5;
+  font-size: 24px;
+  margin-bottom: 10px;
 }
 
 .error-suggestions {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 16px;
-  margin: 16px 0;
-}
-
-.error-suggestions p {
-  margin: 0 0 8px 0;
-  color: #333;
-  font-weight: 500;
+  margin: 20px 0;
+  text-align: left;
 }
 
 .error-suggestions ul {
-  margin: 8px 0 0 0;
-  padding-left: 20px;
-}
-
-.error-suggestions li {
-  margin: 4px 0;
-  color: #555;
-  line-height: 1.4;
+  margin-left: 20px;
 }
 
 .error-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
   margin-top: 20px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
 }
 
 .btn-retry, .btn-close {
   padding: 8px 16px;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  font-weight: bold;
+  transition: background-color 0.3s;
 }
 
 .btn-retry {
-  background: #3498db;
+  background-color: #4caf50;
   color: white;
 }
 
 .btn-retry:hover {
-  background: #2980b9;
-  transform: translateY(-1px);
+  background-color: #45a049;
 }
 
 .btn-close {
-  background: #95a5a6;
+  background-color: #f44336;
   color: white;
 }
 
 .btn-close:hover {
-  background: #7f8c8d;
-  transform: translateY(-1px);
+  background-color: #d32f2f;
 }
 
-/* 响应式设计 */
-@media (max-width: 600px) {
-  .video-error-tip {
-    width: 95%;
-    padding: 20px;
-  }
-  
-  .error-actions {
-    flex-direction: column;
-  }
-  
-  .btn-retry, .btn-close {
-    width: 100%;
-  }
+/* Video.js 自定义样式 */
+:deep(.video-js) {
+  width: 100%;
+  height: 100%;
+  min-width: 640px;
+  min-height: 360px;
 }
 
-.modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
-.modal-enter-from, .modal-leave-to { opacity: 0; }
+:deep(.vjs-big-play-button) {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+:deep(.vjs-poster) {
+  background-size: contain;
+}
+
+/* 过渡动画 */
+.modal-enter-active, .modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from, .modal-leave-to {
+  opacity: 0;
+}
 </style>
