@@ -17,6 +17,17 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
+    // 规范化 URL，避免当 baseURL 以 /api 结尾且 url 也以 /api/ 开头时出现 /api/api/... 的重复前缀
+    const base = request.defaults.baseURL
+    if (typeof base === 'string' && typeof config.url === 'string') {
+      const baseNormalized = String(base).replace(/\/+$/, '')
+      const isBaseApi = /\/api$/i.test(baseNormalized)
+      if (isBaseApi && /^\/api(\/|$)/i.test(config.url)) {
+        // 去掉请求 URL 的第一个 /api，使最终路径为 /api/v1/... 而不是 /api/api/v1/...
+        config.url = config.url.replace(/^\/api(\/|$)/i, '/')
+      }
+    }
+
     // 添加认证token
     const userStore = useUserStore()
     if (userStore.token) {
