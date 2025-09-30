@@ -894,7 +894,9 @@ const tryLowResolutionSource = async () => {
   
   const extension = props.src.split('.').pop().toLowerCase();
   const baseSrc = props.src.substring(0, props.src.lastIndexOf('.'));
-  const lowResSrc = normalizePath(`${baseSrc}_low.${extension}`);
+  let lowResSrc = normalizePath(`${baseSrc}_low.${extension}`);
+  // 跨域时走代理，避免公司网络/CORS/404
+  if (isCrossOrigin(lowResSrc)) lowResSrc = toProxyUrl(lowResSrc);
   
   if (!(await urlReachable(lowResSrc))) {
     console.warn('低清视频不可达，放弃切换:', lowResSrc);
@@ -934,6 +936,8 @@ const tryAlternativeFormat = async () => {
     alternativeSrc = normalizePath(`${baseSrc}.mp4`);
     alternativeType = 'video/mp4';
   }
+  // 跨域时走代理
+  if (isCrossOrigin(alternativeSrc)) alternativeSrc = toProxyUrl(alternativeSrc);
   
   if (!(await urlReachable(alternativeSrc))) {
     console.warn('替代格式视频不可达，放弃切换:', alternativeSrc);
@@ -1242,8 +1246,9 @@ onUnmounted(() => {
   padding: 30px;
   text-align: center;
   max-width: 90vw;
-  max-height: 65vh;
-  overflow: hidden;
+  max-height: 70vh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .error-icon {
@@ -1530,6 +1535,6 @@ onUnmounted(() => {
   .video-container { min-width: 320px; min-height: 180px; }
   .modal-container { width: 95vw; max-width: 95vw; max-height: 85vh; }
   .close-button { top: -32px; right: -32px; width: 32px; height: 32px; font-size: 1.2rem; }
-  .error-content { max-height: 55vh; }
+  .error-content { max-height: 60vh; }
 }
 </style>
