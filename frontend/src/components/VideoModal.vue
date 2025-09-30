@@ -30,8 +30,8 @@
                 <button v-if="hasAlternativeSource" class="btn-alternative" @click="tryAlternativeFormat">尝试其他格式</button>
                 <button v-if="hasLowResSource" class="btn-lowres" @click="tryLowResolutionSource">尝试低清版本</button>
                 <button v-if="isOssVideo && !isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
-                              <a :href="downloadUrl" class="btn-download" download target="_blank" rel="noopener" @click.stop data-allow-nav>下载到本地</a>
-              <button class="btn-close" @click="$emit('close')">关闭</button>
+                <button class="btn-download" @click.stop="downloadVideo">下载到本地</button>
+                <button class="btn-close" @click="$emit('close')">关闭</button>
             </div>
           </div>
         </div>
@@ -243,10 +243,18 @@ watch(() => props.visible, (newValue) => {
       // 初始化下载链接（跨域时走代理）
       const src = normalizePath(props.src);
       const downloadProxyPath = `${resolveApiBase()}/proxy/download`;
+      // 生成文件名
+      let defaultName = 'video.mp4';
+      try {
+        const urlObj = new URL(src, window.location.origin);
+        const original = (urlObj.pathname.split('/').pop() || '').trim();
+        defaultName = original && original.includes('.') ? original : 'video.mp4';
+      } catch (_) {}
       downloadUrl.value = isCrossOrigin(src) ? 
         (() => {
           const proxied = new URL(downloadProxyPath, window.location.origin);
           proxied.searchParams.set('url', src);
+          proxied.searchParams.set('filename', defaultName);
           return proxied.toString();
         })() : src;
     });
@@ -502,7 +510,7 @@ const applyLowEndDeviceOptimizations = () => {
       };
     }
     
-    // 减少缓冲区大小，降低内存占用
+    // 减少缓冲区大小，更快开始播放
     if (player.value.tech_ && player.value.tech_.vhs) {
       player.value.tech_.vhs.bufferSize = 5; // 5秒缓冲
     }
@@ -1102,15 +1110,13 @@ const downloadVideo = async () => {
     toast.error('没有可下载的视频源');
     return;
   }
-  
+
   try {
     // 获取文件名 - 优先使用传入的videoName，否则从URL提取
     let fileName;
     if (props.videoName && props.videoName.trim()) {
       fileName = props.videoName.trim();
-      // 确保文件名有扩展名
       if (!fileName.includes('.')) {
-        // 从原始URL获取扩展名
         const url = new URL(props.src, window.location.origin);
         const pathname = url.pathname;
         const originalFileName = pathname.split('/').pop() || 'video';
@@ -1118,93 +1124,74 @@ const downloadVideo = async () => {
         fileName += '.' + extension;
       }
     } else {
-      // 回退到原始逻辑
       const url = new URL(props.src, window.location.origin);
       const pathname = url.pathname;
       fileName = pathname.split('/').pop() || 'video';
-      
-      // 确保文件名有扩展名
       if (!fileName.includes('.')) {
         fileName += '.mp4';
       }
     }
-    
-    // 处理跨域URL
-    let downloadUrl = props.src;
+
+    // 处理跨域URL：统一走下载代理，确保 Content-Disposition: attachment
+    let finalDownloadUrl = props.src;
     if (isCrossOrigin(props.src)) {
-      downloadUrl = toProxyUrl(props.src);
+      const base = resolveApiBase();
+      const dl = new URL(`${base}/proxy/download`, window.location.origin);
+      dl.searchParams.set('url', props.src);
+      dl.searchParams.set('filename', fileName);
+      finalDownloadUrl = dl.toString();
     }
-    
-    console.log('开始下载视频:', {
-      原始URL: props.src,
-      下载URL: downloadUrl,
-      文件名: fileName
-    });
-    
-    try {
-      // 尝试通过fetch获取视频数据
-      const response = await fetch(downloadUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'video/*,*/*;q=0.9'
+
+    console.log('开始下载视频:', { 原始URL: props.src, 下载URL: finalDownloadUrl, 文件名: fileName });
+
+    // 优先使用文件保存对话框（受支持的浏览器：Chrome/Edge等）
+    if (typeof window.showSaveFilePicker === 'function') {
+      try {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: fileName,
+          types: [
+            {
+              description: '视频文件',
+              accept: {
+                'video/*': ['.mp4', '.mov', '.avi', '.mkv']
+              }
+            }
+          ]
+        });
+
+        const response = await fetch(finalDownloadUrl, { headers: { Accept: 'video/*,*/*' } });
+        if (!response.ok) throw new Error(`下载失败（${response.status}）`);
+
+        const writable = await fileHandle.createWritable();
+        if (response.body && typeof response.body.pipeTo === 'function') {
+          await response.body.pipeTo(writable);
+        } else {
+          const blob = await response.blob();
+          await writable.write(blob);
+          await writable.close();
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+        toast.success('下载完成，已保存到您选择的位置');
+        return; // 已通过文件保存对话框完成下载
+      } catch (e) {
+        console.warn('文件保存对话框下载失败，回退到浏览器默认下载:', e);
+        // 继续走下面的回退方案
       }
-      
-      // 检查响应类型
-      const contentType = response.headers.get('content-type');
-      console.log('响应内容类型:', contentType);
-      
-      const blob = await response.blob();
-      console.log('获取到blob:', blob.size, 'bytes');
-      
-      if (blob.size === 0) {
-        throw new Error('下载的文件为空');
-      }
-      
-      const blobUrl = URL.createObjectURL(blob);
-      
-      // 创建下载链接
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName;
-      link.style.display = 'none';
-      
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // 清理blob URL
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-      
-      console.log('视频下载成功');
-      toast.success('视频下载成功！请检查浏览器下载文件夹。');
-      
-    } catch (fetchError) {
-      console.error('通过fetch下载失败:', fetchError);
-      
-      // 如果fetch失败，尝试直接下载
-      console.log('尝试直接下载...');
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = fileName;
-      link.target = '_blank';
-      link.style.display = 'none';
-      
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      console.log('尝试直接下载完成');
-      toast.warning('已尝试下载视频，如果没有开始下载，请右键点击视频选择"另存为"');
     }
-    
+
+    // 回退方案：使用隐藏的 <a> 元素触发浏览器默认下载（可能直接保存到下载目录，无弹窗）
+    const a = document.createElement('a');
+    a.href = finalDownloadUrl;
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    toast.info('已发起下载请求。如未弹窗，这是浏览器的默认行为（自动保存到下载目录）。如需弹窗，请开启浏览器“下载前询问每个文件的保存位置”。');
   } catch (error) {
     console.error('视频下载失败:', error);
-    toast.error(`视频下载失败: ${error.message}\n\n请尝试以下方法：\n1. 右键点击视频选择"另存为"\n2. 检查网络连接\n3. 尝试使用其他浏览器`);
+    toast.error(`视频下载失败: ${error.message}`);
   }
 };
 

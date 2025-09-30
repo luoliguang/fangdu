@@ -149,6 +149,7 @@ class Server {
     // 直接在应用层挂载代理路由，防止生产环境路由前缀/反向代理导致的匹配问题
     this.app.use('/api/proxy', createProxyRoutes());
     this.app.use('/api/v1/proxy', createProxyRoutes());
+    this.app.use('/proxy', createProxyRoutes());
     
     console.log('✅ 路由配置完成');
   }
