@@ -12,24 +12,28 @@
               <h4>视频播放遇到问题</h4>
               <p>{{ errorMessage }}</p>
               <div class="error-suggestions">
-                <p><strong>可能的解决方案：</strong></p>
+                <p><strong>推荐解决方案：</strong></p>
                 <ul>
+                  <li><strong>直接下载视频到本地播放</strong> - 最简单有效的解决方案</li>
                   <li>刷新页面重试</li>
-                  <li>检查网络连接</li>
+                  <li>检查网络连接状态</li>
                   <li>尝试使用其他浏览器（推荐Chrome、Edge）</li>
                   <li>更新浏览器到最新版本</li>
-                  <li>如果在办公区域，可能受网络限制，请尝试使用手机热点</li>
                   <li v-if="deviceInfo.isLowEndDevice">您的设备配置较低，建议关闭其他应用程序</li>
                   <li v-if="deviceInfo.isOldDevice">您的浏览器版本较旧，建议升级到最新版本</li>
-                  <li v-if="isOssVideo">阿里云OSS视频可能需要转码处理，建议使用阿里云视频点播服务</li>
+
                   <li>如果问题持续，请联系技术支持</li>
                 </ul>
               </div>
               <div class="error-actions">
+                <button class="btn-download" @click="downloadVideo">
+                  <span class="download-icon">⬇️</span>
+                  下载到本地
+                </button>
                 <button class="btn-retry" @click="retryVideo">重试播放</button>
                 <button v-if="hasAlternativeSource" class="btn-alternative" @click="tryAlternativeFormat">尝试其他格式</button>
                 <button v-if="hasLowResSource" class="btn-lowres" @click="tryLowResolutionSource">尝试低清版本</button>
-                <button v-if="isOssVideo && !isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
+                <button v-if="!isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
                 <button class="btn-close" @click="$emit('close')">关闭</button>
               </div>
             </div>
@@ -77,7 +81,6 @@ const deviceInfo = ref({
 });
 const hasAlternativeSource = ref(false);
 const hasLowResSource = ref(false);
-const isOssVideo = ref(false);
 const isTranscoding = ref(false);
 const transcodingProgress = ref(0);
 const ffmpeg = ref(null);
@@ -787,15 +790,11 @@ const handleVideoError = async (event) => {
         break;
       case 3: // MEDIA_ERR_DECODE
         errorMessage.value = '视频解码失败，可能是格式不支持或文件损坏。';
-        // 检查是否是阿里云OSS兼容性问题
-        checkOssCompatibility();
         // 尝试切换到其他格式
         tryAlternativeFormat();
         break;
       case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
-        errorMessage.value = '视频格式不支持或文件路径无效，可能是阿里云OSS格式兼容性问题。';
-        // 检查是否是阿里云OSS兼容性问题
-        checkOssCompatibility();
+        errorMessage.value = '视频格式不支持或文件路径无效。';
         // 尝试切换到其他格式
         tryAlternativeFormat();
         break;
@@ -818,18 +817,7 @@ const handleVideoError = async (event) => {
   console.error('视频播放错误:', event, player.value?.error());
 };
 
-// 检查是否是阿里云OSS兼容性问题
-const checkOssCompatibility = () => {
-  // 检查视频URL是否来自阿里云OSS
-  if (props.src && (props.src.includes('aliyuncs.com') || props.src.includes('oss-cn'))) {
-    console.warn('检测到阿里云OSS视频源，可能存在格式兼容性问题');
-    errorMessage.value += ' 检测到阿里云OSS视频源，可能需要转码处理。';
-    isOssVideo.value = true;
-    
-    // 添加OSS特定的错误提示到控制台
-    console.log('阿里云OSS视频可能需要通过转码服务处理，建议使用阿里云的视频点播服务');
-  }
-};
+
 
 // 尝试使用低分辨率视频源
 const tryLowResolutionSource = async () => {
@@ -1003,6 +991,86 @@ const transcodeVideo = async () => {
   }
 };
 
+// 下载视频到本地
+const downloadVideo = async () => {
+  try {
+    if (!props.src) {
+      console.error('视频源为空，无法下载');
+      return;
+    }
+    
+    // 获取视频文件名
+    let fileName = props.src.split('/').pop() || 'video.mp4';
+    
+    // 确保文件名有扩展名
+    if (!fileName.includes('.')) {
+      fileName += '.mp4';
+    }
+    
+    // 处理跨域视频下载
+    let downloadUrl = props.src;
+    
+    if (isCrossOrigin(props.src)) {
+      // 如果是跨域视频，使用代理URL
+      downloadUrl = toProxyUrl(props.src);
+    } else {
+      // 如果是同域视频，规范化路径
+      downloadUrl = normalizePath(props.src);
+    }
+    
+    console.log('开始下载视频:', {
+      原始URL: props.src,
+      下载URL: downloadUrl,
+      文件名: fileName
+    });
+    
+    // 创建下载链接
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = fileName;
+    link.target = '_blank';
+    
+    // 对于跨域资源，可能需要通过fetch获取blob
+    if (isCrossOrigin(props.src)) {
+      try {
+        const response = await fetch(downloadUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        
+        link.href = blobUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // 清理blob URL
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        
+        console.log('视频下载成功');
+      } catch (error) {
+        console.error('通过fetch下载失败，尝试直接下载:', error);
+        // 如果fetch失败，尝试直接下载
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } else {
+      // 同域资源直接下载
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      console.log('视频下载成功');
+    }
+    
+  } catch (error) {
+    console.error('视频下载失败:', error);
+    alert('视频下载失败，请尝试右键点击视频选择"另存为"');
+  }
+};
+
 // 处理 ESC 键关闭
 const handleKeydown = (e) => {
   if (e.key === 'Escape' && props.visible) {
@@ -1136,7 +1204,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.btn-retry, .btn-close, .btn-alternative, .btn-lowres, .btn-transcode {
+.btn-retry, .btn-close, .btn-alternative, .btn-lowres, .btn-transcode, .btn-download {
   padding: 12px 20px;
   border: none;
   border-radius: 6px;
@@ -1145,6 +1213,40 @@ onUnmounted(() => {
   font-size: 14px;
   transition: all 0.3s ease;
   min-width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-download {
+  background: linear-gradient(135deg, #00bcd4, #0097a7);
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 188, 212, 0.3);
+  min-width: 120px;
+}
+
+.btn-download:hover {
+  background: linear-gradient(135deg, #0097a7, #00838f);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 188, 212, 0.4);
+}
+
+.download-icon {
+  font-size: 16px;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-3px);
+  }
+  60% {
+    transform: translateY(-2px);
+  }
 }
 
 .btn-retry {
