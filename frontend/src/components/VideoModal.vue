@@ -43,6 +43,20 @@
           <p>正在转码视频，请稍候... {{ transcodingProgress }}%</p>
         </div>
         
+        <!-- 常规视频控制按钮区域 -->
+        <div v-if="!showErrorTip && !isTranscoding" class="video-controls">
+          <div class="control-buttons">
+            <button class="btn-download-normal" @click="downloadVideo" title="下载视频">
+              <span class="download-icon">⬇</span>
+              下载
+            </button>
+            <button v-if="hasAlternativeSource" class="btn-format" @click="tryAlternativeFormat" title="尝试其他格式">
+              <span class="format-icon">🔄</span>
+              切换格式
+            </button>
+          </div>
+        </div>
+        
         <button class="close-button" @click="$emit('close')">&times;</button>
       </div>
     </div>
@@ -59,12 +73,39 @@ import { useToast } from 'vue-toastification';
 const props = defineProps({
   visible: Boolean,
   src: String,
-  poster: String
+  poster: String,
+  videoName: String
 });
 const emit = defineEmits(['close']);
 
 // 初始化toast通知
 const toast = useToast();
+
+// 辅助函数：判断是否跨域
+const isCrossOrigin = (url) => {
+  try {
+    if (!url) return false;
+    if (url.startsWith('blob:') || url.startsWith('data:')) return false;
+    const u = new URL(url, window.location.href);
+    return u.origin !== window.location.origin;
+  } catch (_) {
+    return true;
+  }
+};
+
+// 辅助函数：转换为代理URL
+const toProxyUrl = (rawUrl) => {
+  try {
+    if (!rawUrl) return rawUrl;
+    const full = normalizePath(rawUrl);
+    if (!isCrossOrigin(full)) return full;
+    const proxied = new URL('/api/v1/proxy/media', window.location.origin);
+    proxied.searchParams.set('url', full);
+    return proxied.toString();
+  } catch (_) {
+    return rawUrl;
+  }
+};
 
 // 视频相关的响应式数据
 const videoContainer = ref(null);
@@ -1004,14 +1045,29 @@ const downloadVideo = async () => {
   }
   
   try {
-    // 获取文件名
-    const url = new URL(props.src, window.location.origin);
-    const pathname = url.pathname;
-    let fileName = pathname.split('/').pop() || 'video';
-    
-    // 确保文件名有扩展名
-    if (!fileName.includes('.')) {
-      fileName += '.mp4';
+    // 获取文件名 - 优先使用传入的videoName，否则从URL提取
+    let fileName;
+    if (props.videoName && props.videoName.trim()) {
+      fileName = props.videoName.trim();
+      // 确保文件名有扩展名
+      if (!fileName.includes('.')) {
+        // 从原始URL获取扩展名
+        const url = new URL(props.src, window.location.origin);
+        const pathname = url.pathname;
+        const originalFileName = pathname.split('/').pop() || 'video';
+        const extension = originalFileName.includes('.') ? originalFileName.split('.').pop() : 'mp4';
+        fileName += '.' + extension;
+      }
+    } else {
+      // 回退到原始逻辑
+      const url = new URL(props.src, window.location.origin);
+      const pathname = url.pathname;
+      fileName = pathname.split('/').pop() || 'video';
+      
+      // 确保文件名有扩展名
+      if (!fileName.includes('.')) {
+        fileName += '.mp4';
+      }
     }
     
     // 处理跨域URL
@@ -1353,6 +1409,62 @@ onUnmounted(() => {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* 常规视频控制按钮样式 */
+.video-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 15;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn-download-normal, .btn-format {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-download-normal {
+  background: rgba(76, 175, 80, 0.9);
+  color: white;
+}
+
+.btn-download-normal:hover {
+  background: rgba(76, 175, 80, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.3);
+}
+
+.btn-format {
+  background: rgba(33, 150, 243, 0.9);
+  color: white;
+}
+
+.btn-format:hover {
+  background: rgba(33, 150, 243, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3);
+}
+
+.download-icon, .format-icon {
+  font-size: 16px;
 }
 
 /* Video.js 自定义样式 */

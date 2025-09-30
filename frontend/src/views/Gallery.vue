@@ -152,6 +152,7 @@ const lightboxVisible = ref(false);
 const lightboxIndex = ref(0);
 const videoModalVisible = ref(false);
 const currentVideoUrl = ref('');
+const currentVideoName = ref(''); // 添加当前视频名称
 const feedbackMessage = ref(''); // 用户留言内容（页面底部）
 
 // 新增：提交留言功能（页面底部）
@@ -219,6 +220,7 @@ const showMedia = (material) => {
         // 无论 file_path 是什么，都移除可能存在的OSS图片处理参数
         const cleanVideoUrl = material.file_path.split('?')[0];
         currentVideoUrl.value = cleanVideoUrl;
+        currentVideoName.value = material.name; // 设置当前视频名称
         videoModalVisible.value = true;
     }
 };
@@ -630,6 +632,7 @@ showFeedbackForm.value = true;
   <VideoModal
     :visible="videoModalVisible"
     :src="currentVideoUrl"
+    :video-name="currentVideoName"
     @close="videoModalVisible = false"
   />
 
