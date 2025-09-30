@@ -84,6 +84,62 @@ function createProxyRoutes() {
     }
   });
 
+  // 代理下载：强制以附件形式下载文件
+  router.get('/download', async (req, res) => {
+    try {
+      const target = req.query.url;
+      const filename = req.query.filename || 'media.mp4';
+      if (!target) return res.status(400).json({ success: false, message: '缺少参数 url' });
+      if (!/^https?:\/\//i.test(target)) {
+        return res.status(400).json({ success: false, message: 'url 必须为 http/https 绝对地址' });
+      }
+      if (!isHostAllowed(target)) {
+        return res.status(403).json({ success: false, message: '目标主机不被允许' });
+      }
+      const parsed = new URL(target);
+      const client = parsed.protocol === 'https:' ? https : http;
+
+      const requestHeaders = {
+        'User-Agent': req.headers['user-agent'] || 'fd-media-proxy',
+        'Accept': req.headers['accept'] || '*/*'
+      };
+      if (req.headers['range']) requestHeaders['Range'] = req.headers['range'];
+
+      const proxyReq = client.request({
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        method: 'GET',
+        headers: requestHeaders
+      }, proxyRes => {
+        const headers = {};
+        const passthrough = [
+          'content-type', 'content-length', 'accept-ranges', 'content-range',
+          'etag', 'last-modified', 'cache-control'
+        ];
+        passthrough.forEach(h => {
+          if (proxyRes.headers[h]) headers[h] = proxyRes.headers[h];
+        });
+        headers['Access-Control-Allow-Origin'] = '*';
+        // 强制下载
+        headers['Content-Disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`;
+        res.writeHead(proxyRes.statusCode || 200, headers);
+        proxyRes.pipe(res);
+      });
+
+      proxyReq.on('error', (e) => {
+        console.error('下载代理失败:', e.message);
+        res.status(502).json({ success: false, message: '上游请求失败' });
+      });
+
+      proxyReq.end();
+    } catch (err) {
+      console.error('下载代理异常:', err);
+      res.status(500).json({ success: false, message: '代理内部错误' });
+    }
+  });
+
   return router;
 }
 

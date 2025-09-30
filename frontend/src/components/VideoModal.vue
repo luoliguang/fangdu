@@ -26,14 +26,11 @@
                 </ul>
               </div>
               <div class="error-actions">
-                <button class="btn-download" @click="downloadVideo">
-                  <span class="download-icon">⬇️</span>
-                  下载到本地
-                </button>
                 <button class="btn-retry" @click="retryVideo">重试播放</button>
                 <button v-if="hasAlternativeSource" class="btn-alternative" @click="tryAlternativeFormat">尝试其他格式</button>
                 <button v-if="hasLowResSource" class="btn-lowres" @click="tryLowResolutionSource">尝试低清版本</button>
-                <button v-if="!isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
+                <button v-if="isOssVideo && !isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
+                <a :href="downloadUrl" class="btn-download" download>下载到本地</a>
                 <button class="btn-close" @click="$emit('close')">关闭</button>
               </div>
             </div>
@@ -88,6 +85,7 @@ const hasLowResSource = ref(false);
 const isTranscoding = ref(false);
 const transcodingProgress = ref(0);
 const ffmpeg = ref(null);
+const downloadUrl = ref('');
 
 // 监听 visible 变化，控制 body 滚动和重置错误状态
 watch(() => props.visible, (newValue) => {
@@ -114,6 +112,9 @@ watch(() => props.visible, (newValue) => {
     // 初始化视频播放器
     nextTick(() => {
       initVideoPlayer();
+      // 初始化下载链接（跨域时走代理）
+      const src = normalizePath(props.src);
+      downloadUrl.value = isCrossOrigin(src) ? toProxyUrl(src).replace('/proxy/media','/proxy/download') : src;
     });
   } else {
     document.body.style.overflow = '';
@@ -1114,7 +1115,7 @@ onUnmounted(() => {
 
 <style scoped>
 .modal-mask { position: fixed; z-index: 9998; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; }
-.modal-container { position: relative; max-width: 80vw; max-height: 80vh; display: flex; justify-content: center; align-items: center;}
+.modal-container { position: relative; width: 90vw; max-width: 1000px; max-height: 85vh; display: flex; justify-content: center; align-items: center; }
 .video-container { width: 100%; height: 100%; min-width: 640px; min-height: 360px; }
 .close-button { 
   position: absolute; 
@@ -1161,9 +1162,9 @@ onUnmounted(() => {
   color: white;
   padding: 30px;
   text-align: center;
-  max-width: 600px;
-  max-height: 80vh;
-  overflow-y: auto;
+  max-width: 90vw;
+  max-height: 65vh;
+  overflow: hidden;
 }
 
 .error-icon {
@@ -1193,12 +1194,9 @@ onUnmounted(() => {
 }
 
 .error-suggestions {
-  margin: 25px 0;
+  margin: 20px 0;
   text-align: left;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 20px;
-  border-radius: 8px;
-  border-left: 4px solid #4caf50;
+  overflow: hidden;
 }
 
 .error-suggestions p {
@@ -1209,7 +1207,9 @@ onUnmounted(() => {
 
 .error-suggestions ul {
   margin-left: 20px;
-  color: #f0f0f0;
+  max-height: none;
+  overflow: hidden;
+  list-style: disc;
 }
 
 .error-suggestions li {
@@ -1218,41 +1218,33 @@ onUnmounted(() => {
 }
 
 .error-actions {
-  margin-top: 25px;
+  margin-top: 20px;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   justify-content: center;
-  flex-wrap: wrap;
-  align-items: center;
 }
 
 .btn-retry, .btn-close, .btn-alternative, .btn-lowres, .btn-transcode, .btn-download {
-  padding: 10px 16px;
+  padding: 8px 16px;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
-  font-weight: 600;
-  font-size: 13px;
-  transition: all 0.3s ease;
-  min-width: 90px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  white-space: nowrap;
+  font-weight: bold;
+  transition: background-color 0.3s;
 }
 
 .btn-download {
-  background: linear-gradient(135deg, #00bcd4, #0097a7);
-  color: white;
-  box-shadow: 0 4px 15px rgba(0, 188, 212, 0.3);
-  min-width: 110px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  background-color: #6a5acd;
+  color: #fff;
+  text-decoration: none;
+  font-weight: bold;
 }
 
 .btn-download:hover {
-  background: linear-gradient(135deg, #0097a7, #00838f);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 188, 212, 0.4);
+  background-color: #5a4acb;
 }
 
 .download-icon {
@@ -1397,5 +1389,12 @@ onUnmounted(() => {
 
 ::deep(.vjs-error .vjs-error-display) {
   display: none !important; /* 隐藏video.js默认黑色报错层 */
+}
+
+@media (max-width: 768px) {
+  .video-container { min-width: 320px; min-height: 180px; }
+  .modal-container { width: 95vw; max-width: 95vw; max-height: 85vh; }
+  .close-button { top: -32px; right: -32px; width: 32px; height: 32px; font-size: 1.2rem; }
+  .error-content { max-height: 55vh; }
 }
 </style>
