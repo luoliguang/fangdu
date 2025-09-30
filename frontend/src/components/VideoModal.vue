@@ -57,6 +57,7 @@ import { watch, onMounted, onUnmounted, ref, nextTick } from 'vue';
 import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
 import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
+import { useToast } from 'vue-toastification';
 
 const props = defineProps({
   visible: Boolean,
@@ -64,6 +65,9 @@ const props = defineProps({
   poster: String
 });
 const emit = defineEmits(['close']);
+
+// 初始化toast通知
+const toast = useToast();
 
 // 视频相关的响应式数据
 const videoContainer = ref(null);
@@ -993,29 +997,26 @@ const transcodeVideo = async () => {
 
 // 下载视频到本地
 const downloadVideo = async () => {
+  if (!props.src) {
+    toast.error('没有可下载的视频源');
+    return;
+  }
+  
   try {
-    if (!props.src) {
-      console.error('视频源为空，无法下载');
-      return;
-    }
-    
-    // 获取视频文件名
-    let fileName = props.src.split('/').pop() || 'video.mp4';
+    // 获取文件名
+    const url = new URL(props.src, window.location.origin);
+    const pathname = url.pathname;
+    let fileName = pathname.split('/').pop() || 'video';
     
     // 确保文件名有扩展名
     if (!fileName.includes('.')) {
       fileName += '.mp4';
     }
     
-    // 处理跨域视频下载
+    // 处理跨域URL
     let downloadUrl = props.src;
-    
     if (isCrossOrigin(props.src)) {
-      // 如果是跨域视频，使用代理URL
       downloadUrl = toProxyUrl(props.src);
-    } else {
-      // 如果是同域视频，规范化路径
-      downloadUrl = normalizePath(props.src);
     }
     
     console.log('开始下载视频:', {
@@ -1024,50 +1025,70 @@ const downloadVideo = async () => {
       文件名: fileName
     });
     
-    // 创建下载链接
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = fileName;
-    link.target = '_blank';
-    
-    // 对于跨域资源，可能需要通过fetch获取blob
-    if (isCrossOrigin(props.src)) {
-      try {
-        const response = await fetch(downloadUrl);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    try {
+      // 尝试通过fetch获取视频数据
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'video/*,*/*;q=0.9'
         }
-        
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        
-        link.href = blobUrl;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // 清理blob URL
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-        
-        console.log('视频下载成功');
-      } catch (error) {
-        console.error('通过fetch下载失败，尝试直接下载:', error);
-        // 如果fetch失败，尝试直接下载
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-    } else {
-      // 同域资源直接下载
+      
+      // 检查响应类型
+      const contentType = response.headers.get('content-type');
+      console.log('响应内容类型:', contentType);
+      
+      const blob = await response.blob();
+      console.log('获取到blob:', blob.size, 'bytes');
+      
+      if (blob.size === 0) {
+        throw new Error('下载的文件为空');
+      }
+      
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // 创建下载链接
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      link.style.display = 'none';
+      
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // 清理blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      
       console.log('视频下载成功');
+      toast.success('视频下载成功！请检查浏览器下载文件夹。');
+      
+    } catch (fetchError) {
+      console.error('通过fetch下载失败:', fetchError);
+      
+      // 如果fetch失败，尝试直接下载
+      console.log('尝试直接下载...');
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = fileName;
+      link.target = '_blank';
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('尝试直接下载完成');
+      toast.warning('已尝试下载视频，如果没有开始下载，请右键点击视频选择"另存为"');
     }
     
   } catch (error) {
     console.error('视频下载失败:', error);
-    alert('视频下载失败，请尝试右键点击视频选择"另存为"');
+    toast.error(`视频下载失败: ${error.message}\n\n请尝试以下方法：\n1. 右键点击视频选择"另存为"\n2. 检查网络连接\n3. 尝试使用其他浏览器`);
   }
 };
 
@@ -1199,31 +1220,33 @@ onUnmounted(() => {
 .error-actions {
   margin-top: 25px;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .btn-retry, .btn-close, .btn-alternative, .btn-lowres, .btn-transcode, .btn-download {
-  padding: 12px 20px;
+  padding: 10px 16px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.3s ease;
-  min-width: 100px;
+  min-width: 90px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .btn-download {
   background: linear-gradient(135deg, #00bcd4, #0097a7);
   color: white;
   box-shadow: 0 4px 15px rgba(0, 188, 212, 0.3);
-  min-width: 120px;
+  min-width: 110px;
 }
 
 .btn-download:hover {
