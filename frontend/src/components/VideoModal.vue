@@ -30,7 +30,7 @@
                 <button v-if="hasAlternativeSource" class="btn-alternative" @click="tryAlternativeFormat">尝试其他格式</button>
                 <button v-if="hasLowResSource" class="btn-lowres" @click="tryLowResolutionSource">尝试低清版本</button>
                 <button v-if="isOssVideo && !isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
-                              <a :href="downloadUrl" class="btn-download" download target="_blank" rel="noopener" @click.stop>下载到本地</a>
+                              <a :href="downloadUrl" class="btn-download" download target="_blank" rel="noopener" @click.stop data-allow-nav>下载到本地</a>
               <button class="btn-close" @click="$emit('close')">关闭</button>
             </div>
           </div>
@@ -80,6 +80,28 @@ const emit = defineEmits(['close']);
 
 // 初始化toast通知
 const toast = useToast();
+
+// 全局导航拦截（捕获阶段），防止页面在弹窗打开时跳转或刷新
+let removeGlobalNavGuard = null;
+const addGlobalNavGuard = () => {
+  const handler = (e) => {
+    try {
+      // 仅在弹窗可见时生效
+      if (!props.visible) return;
+      const path = e.composedPath ? e.composedPath() : [];
+      const anchor = path.find && path.find((n) => n && n.tagName === 'A');
+      if (!anchor) return;
+      // 下载按钮允许导航
+      if (anchor.hasAttribute && anchor.hasAttribute('data-allow-nav')) return;
+      // video 控件内部的点击不拦截（但一般不会是 a）
+      // 其余全部拦截默认行为，避免路由/刷新
+      e.preventDefault();
+      e.stopPropagation();
+    } catch (_) {}
+  };
+  window.addEventListener('click', handler, true); // 捕获阶段
+  removeGlobalNavGuard = () => window.removeEventListener('click', handler, true);
+};
 
 // 辅助函数：判断是否跨域
 const isCrossOrigin = (url) => {
@@ -197,7 +219,10 @@ watch(() => props.visible, (newValue) => {
     // 重置错误状态
     showErrorTip.value = false;
     errorMessage.value = '';
-    
+
+    // 添加全局导航拦截
+    addGlobalNavGuard();
+
     // 检查浏览器兼容性
     const browserCompat = checkBrowserCompatibility();
     if (!browserCompat.isCompatible) {
@@ -230,6 +255,8 @@ watch(() => props.visible, (newValue) => {
     clearLoadingTimeout();
     // 销毁视频播放器
     disposeVideoPlayer();
+    // 移除全局导航拦截
+    if (removeGlobalNavGuard) removeGlobalNavGuard();
   }
 });
 
@@ -1198,6 +1225,8 @@ onUnmounted(() => {
   disposeVideoPlayer();
   // 确保组件卸载时恢复 body 滚动
   document.body.style.overflow = '';
+  // 移除全局导航拦截
+  if (removeGlobalNavGuard) removeGlobalNavGuard();
 });
 </script>
 
