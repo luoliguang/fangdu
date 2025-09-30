@@ -279,7 +279,7 @@ const initVideoPlayer = async () => {
     autoplay: !deviceInfo.value.isLowEndDevice, // 低端设备不自动播放
     preload: deviceInfo.value.isLowEndDevice ? 'metadata' : 'auto', // 低端设备只预加载元数据
     fluid: true,
-    poster: props.poster ? normalizePath(props.poster) : null,
+    poster: props.poster ? (isCrossOrigin(props.poster) ? toProxyUrl(props.poster) : normalizePath(props.poster)) : null,
     sources: sources,
     html5: {
       hls: {
@@ -289,7 +289,6 @@ const initVideoPlayer = async () => {
         smoothQualityChange: !deviceInfo.value.isLowEndDevice,
         bandwidth: deviceInfo.value.isLowEndDevice ? 1000000 : undefined // 低端设备限制带宽
       },
-      // 关键：关闭凭据，跨域以匿名方式请求
       vhs: { withCredentials: false },
       xhr: { withCredentials: false },
       nativeVideoTracks: false,
@@ -301,6 +300,12 @@ const initVideoPlayer = async () => {
     responsive: true,
     playbackRates: [0.5, 1, 1.5, 2]
   });
+  
+  // 关闭 video.js 内置错误提示，由我们自定义层接管
+  if (player.value && player.value.errorDisplay) {
+    player.value.errorDisplay.hide();
+    player.value.errorDisplay.dispose && player.value.errorDisplay.dispose();
+  }
   
   // 设置事件监听
   player.value.on('error', handleVideoError);
@@ -1154,5 +1159,9 @@ onUnmounted(() => {
 
 .modal-enter-from, .modal-leave-to {
   opacity: 0;
+}
+
+::deep(.vjs-error .vjs-error-display) {
+  display: none !important; /* 隐藏video.js默认黑色报错层 */
 }
 </style>
