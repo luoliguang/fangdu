@@ -4,6 +4,7 @@ const createFeedbackRoutes = require('./feedbackRoutes');
 const createVisitRoutes = require('./visitRoutes');
 const createAuthRoutes = require('./authRoutes');
 const drawerConfigRoutes = require('./drawerConfigRoutes');
+const createProxyRoutes = require('./proxyRoutes');
 
 /**
  * 主路由配置
@@ -29,6 +30,9 @@ function createRoutes(db) {
 
   // 抽屉配置相关路由
   apiV1.use('/drawer-config', drawerConfigRoutes);
+
+  // 媒体代理路由（用于公司网络/CORS绕行）
+  apiV1.use('/proxy', createProxyRoutes());
 
   // 健康检查路由
   apiV1.get('/health', (req, res) => {

@@ -145,6 +145,19 @@ const initVideoPlayer = async () => {
     }
   };
   
+  const toProxyUrl = (rawUrl) => {
+    try {
+      if (!rawUrl) return rawUrl;
+      const full = normalizePath(rawUrl);
+      if (!isCrossOrigin(full)) return full;
+      const proxied = new URL('/api/v1/proxy/media', window.location.origin);
+      proxied.searchParams.set('url', full);
+      return proxied.toString();
+    } catch (_) {
+      return rawUrl;
+    }
+  };
+  
   // 添加一个URL可用性探测方法（优先HEAD，其次Range GET），公司网络/CORS下更稳健
   const urlReachable = async (url, signal) => {
     if (!url) return false;
@@ -191,9 +204,10 @@ const initVideoPlayer = async () => {
     const mainSrcPath = normalizePath(props.src);
     const cross = isCrossOrigin(mainSrcPath);
     
-    // 始终加入主源
+    // 始终加入主源（跨域时改写为代理URL）
+    const mainPlayable = cross ? toProxyUrl(mainSrcPath) : mainSrcPath;
     sources.push({
-      src: mainSrcPath,
+      src: mainPlayable,
       type: getVideoType(props.src)
     });
     
