@@ -111,7 +111,8 @@ const toProxyUrl = (rawUrl) => {
       // 所以开发环境也应该使用 /api/proxy/media
       proxyPath = `${apiBaseUrl}/api/proxy/media`;
     } else {
-      // 生产环境：使用相对路径
+      // 生产环境：使用相对路径，确保路径正确
+      // 生产环境中 VITE_API_BASE_URL=/api，所以完整路径是 /api/proxy/media
       proxyPath = `${apiBaseUrl}/proxy/media`;
     }
     
@@ -222,7 +223,8 @@ watch(() => props.visible, (newValue) => {
         // 所以开发环境也应该使用 /api/proxy/download
         downloadProxyPath = `${apiBaseUrl}/api/proxy/download`;
       } else {
-        // 生产环境：使用相对路径
+        // 生产环境：使用相对路径，确保路径正确
+        // 生产环境中 VITE_API_BASE_URL=/api，所以完整路径是 /api/proxy/download
         downloadProxyPath = `${apiBaseUrl}/proxy/download`;
       }
       
@@ -342,11 +344,15 @@ const initVideoPlayer = async () => {
     最终posterUrl: posterUrl
   });
   
+  // 确保video元素被添加到容器中
+  videoContainer.value.appendChild(videoElement);
+  
   player.value = videojs(videoElement, {
     controls: true,
     autoplay: !deviceInfo.value.isLowEndDevice, // 低端设备不自动播放
     preload: deviceInfo.value.isLowEndDevice ? 'metadata' : 'auto', // 低端设备只预加载元数据
     fluid: true,
+    responsive: true,
     poster: posterUrl,
     sources: sources,
     html5: {
@@ -364,9 +370,14 @@ const initVideoPlayer = async () => {
       nativeTextTracks: false
     },
     techOrder: ["html5"],
-    // 添加响应式UI配置
-    responsive: true,
-    playbackRates: [0.5, 1, 1.5, 2]
+    // 添加完整的播放器控件配置
+    playbackRates: [0.5, 1, 1.25, 1.5, 2],
+    // 确保显示所有标准控件
+    userActions: {
+      hotkeys: true
+    },
+    // 启用重播功能（使用内置功能）
+    loop: false
   });
   
   // 关闭 video.js 内置错误提示，由我们自定义层接管

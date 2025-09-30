@@ -28,9 +28,10 @@ function createProxyRoutes() {
     res.set({
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-      'Access-Control-Allow-Headers': 'Range, Accept, User-Agent',
+      'Access-Control-Allow-Headers': 'Range, Content-Type, Authorization',
       'Cross-Origin-Resource-Policy': 'cross-origin',
-      'Cross-Origin-Embedder-Policy': 'unsafe-none'
+      'Cross-Origin-Embedder-Policy': 'unsafe-none',
+      'Cache-Control': 'public, max-age=3600' // 添加缓存控制，提高生产环境性能
     });
     res.status(200).end();
   });
@@ -156,6 +157,7 @@ function createProxyRoutes() {
         headers['Cross-Origin-Embedder-Policy'] = 'unsafe-none';
         // 强制下载
         headers['Content-Disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`;
+        headers['Cache-Control'] = 'public, max-age=3600'; // 添加缓存控制
         res.writeHead(proxyRes.statusCode || 200, headers);
         proxyRes.pipe(res);
       });
