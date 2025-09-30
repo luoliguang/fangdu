@@ -107,6 +107,47 @@ const toProxyUrl = (rawUrl) => {
   }
 };
 
+// 辅助函数：URL可用性探测方法
+const urlReachable = async (url, signal) => {
+  if (!url) return false;
+  try {
+    // 同源或 blob:/data: 直接认为可达，避免本地/开发环境被误判
+    if (url.startsWith('blob:') || url.startsWith('data:')) return true;
+    try {
+      const test = new URL(url, window.location.href);
+      if (test.origin === window.location.origin) return true;
+      // 对跨域资源不做主动探测，避免触发CORS错误日志
+      return false;
+    } catch (_) {}
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const headResp = await fetch(url, {
+      method: 'HEAD',
+      mode: 'cors',
+      credentials: 'omit',
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (headResp.ok || headResp.status === 206) return true;
+  } catch (_) {}
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const getResp = await fetch(url, {
+      method: 'GET',
+      headers: { 'Range': 'bytes=0-1' },
+      mode: 'cors',
+      credentials: 'omit',
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return getResp.ok || getResp.status === 206;
+  } catch (_) {
+    return false;
+  }
+};
+
 // 视频相关的响应式数据
 const videoContainer = ref(null);
 const player = ref(null);
@@ -183,72 +224,6 @@ const initVideoPlayer = async () => {
   
   // 准备多个不同格式的视频源
   const sources = [];
-  
-  // 判断是否跨域
-  const isCrossOrigin = (url) => {
-    try {
-      if (!url) return false;
-      if (url.startsWith('blob:') || url.startsWith('data:')) return false;
-      const u = new URL(url, window.location.href);
-      return u.origin !== window.location.origin;
-    } catch (_) {
-      return true;
-    }
-  };
-  
-  const toProxyUrl = (rawUrl) => {
-    try {
-      if (!rawUrl) return rawUrl;
-      const full = normalizePath(rawUrl);
-      if (!isCrossOrigin(full)) return full;
-      const proxied = new URL('/api/v1/proxy/media', window.location.origin);
-      proxied.searchParams.set('url', full);
-      return proxied.toString();
-    } catch (_) {
-      return rawUrl;
-    }
-  };
-  
-  // 添加一个URL可用性探测方法（优先HEAD，其次Range GET），公司网络/CORS下更稳健
-  const urlReachable = async (url, signal) => {
-    if (!url) return false;
-    try {
-      // 同源或 blob:/data: 直接认为可达，避免本地/开发环境被误判
-      if (url.startsWith('blob:') || url.startsWith('data:')) return true;
-      try {
-        const test = new URL(url, window.location.href);
-        if (test.origin === window.location.origin) return true;
-        // 对跨域资源不做主动探测，避免触发CORS错误日志
-        return false;
-      } catch (_) {}
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
-      const headResp = await fetch(url, {
-        method: 'HEAD',
-        mode: 'cors',
-        credentials: 'omit',
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (headResp.ok || headResp.status === 206) return true;
-    } catch (_) {}
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const getResp = await fetch(url, {
-        method: 'GET',
-        headers: { 'Range': 'bytes=0-1' },
-        mode: 'cors',
-        credentials: 'omit',
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      return getResp.ok || getResp.status === 206;
-    } catch (_) {
-      return false;
-    }
-  };
   
   // 添加主源
   if (props.src) {
@@ -816,7 +791,12 @@ const handleSuspend = () => {
 
 // 处理视频错误
 const handleVideoError = async (event) => {
+  console.log('handleVideoError 被调用:', event);
+  console.log('当前 showErrorTip 状态:', showErrorTip.value);
+  
   clearLoadingTimeout();
+  
+  // 强制设置错误状态
   showErrorTip.value = true;
   
   if (event.type === 'timeout') {
@@ -825,6 +805,7 @@ const handleVideoError = async (event) => {
     errorMessage.value = event.message || '网络连接问题，请检查您的网络设置。';
   } else if (player.value && player.value.error()) {
     const error = player.value.error();
+    console.log('Video.js 错误详情:', error);
     switch (error.code) {
       case 1: // MEDIA_ERR_ABORTED
         errorMessage.value = '视频播放被中断。';
@@ -840,7 +821,7 @@ const handleVideoError = async (event) => {
         tryAlternativeFormat();
         break;
       case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
-        errorMessage.value = '视频格式不支持或文件路径无效。';
+        errorMessage.value = '视频格式不支持或文件路径无效。可能是媒体资源404错误导致。';
         // 尝试切换到其他格式
         tryAlternativeFormat();
         break;
@@ -861,6 +842,12 @@ const handleVideoError = async (event) => {
   }
   
   console.error('视频播放错误:', event, player.value?.error());
+  console.log('设置后 showErrorTip.value:', showErrorTip.value);
+  console.log('设置后 errorMessage.value:', errorMessage.value);
+  
+  // 强制触发Vue的响应式更新
+  await nextTick();
+  console.log('nextTick后 showErrorTip.value:', showErrorTip.value);
 };
 
 
