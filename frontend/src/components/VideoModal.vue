@@ -1478,7 +1478,7 @@ onUnmounted(() => {
 .video-controls {
   position: absolute;
   bottom: 20px;
-  right: 20px;
+  right: 0px;
   z-index: 15;
 }
 
@@ -1490,6 +1490,7 @@ onUnmounted(() => {
 
 .btn-download-normal, .btn-format {
   display: flex;
+  margin-bottom: 20px;
   align-items: center;
   gap: 6px;
   padding: 10px 16px;

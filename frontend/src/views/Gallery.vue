@@ -6,6 +6,7 @@ import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
 import TutorialGuide from '../components/TutorialGuide.vue';
 import tutorialManager from '../utils/tutorialManager.js';
+import { copyImageToClipboard } from 'copy-image-clipboard';
 
 // 简单的 UUID 生成函数
 function generateUUID() {
@@ -519,6 +520,93 @@ if (typeof window !== 'undefined') {
 
 // 留言表单始终显示
 showFeedbackForm.value = true;
+
+// 快捷复制图片（从卡片直接复制，不打开大图）
+const quickCopyImage = async (material) => {
+  try {
+    if (material.media_type !== 'image') return;
+    
+    const imageUrl = material.file_path;
+    const imageName = material.name || '图片';
+    
+    showCustomToast(`正在复制"${imageName}"...`, 'success');
+
+    const isCrossOrigin = isCrossOriginUrl(imageUrl);
+    let imageUrlToUse = isCrossOrigin ? getProxyUrl(imageUrl) : imageUrl;
+
+    try {
+      await copyImageToClipboard(imageUrlToUse);
+      showCustomToast(`"${imageName}" 已复制！`, 'success');
+    } catch (error) {
+      console.error('快捷复制失败:', error);
+      await copyImageNative(imageUrlToUse, material);
+    }
+  } catch (error) {
+    console.error('快捷复制图片失败:', error);
+    showCustomToast('复制失败，请重试', 'error');
+  }
+};
+
+// 检查URL是否跨域
+const isCrossOriginUrl = (url) => {
+  try {
+    const urlObj = new URL(url, window.location.href);
+    return urlObj.origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+};
+
+// 获取代理URL
+const getProxyUrl = (url) => {
+  try {
+    const proxyPath = '/api/proxy/media';
+    const proxied = new URL(proxyPath, window.location.origin);
+    proxied.searchParams.set('url', url);
+    return proxied.toString();
+  } catch (error) {
+    console.error('构建代理URL失败:', error);
+    return url;
+  }
+};
+
+// 原生复制方法（作为降级方案）
+const copyImageNative = async (imageUrl, material) => {
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.write) {
+      throw new Error('浏览器不支持剪贴板API');
+    }
+
+    const response = await fetch(imageUrl);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const blob = await response.blob();
+    
+    // 确保blob类型正确
+    let finalBlob = blob;
+    if (!blob.type || !blob.type.startsWith('image/')) {
+      finalBlob = new Blob([blob], { type: 'image/png' });
+    }
+    
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        [finalBlob.type]: finalBlob
+      })
+    ]);
+
+    const successMsg = material?.name ? `"${material.name}" 已复制！` : '图片已复制到剪贴板！';
+    showCustomToast(successMsg, 'success');
+  } catch (error) {
+    console.error('原生复制方法失败:', error);
+    
+    // 最终降级：复制图片链接
+    await navigator.clipboard.writeText(imageUrl);
+    showCustomToast('已复制图片链接（图片无法直接复制）', 'success');
+  }
+};
 </script>
 
 <template>
@@ -577,12 +665,33 @@ showFeedbackForm.value = true;
         ></video>
         <p>{{ material.name }}</p>
         <div v-if="material.media_type === 'video'" class="media-icon">▶</div>
-        <!-- 收藏按钮 -->
-        <button @click.stop="addToFavorites(material)" class="favorite-btn" :class="{ 'favorited': favorites.find(fav => fav.id === material.id) }">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20.84 4.61C20.3292 4.099 19.7228 3.69364 19.0554 3.41708C18.3879 3.14052 17.6725 2.99817 16.95 2.99817C16.2275 2.99817 15.5121 3.14052 14.8446 3.41708C14.1772 3.69364 13.5708 4.099 13.06 4.61L12 5.67L10.94 4.61C9.9083 3.5783 8.50903 2.9987 7.05 2.9987C5.59096 2.9987 4.19169 3.5783 3.16 4.61C2.1283 5.6417 1.5487 7.04097 1.5487 8.5C1.5487 9.95903 2.1283 11.3583 3.16 12.39L4.22 13.45L12 21.23L19.78 13.45L20.84 12.39C21.351 11.8792 21.7563 11.2728 22.0329 10.6053C22.3095 9.93789 22.4518 9.22248 22.4518 8.5C22.4518 7.77752 22.3095 7.06211 22.0329 6.39467C21.7563 5.72723 21.351 5.1208 20.84 4.61V4.61Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
+        
+        <!-- 快捷操作按钮组 -->
+        <div class="card-actions">
+          <!-- 收藏按钮 -->
+          <button 
+            @click.stop="addToFavorites(material)" 
+            class="action-btn favorite-btn" 
+            :class="{ 'favorited': favorites.find(fav => fav.id === material.id) }"
+            title="收藏"
+          >
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20.84 4.61C20.3292 4.099 19.7228 3.69364 19.0554 3.41708C18.3879 3.14052 17.6725 2.99817 16.95 2.99817C16.2275 2.99817 15.5121 3.14052 14.8446 3.41708C14.1772 3.69364 13.5708 4.099 13.06 4.61L12 5.67L10.94 4.61C9.9083 3.5783 8.50903 2.9987 7.05 2.9987C5.59096 2.9987 4.19169 3.5783 3.16 4.61C2.1283 5.6417 1.5487 7.04097 1.5487 8.5C1.5487 9.95903 2.1283 11.3583 3.16 12.39L4.22 13.45L12 21.23L19.78 13.45L20.84 12.39C21.351 11.8792 21.7563 11.2728 22.0329 10.6053C22.3095 9.93789 22.4518 9.22248 22.4518 8.5C22.4518 7.77752 22.3095 7.06211 22.0329 6.39467C21.7563 5.72723 21.351 5.1208 20.84 4.61V4.61Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          
+          <!-- 快捷复制按钮（仅图片显示） -->
+          <button 
+            v-if="material.media_type === 'image'"
+            @click.stop="quickCopyImage(material)" 
+            class="action-btn copy-btn"
+            title="快捷复制"
+          >
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 5H6C4.89543 5 4 5.89543 4 7V19C4 20.1046 4.89543 21 6 21H16C17.1046 21 18 20.1046 18 19V18M8 5C8 3.89543 8.89543 3 10 3H14C15.1046 3 16 3.89543 16 3V5M8 5C8 6.10457 8.89543 7 10 7H14C15.1046 7 16 6.10457 16 7V8M16 8H18C19.1046 8 20 8.89543 20 10V16C20 17.1046 19.1046 18 18 18H16M16 8V18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </TransitionGroup>
 
@@ -1550,40 +1659,107 @@ a.router-link-active.router-link-exact-active{
 
 /* === 抽屉相关样式已移至SideDrawer.vue组件 === */
 
-/* === 收藏按钮样式 === */
-.favorite-btn {
+/* === 卡片快捷操作按钮组 === */
+.card-actions {
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 32px;
-  height: 32px;
-  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.grid-item:hover .card-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 移动端始终显示按钮 */
+@media (max-width: 768px) {
+  .card-actions {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 统一的操作按钮样式 */
+.action-btn {
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.95);
   border: none;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   color: #6c757d;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.favorite-btn:hover {
+.action-btn:hover {
   background: white;
-  transform: scale(1.1);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn:active {
+  transform: scale(1.05);
+}
+
+.action-btn svg {
+  width: 18px;
+  height: 18px;
+  transition: all 0.2s ease;
+}
+
+/* 收藏按钮特定样式 */
+.favorite-btn:hover {
   color: #dc3545;
 }
 
 .favorite-btn.favorited {
-  background: #dc3545;
+  background: linear-gradient(135deg, #dc3545, #c82333);
   color: white;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+.favorite-btn.favorited:hover {
+  background: linear-gradient(135deg, #c82333, #bd2130);
 }
 
 .favorite-btn svg {
-  width: 18px;
-  height: 18px;
   fill: currentColor;
+}
+
+/* 复制按钮特定样式 */
+.copy-btn {
+  color: #8a2be2;
+}
+
+.copy-btn:hover {
+  background: linear-gradient(135deg, #8a2be2, #4b0082);
+  color: white;
+  box-shadow: 0 4px 12px rgba(138, 43, 226, 0.4);
+}
+
+.copy-btn svg {
+  stroke: currentColor;
+}
+
+/* 按钮动画效果 */
+@keyframes copySuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.copy-btn.copying {
+  animation: copySuccess 0.4s ease;
 }
 
 /* 响应式设计 */

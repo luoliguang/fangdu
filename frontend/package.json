@@ -16,6 +16,7 @@
     "@ffmpeg/ffmpeg": "^0.10.1",
     "axios": "^1.11.0",
     "chroma-js": "^3.1.2",
+    "copy-image-clipboard": "^2.1.2",
     "echarts": "^6.0.0",
     "element-plus": "^2.11.4",
     "html2canvas": "^1.4.1",
