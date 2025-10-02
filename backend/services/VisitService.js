@@ -22,9 +22,9 @@ class VisitService {
         throw new Error('IP地址不能为空');
       }
 
-      // 检查频率限制（防刷机制）
-      if (!skipRateLimit && !this.checkRateLimit(ipAddress)) {
-        console.log(`IP ${ipAddress} 访问过于频繁，跳过记录`);
+      // 检查频率限制（防刷机制）- 改为按页面+IP组合限制
+      if (!skipRateLimit && !this.checkRateLimit(ipAddress, page)) {
+        console.log(`IP ${ipAddress} 访问页面 ${page} 过于频繁，跳过记录`);
         return {
           success: true,
           message: '访问记录已跳过（频率限制）',
@@ -32,8 +32,8 @@ class VisitService {
         };
       }
 
-      // 检查是否为重复访问（1分钟内）
-      const hasRecentVisit = await this.visitModel.hasRecentVisit(ipAddress, 1);
+      // 检查是否为重复访问（同一页面1分钟内）
+      const hasRecentVisit = await this.visitModel.hasRecentVisit(ipAddress, 1, page);
       if (hasRecentVisit) {
         return {
           success: true,
@@ -272,9 +272,10 @@ class VisitService {
   /**
    * 检查频率限制
    */
-  checkRateLimit(ipAddress, maxRequests = 30, windowMs = 60000) {
+  checkRateLimit(ipAddress, page = '/', maxRequests = 10, windowMs = 60000) {
     const now = Date.now();
-    const key = ipAddress;
+    // 使用页面+IP作为key，每个页面独立计数
+    const key = `${ipAddress}:${page}`;
     
     if (!this.rateLimitCache.has(key)) {
       this.rateLimitCache.set(key, { count: 1, resetTime: now + windowMs });

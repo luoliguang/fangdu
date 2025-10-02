@@ -463,13 +463,28 @@ const visits = this.trendData.length > 0
 
 **现象：** 尺码工具页面访问次数显示为0
 
-**原因：** 功能配置正确，只是用户还未访问过该页面
+**根本原因：** `getPageStats` 方法硬编码只返回4个页面（`/`, `/admin`, `/login`, `/color-card`），导致其他页面如尺码工具无法显示
 
-**说明：**
-- 路由配置正确：`/size-converter`
-- 路由守卫正常工作
-- 页面名称已映射：`尺码转换工具`
-- 只需实际访问一次页面即可统计
+**修复方案：**
+```javascript
+// 修改前：硬编码页面列表
+const mainPages = ['/', '/admin', '/login', '/color-card'];
+WHERE page IN (?, ?, ?, ?)
+
+// 修改后：动态查询所有页面，过滤掉API和内部路径
+WHERE page NOT LIKE '/api/%'
+  AND page NOT LIKE '/stats/%'
+  AND page NOT LIKE '/online%'
+  ...其他内部路径过滤
+GROUP BY page 
+ORDER BY visits DESC
+LIMIT ?
+```
+
+**修复效果：**
+- ✅ 自动显示所有前端页面的访问统计
+- ✅ 新增页面无需手动配置
+- ✅ 过滤掉后端API和内部路径
 
 ## 相关文档
 - [动态访问统计功能](./DYNAMIC_VISIT_TRACKING.md)

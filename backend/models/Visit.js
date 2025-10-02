@@ -66,40 +66,35 @@ class Visit {
   /**
    * 获取页面访问统计
    */
-  async getPageStats(limit = 10) {
-    // 确保返回所有主要页面，即使没有访问记录
-    const mainPages = ['/', '/admin', '/login', '/color-card'];
-    
-    // 先获取有访问记录的页面统计
+  async getPageStats(limit = 50) {
+    // 获取所有页面的访问统计，按访问量排序
     const sql = `
       SELECT 
         page,
         COUNT(*) as visits,
         COUNT(DISTINCT ip_address) as unique_visitors
       FROM visits 
-      WHERE page IN (?, ?, ?, ?)
+      WHERE page NOT LIKE '/api/%'
+        AND page NOT LIKE '/stats/%'
+        AND page NOT LIKE '/online%'
+        AND page NOT LIKE '/record%'
+        AND page NOT LIKE '/trends%'
+        AND page NOT LIKE '/overview%'
+        AND page NOT LIKE '/pages%'
+        AND page NOT LIKE '/contacts%'
+        AND page NOT LIKE '/config%'
+        AND page NOT LIKE '/announcements%'
+        AND page NOT LIKE '/tutorials%'
+        AND page NOT LIKE '/tags/%'
+        AND page NOT LIKE '/filters%'
+        AND page NOT LIKE '/user/%'
       GROUP BY page 
       ORDER BY visits DESC
+      LIMIT ?
     `;
     
-    const results = await this.queryAll(sql, mainPages);
-    
-    // 检查是否所有主要页面都有数据
-    const existingPages = results.map(item => item.page);
-    
-    // 为没有访问记录的页面添加默认数据
-    const finalResults = [...results];
-    mainPages.forEach(page => {
-      if (!existingPages.includes(page)) {
-        finalResults.push({
-          page: page,
-          visits: 0,
-          unique_visitors: 0
-        });
-      }
-    });
-    
-    return finalResults;
+    const results = await this.queryAll(sql, [limit]);
+    return results;
   }
 
   /**
@@ -242,15 +237,31 @@ class Visit {
   /**
    * 检查IP是否在指定时间内访问过
    */
-  async hasRecentVisit(ipAddress, minutes = 1) {
-    const sql = `
-      SELECT COUNT(*) as count 
-      FROM visits 
-      WHERE ip_address = ? 
-      AND visit_time >= datetime('now', '-${minutes} minutes')
-    `;
+  async hasRecentVisit(ipAddress, minutes = 1, page = null) {
+    let sql, params;
     
-    const result = await this.queryOne(sql, [ipAddress]);
+    if (page) {
+      // 检查特定页面的重复访问
+      sql = `
+        SELECT COUNT(*) as count 
+        FROM visits 
+        WHERE ip_address = ? 
+        AND page = ?
+        AND visit_time >= datetime('now', '-${minutes} minutes')
+      `;
+      params = [ipAddress, page];
+    } else {
+      // 检查任意页面的重复访问
+      sql = `
+        SELECT COUNT(*) as count 
+        FROM visits 
+        WHERE ip_address = ? 
+        AND visit_time >= datetime('now', '-${minutes} minutes')
+      `;
+      params = [ipAddress];
+    }
+    
+    const result = await this.queryOne(sql, params);
     return result.count > 0;
   }
 
