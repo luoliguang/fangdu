@@ -29,15 +29,39 @@
       </div>
       
       <div class="announcements-list">
+        <div v-if="announcements.length === 0" class="empty-list">
+          <p>📢 暂无公告，点击右上角"添加公告"开始创建</p>
+        </div>
         <div v-for="announcement in announcements" :key="announcement.id" class="announcement-card">
           <div class="card-header">
             <h3>{{ announcement.title }}</h3>
-            <div class="card-actions">
-              <button @click="editAnnouncement(announcement)" class="edit-btn">编辑</button>
-              <button @click="deleteAnnouncement(announcement.id)" class="delete-btn">删除</button>
+            <div class="card-actions" style="display: flex !important; gap: 8px;">
+              <button 
+                @click="editAnnouncement(announcement)" 
+                class="edit-btn" 
+                title="编辑此公告"
+                style="background: #4CAF50 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+              >
+                ✏️ 编辑
+              </button>
+              <button 
+                @click="deleteAnnouncement(announcement.id)" 
+                class="delete-btn" 
+                title="删除此公告"
+                style="background: #f44336 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+              >
+                🗑️ 删除
+              </button>
             </div>
           </div>
-          <p class="announcement-content">{{ announcement.content }}</p>
+          <div class="announcement-content markdown-content">
+            <MdPreview 
+              :modelValue="announcement.content" 
+              language="zh-CN" 
+              :showCodeRowNumber="false"
+              previewTheme="default"
+            />
+          </div>
           <div class="announcement-meta">
             <span class="type-badge" :class="announcement.type">{{ getTypeLabel(announcement.type) }}</span>
             <span class="date">{{ formatDate(announcement.created_at) }}</span>
@@ -59,18 +83,42 @@
       </div>
       
       <div class="tutorials-list">
+        <div v-if="tutorials.length === 0" class="empty-list">
+          <p>📚 暂无教程，点击右上角"添加教程"开始创建</p>
+        </div>
         <div v-for="tutorial in tutorials" :key="tutorial.id" class="tutorial-card">
           <div class="card-header">
             <div class="tutorial-title-row">
               <span class="tutorial-icon">{{ tutorial.icon }}</span>
               <h3>{{ tutorial.title }}</h3>
             </div>
-            <div class="card-actions">
-              <button @click="editTutorial(tutorial)" class="edit-btn">编辑</button>
-              <button @click="deleteTutorial(tutorial.id)" class="delete-btn">删除</button>
+            <div class="card-actions" style="display: flex !important; gap: 8px;">
+              <button 
+                @click="editTutorial(tutorial)" 
+                class="edit-btn" 
+                title="编辑此教程"
+                style="background: #4CAF50 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+              >
+                ✏️ 编辑
+              </button>
+              <button 
+                @click="deleteTutorial(tutorial.id)" 
+                class="delete-btn" 
+                title="删除此教程"
+                style="background: #f44336 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+              >
+                🗑️ 删除
+              </button>
             </div>
           </div>
-          <p class="tutorial-content">{{ tutorial.content }}</p>
+          <div class="tutorial-content markdown-content">
+            <MdPreview 
+              :modelValue="tutorial.content" 
+              language="zh-CN" 
+              :showCodeRowNumber="false"
+              previewTheme="default"
+            />
+          </div>
           <div class="tutorial-meta">
             <span class="order">排序: {{ tutorial.sort_order }}</span>
             <span class="status" :class="{ active: tutorial.is_active }">
@@ -91,15 +139,32 @@
       </div>
       
       <div class="filters-list">
+        <div v-if="quickFilters.length === 0" class="empty-list">
+          <p>🔍 暂无筛选器，点击右上角"添加筛选器"开始创建</p>
+        </div>
         <div v-for="filter in quickFilters" :key="filter.id" class="filter-card">
           <div class="card-header">
             <div class="filter-title-row">
               <span class="filter-icon">{{ filter.icon }}</span>
               <h3>{{ filter.name }}</h3>
             </div>
-            <div class="card-actions">
-              <button @click="editFilter(filter)" class="edit-btn">编辑</button>
-              <button @click="deleteFilter(filter.id)" class="delete-btn">删除</button>
+            <div class="card-actions" style="display: flex !important; gap: 8px;">
+              <button 
+                @click="editFilter(filter)" 
+                class="edit-btn" 
+                title="编辑此筛选器"
+                style="background: #4CAF50 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+              >
+                ✏️ 编辑
+              </button>
+              <button 
+                @click="deleteFilter(filter.id)" 
+                class="delete-btn" 
+                title="删除此筛选器"
+                style="background: #f44336 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+              >
+                🗑️ 删除
+              </button>
             </div>
           </div>
           <div class="filter-details">
@@ -126,15 +191,32 @@
       </div>
       
       <div class="contacts-list">
+        <div v-if="contactInfos.length === 0" class="empty-list">
+          <p>📞 暂无联系方式，点击右上角"添加联系方式"开始创建</p>
+        </div>
         <div v-for="contact in contactInfos" :key="contact.id" class="contact-card">
           <div class="card-header">
             <div class="contact-title-row">
               <span class="contact-icon">{{ contact.icon }}</span>
               <h3>{{ contact.label }}</h3>
             </div>
-            <div class="card-actions">
-              <button @click="editContact(contact)" class="edit-btn">编辑</button>
-              <button @click="deleteContact(contact.id)" class="delete-btn">删除</button>
+            <div class="card-actions" style="display: flex !important; gap: 8px;">
+              <button 
+                @click="editContact(contact)" 
+                class="edit-btn" 
+                title="编辑此联系方式"
+                style="background: #4CAF50 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+              >
+                ✏️ 编辑
+              </button>
+              <button 
+                @click="deleteContact(contact.id)" 
+                class="delete-btn" 
+                title="删除此联系方式"
+                style="background: #f44336 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+              >
+                🗑️ 删除
+              </button>
             </div>
           </div>
           <p class="contact-value">{{ contact.value }}</p>
@@ -161,9 +243,24 @@
             <label>标题</label>
             <input v-model="announcementForm.title" type="text" required>
           </div>
-          <div class="form-group">
-            <label>内容</label>
-            <textarea v-model="announcementForm.content" rows="4" required></textarea>
+          <div class="form-group markdown-editor-wrapper">
+            <label>内容（支持Markdown格式）</label>
+            <MdEditor 
+              v-model="announcementForm.content" 
+              language="zh-CN"
+              :preview="true"
+              previewTheme="default"
+              :toolbars="[
+                'bold', 'italic', 'strikeThrough', '-',
+                'title', 'unorderedList', 'orderedList', '-',
+                'codeRow', 'code', 'quote', '-',
+                'link', 'image', 'table', '-',
+                'revoke', 'next', '=',
+                'preview', 'fullscreen'
+              ]"
+              style="height: 450px;"
+              placeholder="请输入公告内容，支持Markdown格式..."
+            />
           </div>
           <div class="form-group">
             <label>类型</label>
@@ -200,9 +297,24 @@
             <label>标题</label>
             <input v-model="tutorialForm.title" type="text" required>
           </div>
-          <div class="form-group">
-            <label>内容</label>
-            <textarea v-model="tutorialForm.content" rows="4" required></textarea>
+          <div class="form-group markdown-editor-wrapper">
+            <label>内容（支持Markdown格式）</label>
+            <MdEditor 
+              v-model="tutorialForm.content" 
+              language="zh-CN"
+              :preview="true"
+              previewTheme="default"
+              :toolbars="[
+                'bold', 'italic', 'strikeThrough', '-',
+                'title', 'unorderedList', 'orderedList', '-',
+                'codeRow', 'code', 'quote', '-',
+                'link', 'image', 'table', '-',
+                'revoke', 'next', '=',
+                'preview', 'fullscreen'
+              ]"
+              style="height: 450px;"
+              placeholder="请输入教程内容，支持Markdown格式..."
+            />
           </div>
           <div class="form-group">
             <label>图标</label>
@@ -333,6 +445,8 @@ import { ref, onMounted } from 'vue';
 import apiClient from '../../axiosConfig.js';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import 'element-plus/dist/index.css';
+import { MdEditor, MdPreview } from 'md-editor-v3';
+import 'md-editor-v3/lib/style.css';
 
 // 响应式数据
 const activeTab = ref('announcements');
@@ -429,6 +543,14 @@ const fetchConfig = async () => {
       tutorials.value = Array.isArray(tutorialsRes.data.data) ? tutorialsRes.data.data : [];
       quickFilters.value = Array.isArray(filtersRes.data.data) ? filtersRes.data.data : [];
       contactInfos.value = Array.isArray(contactsRes.data.data) ? contactsRes.data.data : [];
+      
+      // 调试信息
+      console.log('✅ 配置数据加载成功:', {
+        公告数量: announcements.value.length,
+        教程数量: tutorials.value.length,
+        筛选器数量: quickFilters.value.length,
+        联系方式数量: contactInfos.value.length
+      });
     } catch (apiError) {
       console.error('API调用失败:', apiError);
       ElMessage.warning('API调用失败，使用默认数据');
@@ -855,6 +977,8 @@ onMounted(() => {
   padding: 20px;
   margin-bottom: 16px;
   transition: all 0.2s;
+  position: relative;
+  overflow: visible;
 }
 
 .announcement-card:hover,
@@ -866,10 +990,12 @@ onMounted(() => {
 }
 
 .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
   margin-bottom: 12px;
+  gap: 16px;
+  position: relative;
 }
 
 .card-header h3 {
@@ -877,6 +1003,12 @@ onMounted(() => {
   color: #333;
   font-size: 16px;
   font-weight: 600;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: calc(100% - 200px);
 }
 
 .tutorial-title-row,
@@ -885,6 +1017,17 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 200px);
+}
+
+.tutorial-title-row h3,
+.filter-title-row h3,
+.contact-title-row h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tutorial-icon,
@@ -894,36 +1037,56 @@ onMounted(() => {
 }
 
 .card-actions {
-  display: flex;
+  display: flex !important;
   gap: 8px;
+  flex-shrink: 0 !important;
+  align-items: center;
+  opacity: 1 !important;
+  visibility: visible !important;
+  position: relative !important;
+  margin-left: auto;
 }
 
 .edit-btn,
 .delete-btn {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
+  padding: 8px 16px !important;
+  border: none !important;
+  border-radius: 6px;
+  cursor: pointer !important;
+  font-size: 13px !important;
+  font-weight: 500;
   transition: all 0.2s;
+  white-space: nowrap;
+  min-width: 60px;
+  display: inline-block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  position: static !important;
+  float: none !important;
 }
 
 .edit-btn {
-  background: #4CAF50;
-  color: white;
+  background: #4CAF50 !important;
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
 }
 
 .edit-btn:hover {
-  background: #45a049;
+  background: #45a049 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
 }
 
 .delete-btn {
-  background: #f44336;
-  color: white;
+  background: #f44336 !important;
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3);
 }
 
 .delete-btn:hover {
-  background: #da190b;
+  background: #da190b !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(244, 67, 54, 0.4);
 }
 
 /* 内容样式 */
@@ -933,6 +1096,218 @@ onMounted(() => {
   margin: 0 0 12px 0;
   color: #666;
   line-height: 1.5;
+}
+
+/* Markdown内容样式优化 */
+.markdown-content {
+  background: #fafafa;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 隐藏默认容器样式 */
+.markdown-content :deep(.md-editor) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.markdown-content :deep(.md-editor-preview) {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.markdown-content :deep(.md-editor-preview-wrapper) {
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+/* 段落 */
+.markdown-content :deep(p) {
+  margin: 6px 0 !important;
+  line-height: 1.6 !important;
+  color: #666 !important;
+  font-size: 14px !important;
+}
+
+/* 标题 */
+.markdown-content :deep(h1) {
+  font-size: 20px !important;
+  margin: 16px 0 10px 0 !important;
+  color: #333 !important;
+  font-weight: 600 !important;
+  border-bottom: 2px solid #667eea !important;
+  padding-bottom: 6px !important;
+}
+
+.markdown-content :deep(h2) {
+  font-size: 18px !important;
+  margin: 14px 0 8px 0 !important;
+  color: #333 !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid #e0e0e0 !important;
+  padding-bottom: 4px !important;
+}
+
+.markdown-content :deep(h3) {
+  font-size: 16px !important;
+  margin: 12px 0 6px 0 !important;
+  color: #333 !important;
+  font-weight: 600 !important;
+}
+
+.markdown-content :deep(h4),
+.markdown-content :deep(h5),
+.markdown-content :deep(h6) {
+  font-size: 15px !important;
+  margin: 10px 0 5px 0 !important;
+  color: #333 !important;
+  font-weight: 600 !important;
+}
+
+/* 列表 */
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  padding-left: 24px !important;
+  margin: 8px 0 !important;
+}
+
+.markdown-content :deep(li) {
+  margin: 4px 0 !important;
+  line-height: 1.6 !important;
+  color: #666 !important;
+  font-size: 14px !important;
+}
+
+.markdown-content :deep(ul > li) {
+  list-style-type: disc !important;
+}
+
+.markdown-content :deep(ol > li) {
+  list-style-type: decimal !important;
+}
+
+/* 行内代码 */
+.markdown-content :deep(code) {
+  background: rgba(102, 126, 234, 0.15) !important;
+  color: #667eea !important;
+  padding: 2px 6px !important;
+  border-radius: 3px !important;
+  font-size: 13px !important;
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+/* 代码块 */
+.markdown-content :deep(pre) {
+  background: #2d2d2d !important;
+  color: #f8f8f2 !important;
+  padding: 12px !important;
+  border-radius: 6px !important;
+  overflow-x: auto !important;
+  margin: 10px 0 !important;
+  font-size: 13px !important;
+}
+
+.markdown-content :deep(pre code) {
+  background: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+}
+
+/* 引用 */
+.markdown-content :deep(blockquote) {
+  border-left: 4px solid #667eea !important;
+  padding: 10px 12px !important;
+  margin: 10px 0 !important;
+  color: #666 !important;
+  font-style: italic !important;
+  background: rgba(102, 126, 234, 0.08) !important;
+  border-radius: 4px !important;
+}
+
+.markdown-content :deep(blockquote p) {
+  margin: 4px 0 !important;
+}
+
+/* 图片 */
+.markdown-content :deep(img) {
+  max-width: 100% !important;
+  border-radius: 6px !important;
+  margin: 10px 0 !important;
+  display: block !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 链接 */
+.markdown-content :deep(a) {
+  color: #667eea !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.4) !important;
+  transition: all 0.2s ease !important;
+}
+
+.markdown-content :deep(a:hover) {
+  color: #5568d3 !important;
+  border-bottom-color: #5568d3 !important;
+}
+
+/* 表格 */
+.markdown-content :deep(table) {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 12px 0 !important;
+  background: white !important;
+  font-size: 13px !important;
+}
+
+.markdown-content :deep(table th),
+.markdown-content :deep(table td) {
+  border: 1px solid #e0e0e0 !important;
+  padding: 8px 12px !important;
+  text-align: left !important;
+}
+
+.markdown-content :deep(table th) {
+  background: #667eea !important;
+  color: white !important;
+  font-weight: 600 !important;
+}
+
+.markdown-content :deep(table td) {
+  color: #666 !important;
+}
+
+.markdown-content :deep(table tr:nth-child(even)) {
+  background: #f9f9f9 !important;
+}
+
+/* 水平线 */
+.markdown-content :deep(hr) {
+  border: none !important;
+  border-top: 2px solid #e0e0e0 !important;
+  margin: 16px 0 !important;
+}
+
+/* 粗体 */
+.markdown-content :deep(strong) {
+  font-weight: 600 !important;
+  color: #333 !important;
+}
+
+/* 斜体 */
+.markdown-content :deep(em) {
+  font-style: italic !important;
+  color: #666 !important;
+}
+
+/* 删除线 */
+.markdown-content :deep(del) {
+  text-decoration: line-through !important;
+  opacity: 0.6 !important;
+  color: #999 !important;
 }
 
 .filter-details {
@@ -1139,7 +1514,98 @@ onMounted(() => {
   color: #666;
 }
 
+/* 空状态样式 */
+.empty-list {
+  padding: 60px 20px;
+  text-align: center;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px dashed #dee2e6;
+}
+
+.empty-list p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 16px;
+}
+
+/* Markdown编辑器包装样式 */
+.markdown-editor-wrapper {
+  margin-bottom: 20px;
+}
+
+.markdown-editor-wrapper :deep(.md-editor) {
+  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.markdown-editor-wrapper :deep(.md-editor:focus-within) {
+  border-color: #667eea;
+  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.2);
+}
+
+.markdown-editor-wrapper :deep(.md-editor-toolbar-wrapper) {
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 8px;
+}
+
+.markdown-editor-wrapper :deep(.md-editor-toolbar-item) {
+  color: #666;
+  transition: all 0.2s;
+}
+
+.markdown-editor-wrapper :deep(.md-editor-toolbar-item:hover) {
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.markdown-editor-wrapper :deep(.md-editor-input-wrapper),
+.markdown-editor-wrapper :deep(.md-editor-preview-wrapper) {
+  background: white;
+  color: #333;
+}
+
+.markdown-editor-wrapper :deep(.md-editor-input) {
+  color: #333;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.markdown-editor-wrapper label {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-weight: 500;
+  font-size: 14px;
+}
+
 /* 响应式设计 */
+@media (max-width: 1024px) {
+  .card-header {
+    flex-wrap: nowrap;
+  }
+  
+  .card-header h3 {
+    max-width: calc(100% - 180px);
+    font-size: 14px;
+  }
+  
+  .tutorial-title-row,
+  .filter-title-row,
+  .contact-title-row {
+    max-width: calc(100% - 180px);
+  }
+  
+  .edit-btn,
+  .delete-btn {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    min-width: 50px;
+  }
+}
+
 @media (max-width: 768px) {
   .drawer-config-container {
     padding: 16px;
@@ -1161,9 +1627,33 @@ onMounted(() => {
   }
   
   .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px;
+  }
+  
+  .card-header h3 {
+    max-width: calc(100% - 150px) !important;
+    font-size: 13px !important;
+  }
+  
+  .tutorial-title-row,
+  .filter-title-row,
+  .contact-title-row {
+    max-width: calc(100% - 150px) !important;
+  }
+  
+  .card-actions {
+    flex-direction: row !important;
+    gap: 4px !important;
+  }
+  
+  .edit-btn,
+  .delete-btn {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+    min-width: 45px !important;
   }
   
   .announcement-meta,

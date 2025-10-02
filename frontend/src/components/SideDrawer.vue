@@ -5,6 +5,8 @@
       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
+      <!-- 红点提醒 -->
+      <span v-if="hasUnreadAnnouncements" class="notification-dot"></span>
     </div>
     <div class="trigger-text">菜单</div>
   </div>
@@ -31,7 +33,11 @@
         :class="{ 'active': activeDrawerTab === tab.key }"
         class="drawer-tab"
       >
-        <span class="tab-icon">{{ tab.icon }}</span>
+        <span class="tab-icon">
+          {{ tab.icon }}
+          <!-- 公告标签上的红点 -->
+          <span v-if="tab.key === 'announcement' && hasUnreadAnnouncements" class="tab-notification-dot"></span>
+        </span>
         <span class="tab-label">{{ tab.label }}</span>
       </button>
     </div>
@@ -40,12 +46,26 @@
       <!-- 公告内容 -->
       <div v-if="activeDrawerTab === 'announcement'" class="tab-content">
         <div class="announcements-list">
-          <div v-for="announcement in announcements" :key="announcement.id" class="announcement-item" :class="announcement.type">
+          <div 
+            v-for="announcement in announcements" 
+            :key="announcement.id" 
+            class="announcement-item" 
+            :class="[announcement.type, { 'unread': !isAnnouncementRead(announcement.id) }]"
+            @click="markAnnouncementAsRead(announcement.id)"
+          >
             <div class="announcement-header">
               <h4 class="announcement-title">{{ announcement.title }}</h4>
-              <span v-if="announcement.isNew" class="new-badge">NEW</span>
+              <span v-if="!isAnnouncementRead(announcement.id)" class="new-badge">NEW</span>
             </div>
-            <p class="announcement-content">{{ announcement.content }}</p>
+            <div class="announcement-content markdown-preview">
+              <MdPreview 
+                :modelValue="announcement.content" 
+                language="zh-CN" 
+                :showCodeRowNumber="false"
+                previewTheme="default"
+                :theme="'light'"
+              />
+            </div>
             <div class="announcement-meta">
               <div class="announcement-date">{{ formatDateTime(announcement.created_at || announcement.date) }}</div>
               <div class="announcement-publish-time">发布于: {{ formatDateTime(announcement.publish_time || announcement.created_at || announcement.date) }}</div>
@@ -61,7 +81,15 @@
             <div class="tutorial-icon">{{ step.icon }}</div>
             <div class="tutorial-content">
               <h4 class="tutorial-title">{{ step.title }}</h4>
-              <p class="tutorial-description">{{ step.content }}</p>
+              <div class="tutorial-description markdown-preview">
+                <MdPreview 
+                  :modelValue="step.content" 
+                  language="zh-CN" 
+                  :showCodeRowNumber="false"
+                  previewTheme="default"
+                  :theme="'light'"
+                />
+              </div>
               <div class="tutorial-meta">
                 <div class="tutorial-publish-time">发布于: {{ formatDateTime(step.publish_time || step.created_at || '2024-01-01') }}</div>
               </div>
@@ -160,6 +188,8 @@
 import { ref, onMounted } from 'vue';
 import apiClient from '../axiosConfig.js';
 import { ElMessage } from 'element-plus';
+import { MdPreview } from 'md-editor-v3';
+import 'md-editor-v3/lib/preview.css';
 
 // Props
 const props = defineProps({
@@ -198,13 +228,82 @@ const announcements = ref([]);
 const tutorialSteps = ref([]);
 const quickFilters = ref([]);
 
+// 已读公告管理
+const readAnnouncementIds = ref(new Set());
+const hasUnreadAnnouncements = ref(false);
+
+// 从localStorage加载已读公告ID
+const loadReadAnnouncements = () => {
+  try {
+    const saved = localStorage.getItem('readAnnouncementIds');
+    if (saved) {
+      readAnnouncementIds.value = new Set(JSON.parse(saved));
+    }
+  } catch (error) {
+    console.error('加载已读公告失败:', error);
+  }
+  updateUnreadStatus();
+};
+
+// 保存已读公告ID到localStorage
+const saveReadAnnouncements = () => {
+  try {
+    localStorage.setItem('readAnnouncementIds', JSON.stringify([...readAnnouncementIds.value]));
+  } catch (error) {
+    console.error('保存已读公告失败:', error);
+  }
+  updateUnreadStatus();
+};
+
+// 检查公告是否已读
+const isAnnouncementRead = (announcementId) => {
+  return readAnnouncementIds.value.has(announcementId);
+};
+
+// 标记公告为已读
+const markAnnouncementAsRead = (announcementId) => {
+  if (!readAnnouncementIds.value.has(announcementId)) {
+    readAnnouncementIds.value.add(announcementId);
+    saveReadAnnouncements();
+  }
+};
+
+// 更新未读状态
+const updateUnreadStatus = () => {
+  hasUnreadAnnouncements.value = announcements.value.some(
+    announcement => !readAnnouncementIds.value.has(announcement.id)
+  );
+};
+
 // 方法
 const toggleDrawer = () => {
   isDrawerOpen.value = !isDrawerOpen.value;
+  // 打开抽屉时，如果当前在公告页，标记所有公告为已读
+  if (isDrawerOpen.value && activeDrawerTab.value === 'announcement') {
+    markAllAnnouncementsAsRead();
+  }
 };
 
 const switchDrawerTab = (tab) => {
   activeDrawerTab.value = tab;
+  // 切换到公告标签时，标记所有公告为已读
+  if (tab === 'announcement') {
+    markAllAnnouncementsAsRead();
+  }
+};
+
+// 标记所有公告为已读
+const markAllAnnouncementsAsRead = () => {
+  let hasNewRead = false;
+  announcements.value.forEach(announcement => {
+    if (!readAnnouncementIds.value.has(announcement.id)) {
+      readAnnouncementIds.value.add(announcement.id);
+      hasNewRead = true;
+    }
+  });
+  if (hasNewRead) {
+    saveReadAnnouncements();
+  }
 };
 
 const applyQuickFilter = (filterValue) => {
@@ -260,7 +359,11 @@ const fetchDrawerConfig = async () => {
     const response = await apiClient.get('/api/v1/drawer-config/config');
     const config = response.data.data;
     
-    if (config.announcements) announcements.value = config.announcements;
+    if (config.announcements) {
+      announcements.value = config.announcements;
+      // 更新未读状态
+      updateUnreadStatus();
+    }
     if (config.tutorials) tutorialSteps.value = config.tutorials;
     if (config.quickFilters) quickFilters.value = config.quickFilters;
     if (config.tabs) drawerTabs.value = config.tabs;
@@ -332,7 +435,13 @@ const loadDefaultConfig = () => {
 };
 
 onMounted(() => {
-  fetchDrawerConfig();
+  loadReadAnnouncements(); // 先加载已读记录
+  fetchDrawerConfig(); // 再获取配置数据
+  
+  // 每隔30秒检查一次公告更新
+  setInterval(() => {
+    fetchDrawerConfig();
+  }, 30000);
 });
 </script>
 
@@ -379,11 +488,37 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   margin-bottom: 4px;
+  position: relative;
 }
 
 .trigger-icon svg {
   width: 100%;
   height: 100%;
+}
+
+/* 红点提醒样式 */
+.notification-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  background: linear-gradient(135deg, #ff4757, #ff3838);
+  border-radius: 50%;
+  border: 2px solid white;
+  animation: pulse-dot 2s ease-in-out infinite;
+  box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7);
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 4px rgba(255, 71, 87, 0);
+  }
 }
 
 /* 抽屉遮罩 */
@@ -491,11 +626,26 @@ onMounted(() => {
 
 .tab-icon {
   font-size: 16px;
+  position: relative;
+  display: inline-block;
 }
 
 .tab-label {
   font-size: 12px;
   font-weight: 500;
+}
+
+/* 标签上的红点 */
+.tab-notification-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  background: #ff4757;
+  border-radius: 50%;
+  border: 2px solid white;
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 
 /* 抽屉内容 */
@@ -526,11 +676,33 @@ onMounted(() => {
   border-radius: 12px;
   border-left: 4px solid #667eea;
   background: #f8f9ff;
-  transition: transform 0.2s;
+  transition: all 0.2s;
+  cursor: pointer;
+  position: relative;
 }
 
 .announcement-item:hover {
   transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 未读公告样式 */
+.announcement-item.unread {
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe9e9 100%);
+  border-left-color: #ff4757;
+}
+
+.announcement-item.unread::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background: #ff4757;
+  border-radius: 50%;
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 
 .announcement-item.feature {
@@ -571,6 +743,199 @@ onMounted(() => {
   font-size: 13px;
   color: #666;
   line-height: 1.4;
+}
+
+/* Markdown预览样式优化 */
+.markdown-preview {
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 隐藏默认容器的padding */
+.markdown-preview :deep(.md-editor) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.markdown-preview :deep(.md-editor-preview) {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.markdown-preview :deep(.md-editor-preview-wrapper) {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 段落样式 */
+.markdown-preview :deep(p) {
+  margin: 4px 0 !important;
+  line-height: 1.6 !important;
+  font-size: 13px !important;
+  color: #666 !important;
+}
+
+/* 标题样式 */
+.markdown-preview :deep(h1) {
+  font-size: 16px !important;
+  margin: 12px 0 8px 0 !important;
+  color: #333 !important;
+  font-weight: 600 !important;
+  border-bottom: none !important;
+}
+
+.markdown-preview :deep(h2) {
+  font-size: 15px !important;
+  margin: 10px 0 6px 0 !important;
+  color: #333 !important;
+  font-weight: 600 !important;
+  border-bottom: none !important;
+}
+
+.markdown-preview :deep(h3),
+.markdown-preview :deep(h4),
+.markdown-preview :deep(h5),
+.markdown-preview :deep(h6) {
+  font-size: 14px !important;
+  margin: 8px 0 4px 0 !important;
+  color: #333 !important;
+  font-weight: 600 !important;
+  border-bottom: none !important;
+}
+
+/* 列表样式 */
+.markdown-preview :deep(ul),
+.markdown-preview :deep(ol) {
+  padding-left: 20px !important;
+  margin: 6px 0 !important;
+}
+
+.markdown-preview :deep(li) {
+  margin: 3px 0 !important;
+  line-height: 1.5 !important;
+  color: #666 !important;
+  font-size: 13px !important;
+}
+
+.markdown-preview :deep(ul > li) {
+  list-style-type: disc !important;
+}
+
+.markdown-preview :deep(ol > li) {
+  list-style-type: decimal !important;
+}
+
+/* 行内代码 */
+.markdown-preview :deep(code) {
+  background: rgba(102, 126, 234, 0.1) !important;
+  color: #667eea !important;
+  padding: 2px 5px !important;
+  border-radius: 3px !important;
+  font-size: 12px !important;
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+/* 代码块 */
+.markdown-preview :deep(pre) {
+  background: #2d2d2d !important;
+  color: #f8f8f2 !important;
+  padding: 10px !important;
+  border-radius: 4px !important;
+  overflow-x: auto !important;
+  font-size: 12px !important;
+  margin: 8px 0 !important;
+}
+
+.markdown-preview :deep(pre code) {
+  background: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+}
+
+/* 引用 */
+.markdown-preview :deep(blockquote) {
+  border-left: 3px solid #667eea !important;
+  padding-left: 12px !important;
+  margin: 8px 0 !important;
+  color: #666 !important;
+  font-style: italic !important;
+  background: rgba(102, 126, 234, 0.05) !important;
+  padding: 8px 12px !important;
+  border-radius: 4px !important;
+}
+
+.markdown-preview :deep(blockquote p) {
+  margin: 0 !important;
+}
+
+/* 图片 */
+.markdown-preview :deep(img) {
+  max-width: 100% !important;
+  border-radius: 4px !important;
+  margin: 8px 0 !important;
+  display: block !important;
+}
+
+/* 链接 */
+.markdown-preview :deep(a) {
+  color: #667eea !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.3) !important;
+}
+
+.markdown-preview :deep(a:hover) {
+  border-bottom-color: #667eea !important;
+}
+
+/* 表格 */
+.markdown-preview :deep(table) {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 8px 0 !important;
+  font-size: 12px !important;
+}
+
+.markdown-preview :deep(table th),
+.markdown-preview :deep(table td) {
+  border: 1px solid #e0e0e0 !important;
+  padding: 6px 8px !important;
+  text-align: left !important;
+}
+
+.markdown-preview :deep(table th) {
+  background: #f5f5f5 !important;
+  font-weight: 600 !important;
+  color: #333 !important;
+}
+
+.markdown-preview :deep(table td) {
+  color: #666 !important;
+}
+
+/* 水平线 */
+.markdown-preview :deep(hr) {
+  border: none !important;
+  border-top: 1px solid #e0e0e0 !important;
+  margin: 12px 0 !important;
+}
+
+/* 粗体 */
+.markdown-preview :deep(strong) {
+  font-weight: 600 !important;
+  color: #333 !important;
+}
+
+/* 斜体 */
+.markdown-preview :deep(em) {
+  font-style: italic !important;
+}
+
+/* 删除线 */
+.markdown-preview :deep(del) {
+  text-decoration: line-through !important;
+  opacity: 0.7 !important;
 }
 
 /* 公告元数据样式 */
@@ -658,6 +1023,10 @@ onMounted(() => {
   font-size: 13px;
   color: #666;
   line-height: 1.4;
+}
+
+.tutorial-description.markdown-preview :deep(p) {
+  margin: 4px 0;
 }
 
 /* 筛选样式 */
