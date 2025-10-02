@@ -22,9 +22,24 @@ class VisitService {
         throw new Error('IP地址不能为空');
       }
 
+      const cleanIP = this.sanitizeIP(ipAddress);
+      console.log(`[访问记录] IP: ${cleanIP}, 页面: ${page}`);
+
+      // 检查是否为同一IP在短时间内的访问（防止快速切换页面刷流量）
+      // 5分钟内该IP的任何访问都不重复计数
+      const hasRecentVisit = await this.visitModel.hasRecentVisit(cleanIP, 5, null);
+      if (hasRecentVisit) {
+        console.log(`[访问记录] IP ${cleanIP} 在5分钟内已访问过，跳过记录`);
+        return {
+          success: true,
+          message: '访问记录已跳过（会话内访问）',
+          duplicate: true
+        };
+      }
+
       // 检查频率限制（防刷机制）- 改为按页面+IP组合限制
-      if (!skipRateLimit && !this.checkRateLimit(ipAddress, page)) {
-        console.log(`IP ${ipAddress} 访问页面 ${page} 过于频繁，跳过记录`);
+      if (!skipRateLimit && !this.checkRateLimit(cleanIP, page)) {
+        console.log(`[访问记录] IP ${cleanIP} 访问页面 ${page} 过于频繁，跳过记录`);
         return {
           success: true,
           message: '访问记录已跳过（频率限制）',
@@ -32,26 +47,18 @@ class VisitService {
         };
       }
 
-      // 检查是否为重复访问（同一页面1分钟内）
-      const hasRecentVisit = await this.visitModel.hasRecentVisit(ipAddress, 1, page);
-      if (hasRecentVisit) {
-        return {
-          success: true,
-          message: '访问记录已跳过（重复访问）',
-          duplicate: true
-        };
-      }
-
       // 记录访问
       const visit = await this.visitModel.recordVisit({
-        ipAddress: this.sanitizeIP(ipAddress),
+        ipAddress: cleanIP,
         userAgent: this.sanitizeUserAgent(userAgent),
         page: this.sanitizePage(page),
         referrer: this.sanitizeReferrer(referrer)
       });
 
+      console.log(`[访问记录] IP ${cleanIP} 访问 ${page} 记录成功`);
+
       // 更新频率限制缓存
-      this.updateRateLimit(ipAddress);
+      this.updateRateLimit(cleanIP);
 
       return {
         success: true,

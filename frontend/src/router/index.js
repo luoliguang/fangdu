@@ -74,6 +74,17 @@ router.afterEach(async (to, from) => {
         // 获取完整路径
         const page = to.path;
         
+        // 过滤掉不需要统计的路径
+        // 1. 管理员后台路径 (/admin/*)
+        // 2. 登录页面 (/login)
+        const shouldNotRecord = 
+            page.startsWith('/admin') ||  // 所有管理员路径
+            page === '/login';             // 登录页面
+        
+        if (shouldNotRecord) {
+            return; // 跳过记录
+        }
+        
         // 发送访问记录到后端
         // 使用动态导入避免循环依赖
         const { default: apiClient } = await import('../axiosConfig.js');

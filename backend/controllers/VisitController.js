@@ -431,26 +431,12 @@ class VisitController {
 
   /**
    * 判断是否应该记录访问
-   * 改为更灵活的规则：只过滤API和静态资源，其他都记录
+   * 中间件不记录访问，因为前端已通过路由守卫主动调用record接口
    */
   shouldRecordVisit(path) {
-    // 不记录API调用
-    if (path.startsWith('/api/')) {
-      return false;
-    }
-    
-    // 不记录静态资源
-    if (path.startsWith('/uploads/') || path.startsWith('/assets/')) {
-      return false;
-    }
-    
-    // 不记录文件扩展名的请求（如.js, .css, .png等）
-    if (/\.[a-zA-Z0-9]+$/.test(path)) {
-      return false;
-    }
-    
-    // 其他所有路径都记录（包括所有前端路由）
-    return true;
+    // 中间件不记录任何访问，避免与前端路由守卫重复记录
+    // 所有访问记录由前端主动调用 /api/v1/visits/record 接口完成
+    return false;
   }
 
   /**
