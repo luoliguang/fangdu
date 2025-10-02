@@ -431,6 +431,7 @@ class VisitController {
 
   /**
    * 判断是否应该记录访问
+   * 改为更灵活的规则：只过滤API和静态资源，其他都记录
    */
   shouldRecordVisit(path) {
     // 不记录API调用
@@ -439,56 +440,31 @@ class VisitController {
     }
     
     // 不记录静态资源
-    if (path.startsWith('/uploads/') || path.includes('.')) {
+    if (path.startsWith('/uploads/') || path.startsWith('/assets/')) {
       return false;
     }
     
-    // 只记录主要页面路径
-    const mainPaths = [
-      '/',                // 首页
-      '/admin',           // 管理后台主页
-      '/login',           // 登录页
-      '/color-card'       // 打色卡页面
-    ];
-    
-    // 精确匹配主要路径
-    if (mainPaths.includes(path)) {
-      return true;
+    // 不记录文件扩展名的请求（如.js, .css, .png等）
+    if (/\.[a-zA-Z0-9]+$/.test(path)) {
+      return false;
     }
     
-    // 管理后台子路由统一记录为 /admin
-    if (path.startsWith('/admin/')) {
-      return true;
-    }
-    
-    return false;
+    // 其他所有路径都记录（包括所有前端路由）
+    return true;
   }
 
   /**
    * 标准化页面路径
+   * 改为保留完整路径，不再合并
    */
   normalizePagePath(path) {
-    // 首页
-    if (path === '/') {
-      return '/';
+    // 移除末尾的斜杠（除了根路径）
+    if (path !== '/' && path.endsWith('/')) {
+      path = path.slice(0, -1);
     }
     
-    // 登录页
-    if (path === '/login') {
-      return '/login';
-    }
-    
-    // 打色卡页面
-    if (path === '/color-card') {
-      return '/color-card';
-    }
-    
-    // 管理后台及其子路由都记录为 /admin
-    if (path === '/admin' || path.startsWith('/admin/')) {
-      return '/admin';
-    }
-    
-    return path;
+    // 返回标准化后的路径
+    return path || '/';
   }
 
   /**

@@ -2,9 +2,9 @@
   <div class="statistics-container">
     <div class="stats-header">
       <h2>网站访问统计</h2>
-      <div class="refresh-btn" @click="refreshData">
-        <i class="refresh-icon">🔄</i>
-        刷新数据
+      <div class="refresh-btn" @click="refreshData" :class="{ 'refreshing': isRefreshing }">
+        <i class="refresh-icon" :class="{ 'spinning': isRefreshing }">🔄</i>
+        {{ isRefreshing ? '刷新中...' : '刷新数据' }}
       </div>
     </div>
 
@@ -76,7 +76,10 @@
           </thead>
           <tbody>
             <tr v-for="page in pageStats" :key="page.page">
-              <td class="page-path">{{ page.page }}</td>
+              <td class="page-path">
+                <div class="page-name">{{ getPageDisplayName(page.page) }}</div>
+                <div class="page-url">{{ page.page }}</div>
+              </td>
               <td>{{ page.visits }}</td>
               <td>{{ page.unique_visitors }}</td>
               <td>{{ ((page.visits / totalPageVisits) * 100).toFixed(1) }}%</td>
@@ -115,7 +118,9 @@ export default {
       trendChart: null,
       pageChart: null,
       refreshTimer: null,
-      resizeHandler: null
+      resizeHandler: null,
+      midnightTimer: null, // 每日00:00刷新定时器
+      isRefreshing: false  // 刷新动画状态
     }
   },
   computed: {
@@ -126,10 +131,14 @@ export default {
   async mounted() {
     await this.loadData()
     this.startAutoRefresh()
+    this.setupMidnightRefresh() // 设置每日00:00刷新
   },
   beforeUnmount() {
     if (this.refreshTimer) {
       clearInterval(this.refreshTimer)
+    }
+    if (this.midnightTimer) {
+      clearTimeout(this.midnightTimer)
     }
     // 清理resize事件监听器
     if (this.resizeHandler) {
@@ -214,7 +223,17 @@ export default {
     },
     
     async refreshData() {
-      await this.loadData()
+      // 添加刷新动画
+      this.isRefreshing = true
+      
+      try {
+        await this.loadData()
+      } finally {
+        // 动画至少持续500ms，让用户能看到
+        setTimeout(() => {
+          this.isRefreshing = false
+        }, 500)
+      }
     },
     
     startAutoRefresh() {
@@ -224,8 +243,35 @@ export default {
       }, 30000)
     },
     
+    /**
+     * 设置每日00:00自动刷新
+     */
+    setupMidnightRefresh() {
+      const scheduleNextRefresh = () => {
+        const now = new Date()
+        const tomorrow = new Date(now)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        tomorrow.setHours(0, 0, 0, 0) // 设置为明天00:00:00
+        
+        const timeUntilMidnight = tomorrow - now
+        
+        // console.log(`下次00:00刷新将在 ${Math.round(timeUntilMidnight / 1000 / 60)} 分钟后`)
+        
+        // 设置定时器在00:00执行
+        this.midnightTimer = setTimeout(async () => {
+          console.log('执行00:00自动刷新')
+          await this.loadData()
+          // 刷新完成后，安排下一次刷新
+          scheduleNextRefresh()
+        }, timeUntilMidnight)
+      }
+      
+      // 开始调度
+      scheduleNextRefresh()
+    },
+    
     renderTrendChart() {
-      if (!this.$refs.trendChart || !this.trendData.length) return
+      if (!this.$refs.trendChart) return
       
       // 销毁已存在的图表实例
       if (this.trendChart) {
@@ -235,9 +281,18 @@ export default {
       // 创建新的图表实例
       this.trendChart = echarts.init(this.$refs.trendChart)
       
-      const dates = this.trendData.map(item => item.date)
-      const visits = this.trendData.map(item => item.visits)
-      const uniqueVisitors = this.trendData.map(item => item.unique_visitors)
+      // 如果没有数据，显示空图表
+      const dates = this.trendData.length > 0 
+        ? this.trendData.map(item => item.date)
+        : [new Date().toISOString().split('T')[0]]
+      
+      const visits = this.trendData.length > 0
+        ? this.trendData.map(item => item.visits)
+        : [0]
+      
+      const uniqueVisitors = this.trendData.length > 0
+        ? this.trendData.map(item => item.unique_visitors)
+        : [0]
       
       const option = {
         title: {
@@ -271,13 +326,15 @@ export default {
           data: dates,
           axisLabel: {
             formatter: function(value) {
-              return new Date(value).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+              const date = new Date(value)
+              return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
             }
           }
         },
         yAxis: {
           type: 'value',
-          minInterval: 1
+          minInterval: 1,
+          min: 0
         },
         series: [
           {
@@ -330,7 +387,7 @@ export default {
     },
     
     renderPageChart() {
-      if (!this.$refs.pageChart || !this.pageStats.length) return
+      if (!this.$refs.pageChart) return
       
       // 销毁已存在的图表实例
       if (this.pageChart) {
@@ -340,16 +397,16 @@ export default {
       // 创建新的图表实例
       this.pageChart = echarts.init(this.$refs.pageChart)
       
-      // 取前10个页面数据
-      const topPages = this.pageStats.slice(0, 10)
-      const pageNames = topPages.map(item => {
-        // 简化页面路径显示
-        const path = item.page
-        if (path === '/') return '首页'
-        if (path.includes('/admin')) return '管理后台'
-        return path.length > 20 ? path.substring(0, 20) + '...' : path
-      })
-      const pageVisits = topPages.map(item => item.visits)
+      // 取前10个页面数据，如果没有数据则显示空图表
+      const topPages = this.pageStats.length > 0 ? this.pageStats.slice(0, 10) : []
+      
+      const pageNames = topPages.length > 0
+        ? topPages.map(item => this.getPageDisplayName(item.page))
+        : ['暂无数据']
+      
+      const pageVisits = topPages.length > 0
+        ? topPages.map(item => item.visits)
+        : [0]
       
       const option = {
         title: {
@@ -366,6 +423,7 @@ export default {
             type: 'shadow'
           },
           formatter: function(params) {
+            if (topPages.length === 0) return '暂无数据'
             const data = topPages[params[0].dataIndex]
             return `页面: ${data.page}<br/>访问量: ${data.visits}<br/>独立访客: ${data.unique_visitors}`
           }
@@ -379,7 +437,8 @@ export default {
         },
         xAxis: {
           type: 'value',
-          minInterval: 1
+          minInterval: 1,
+          min: 0
         },
         yAxis: {
           type: 'category',
@@ -410,6 +469,26 @@ export default {
       }
       
       this.pageChart.setOption(option)
+    },
+    
+    /**
+     * 将路径转换为友好的显示名称
+     */
+    getPageDisplayName(path) {
+      const pageNameMap = {
+        '/': '素材库（首页）',
+        '/login': '登录页',
+        '/color-card': '色卡工具',
+        '/size-converter': '尺码转换工具',
+        '/admin': '后台管理',
+        '/admin/upload': '上传素材',
+        '/admin/materials': '素材管理',
+        '/admin/feedback': '留言管理',
+        '/admin/statistics': '访问统计',
+        '/admin/drawer-config': '抽屉配置'
+      };
+      
+      return pageNameMap[path] || path;
     }
   }
 }
@@ -444,15 +523,39 @@ export default {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: all 0.3s;
+  user-select: none;
 }
 
 .refresh-btn:hover {
   background: #0056b3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.refresh-btn.refreshing {
+  background: #6c757d;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .refresh-icon {
   font-size: 14px;
+  display: inline-block;
+  transition: transform 0.3s;
+}
+
+.refresh-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .overview-cards {
@@ -593,8 +696,22 @@ export default {
 }
 
 .page-path {
-  font-family: monospace;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.page-url {
+  font-family: 'Courier New', monospace;
   color: #007bff;
+  font-size: 12px;
+  opacity: 0.8;
 }
 
 @media (max-width: 768px) {

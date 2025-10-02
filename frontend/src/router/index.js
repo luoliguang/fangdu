@@ -68,4 +68,27 @@ const router = createRouter({
     routes
 });
 
+// 全局路由守卫 - 自动记录页面访问
+router.afterEach(async (to, from) => {
+    try {
+        // 获取完整路径
+        const page = to.path;
+        
+        // 发送访问记录到后端
+        // 使用动态导入避免循环依赖
+        const { default: apiClient } = await import('../axiosConfig.js');
+        
+        // 异步发送，不阻塞路由跳转
+        apiClient.post('/api/v1/visits/record', {
+            page,
+            referrer: from.path || document.referrer
+        }).catch(error => {
+            // 访问记录失败不影响页面使用
+            console.log('访问记录失败:', error.message);
+        });
+    } catch (error) {
+        console.log('访问追踪错误:', error);
+    }
+});
+
 export default router;
