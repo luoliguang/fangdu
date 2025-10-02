@@ -110,7 +110,7 @@ export const useMaterialStore = defineStore('material', () => {
     await fetchMaterials(currentPage.value)
   }
   
-  // 上传素材
+  // 上传素材（单个）
   const uploadMaterial = async (formData, onUploadProgress) => {
     try {
       const token = localStorage.getItem('authToken')
@@ -129,6 +129,33 @@ export const useMaterialStore = defineStore('material', () => {
     } catch (error) {
       console.error('上传素材失败:', error)
       const message = error.response?.data?.message || '上传素材失败'
+      toast.error(message)
+      return { success: false, message }
+    }
+  }
+
+  // 批量上传素材
+  const uploadMaterialsBatch = async (formData, onUploadProgress) => {
+    try {
+      const token = localStorage.getItem('authToken')
+      const response = await apiClient.post('/api/v1/materials/batch/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        },
+        onUploadProgress
+      })
+      
+      const result = response.data
+      if (result.success) {
+        toast.success(result.message)
+        // 刷新素材列表
+        await refresh()
+      }
+      return result
+    } catch (error) {
+      console.error('批量上传素材失败:', error)
+      const message = error.response?.data?.message || '批量上传素材失败'
       toast.error(message)
       return { success: false, message }
     }
@@ -162,6 +189,7 @@ export const useMaterialStore = defineStore('material', () => {
     updateMaterial,
     deleteMaterial,
     uploadMaterial,
+    uploadMaterialsBatch,
     goToPage,
     refresh,
     reset

@@ -20,10 +20,16 @@ function createMaterialRoutes(db) {
   // 搜索素材（必须在 /:id 之前）
   router.get('/search/query', materialController.searchMaterials.bind(materialController));
 
-  // 上传素材
+  // 上传素材（单个）
   router.post('/', 
     materialController.getUploadMiddleware(),
     materialController.uploadMaterial.bind(materialController)
+  );
+
+  // 批量上传素材
+  router.post('/batch/upload',
+    materialController.upload.array('files', 20), // 最多20个文件
+    materialController.uploadMaterialsBatch.bind(materialController)
   );
 
   // 批量删除素材

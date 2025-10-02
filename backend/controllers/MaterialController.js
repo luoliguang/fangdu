@@ -22,7 +22,8 @@ class MaterialController {
     this.upload = multer({
       storage: multer.memoryStorage(),
       limits: {
-        fileSize: this.parseFileSize(serverConf.upload.maxFileSize)
+        fileSize: this.parseFileSize(serverConf.upload.maxFileSize),
+        files: 20 // 最多同时上传20个文件
       },
       fileFilter: (req, file, cb) => {
         if (serverConf.upload.allowedTypes.includes(file.mimetype)) {
@@ -51,7 +52,7 @@ class MaterialController {
   }
 
   /**
-   * 上传素材
+   * 上传素材（单个）
    */
   async uploadMaterial(req, res) {
     try {
@@ -88,6 +89,74 @@ class MaterialController {
       res.status(statusCode).json({
         success: false,
         message: error.message || '上传素材失败'
+      });
+    }
+  }
+
+  /**
+   * 批量上传素材
+   */
+  async uploadMaterialsBatch(req, res) {
+    try {
+      const files = req.files;
+      const { tags } = req.body; // 所有文件共享的标签
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '请选择要上传的文件'
+        });
+      }
+
+      if (!tags) {
+        return res.status(400).json({
+          success: false,
+          message: '标签不能为空'
+        });
+      }
+
+      const results = {
+        success: [],
+        failed: []
+      };
+
+      // 逐个上传文件
+      for (const file of files) {
+        try {
+          // 使用文件名作为素材名称（去除扩展名）
+          const name = file.originalname.replace(/\.[^/.]+$/, '');
+          const result = await this.materialService.uploadMaterial(file, { name, tags });
+          
+          results.success.push({
+            name: file.originalname,
+            message: '上传成功',
+            data: result.data
+          });
+        } catch (error) {
+          console.error(`上传文件 ${file.originalname} 失败:`, error);
+          results.failed.push({
+            name: file.originalname,
+            message: error.message || '上传失败'
+          });
+        }
+      }
+
+      // 返回批量上传结果
+      res.status(200).json({
+        success: true,
+        data: {
+          total: files.length,
+          successCount: results.success.length,
+          failedCount: results.failed.length,
+          results
+        },
+        message: `成功上传 ${results.success.length} 个文件，失败 ${results.failed.length} 个`
+      });
+    } catch (error) {
+      console.error('批量上传素材失败:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || '批量上传素材失败'
       });
     }
   }
@@ -331,7 +400,7 @@ class MaterialController {
     
     const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)$/i);
     if (!match) {
-      return 10 * 1024 * 1024; // 默认10MB
+      return 50 * 1024 * 1024; // 默认50MB
     }
     
     const [, size, unit] = match;

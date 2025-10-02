@@ -66,8 +66,8 @@ class ServerConfig {
         credentials: true
       },
       upload: {
-        maxFileSize: process.env.MAX_FILE_SIZE || '10MB',
-        allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'video/mp4', 'video/avi']
+        maxFileSize: process.env.MAX_FILE_SIZE || '50MB',
+        allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'video/mp4', 'video/avi', 'video/quicktime', 'video/x-msvideo']
       }
     };
   }

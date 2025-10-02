@@ -37,9 +37,9 @@ const baseConfig = {
   
   // 上传配置
   upload: {
-    maxFileSize: 10 * 1024 * 1024, // 10MB
-    allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-    allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+    maxFileSize: 50 * 1024 * 1024, // 50MB
+    allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/avi', 'video/quicktime'],
+    allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.avi', '.mov']
   },
   
   // UI配置
