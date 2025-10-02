@@ -362,12 +362,26 @@ const initVideoPlayer = async () => {
   console.log('设备环境检测结果:', deviceInfo.value);
 
   // 初始化video.js播放器，使用多源配置和环境适配
-  const posterUrl = props.poster ? (isCrossOrigin(props.poster) ? toProxyUrl(props.poster) : normalizePath(props.poster)) : null;
-  console.log('封面处理结果:', {
-    原始poster: props.poster,
-    是否跨域: props.poster ? isCrossOrigin(props.poster) : false,
-    最终posterUrl: posterUrl
-  });
+  // 处理封面URL：确保封面图片可以正确加载
+  let posterUrl = null;
+  if (props.poster && props.poster.trim()) {
+    try {
+      const normalizedPoster = normalizePath(props.poster);
+      const isPosterCrossOrigin = isCrossOrigin(normalizedPoster);
+      posterUrl = isPosterCrossOrigin ? toProxyUrl(normalizedPoster) : normalizedPoster;
+      
+      console.log('封面处理结果:', {
+        原始poster: props.poster,
+        是否跨域: isPosterCrossOrigin,
+        最终posterUrl: posterUrl
+      });
+    } catch (error) {
+      console.warn('封面URL处理失败:', error);
+      posterUrl = null;
+    }
+  } else {
+    console.log('未提供视频封面，将使用video.js默认行为');
+  }
   
   // 确保video元素被添加到容器中
   videoContainer.value.appendChild(videoElement);

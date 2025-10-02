@@ -153,6 +153,7 @@ const lightboxIndex = ref(0);
 const videoModalVisible = ref(false);
 const currentVideoUrl = ref('');
 const currentVideoName = ref(''); // 添加当前视频名称
+const currentVideoPoster = ref(''); // 添加当前视频封面
 const feedbackMessage = ref(''); // 用户留言内容（页面底部）
 
 // 新增：提交留言功能（页面底部）
@@ -221,6 +222,8 @@ const showMedia = (material) => {
         const cleanVideoUrl = material.file_path.split('?')[0];
         currentVideoUrl.value = cleanVideoUrl;
         currentVideoName.value = material.name; // 设置当前视频名称
+        // 设置视频封面：优先使用cover_image_path，其次是thumbnail_url
+        currentVideoPoster.value = material.cover_image_path || material.thumbnail_url || '';
         videoModalVisible.value = true;
     }
 };
@@ -557,12 +560,16 @@ showFeedbackForm.value = true;
         @click="showMedia(material)" 
       >
         <img v-if="material.media_type === 'image'" :src="material.thumbnail_url || material.file_path" :alt="material.name" loading="lazy" >
-        <img 
+        <video 
             v-else-if="material.media_type === 'video'"
-            :src="material.cover_image_path || material.thumbnail_url" 
-            :alt="material.name + ' 封面'"
-            loading="lazy"
-        >
+            :src="material.file_path" 
+            :poster="material.cover_image_path || material.thumbnail_url"
+            preload="metadata"
+            muted
+            playsinline
+            disablePictureInPicture
+            @click.prevent
+        ></video>
         <p>{{ material.name }}</p>
         <div v-if="material.media_type === 'video'" class="media-icon">▶</div>
         <!-- 收藏按钮 -->
@@ -632,6 +639,7 @@ showFeedbackForm.value = true;
   <VideoModal
     :visible="videoModalVisible"
     :src="currentVideoUrl"
+    :poster="currentVideoPoster"
     :video-name="currentVideoName"
     @close="videoModalVisible = false"
   />
@@ -839,6 +847,11 @@ showFeedbackForm.value = true;
   display: block; 
   background-color: #e9ecef; /* 占位背景色 */
   margin-bottom: 1rem;
+}
+
+/* 防止video元素在列表中被直接播放 */
+.grid-item video {
+  pointer-events: none; /* 禁止video自身的交互 */
 }
 .grid-item p { 
   margin-top: 0.5rem; 
