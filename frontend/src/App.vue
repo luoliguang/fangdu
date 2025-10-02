@@ -1,7 +1,8 @@
 <script setup>
-import { ref, onMounted, onUnmounted,watch,nextTick, computed  } from 'vue';
+import { ref, onMounted, onUnmounted,watch,nextTick, computed, provide  } from 'vue';
 import { useRoute, useRouter  } from 'vue-router';
 import apiClient from './axiosConfig.js';
+import SideDrawer from './components/SideDrawer.vue';
 
 
 // --- 新增：导航栏滑动效果的逻辑 ---
@@ -16,6 +17,28 @@ const isLoggedIn = computed(() => loginState.value);
 
 // 未处理留言数量
 const pendingFeedbacksCount = ref(0);
+
+// --- SideDrawer 全局状态 ---
+// 收藏夹（只在Gallery页面使用）
+const favorites = ref([]);
+
+// 简单的 UUID 生成函数
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0,
+      v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// 提供给子组件使用的方法
+const addToFavorites = (material) => {
+  const exists = favorites.value.find(fav => fav.id === material.id);
+  if (!exists) {
+    favorites.value.push(material);
+    console.log('已添加到收藏夹');
+  }
+};
 
 // 监听localStorage变化
 const updateLoginState = () => {
@@ -48,6 +71,72 @@ const fetchPendingFeedbacksCount = async () => {
   }
 };
 
+// --- SideDrawer 处理方法 ---
+// 处理反馈提交
+const handleFeedbackSubmit = async (feedbackData) => {
+  // 获取或生成用户ID
+  let userId = localStorage.getItem('user_id');
+  if (!userId) {
+    userId = generateUUID();
+    localStorage.setItem('user_id', userId);
+  }
+
+  try {
+    // 处理从SideDrawer传来的字符串格式
+    const message = typeof feedbackData === 'string' ? feedbackData : feedbackData.message;
+    
+    const response = await apiClient.post('/api/v1/feedbacks', {
+      message: message,
+      user_id: userId
+    });
+    
+    if (response.data.success) {
+      // 显示成功提示（可以使用Element Plus的消息提示）
+      console.log('留言成功，感谢您的反馈！');
+    }
+  } catch (error) {
+    console.error('提交留言失败:', error);
+  }
+};
+
+// Gallery页面的回调引用
+const galleryCallbacks = ref({
+  handleQuickFilter: null,
+  handleShowMedia: null,
+  handleRemoveFromFavorites: null
+});
+
+// 处理快速筛选（仅在Gallery页面有效）
+const handleQuickFilter = (filterValue) => {
+  if (galleryCallbacks.value.handleQuickFilter) {
+    galleryCallbacks.value.handleQuickFilter(filterValue);
+  } else {
+    console.log('快速筛选:', filterValue);
+  }
+};
+
+// 处理显示媒体（仅在Gallery页面有效）
+const handleShowMedia = (material) => {
+  if (galleryCallbacks.value.handleShowMedia) {
+    galleryCallbacks.value.handleShowMedia(material);
+  } else {
+    console.log('显示媒体:', material);
+  }
+};
+
+// 处理从收藏夹移除
+const handleRemoveFromFavorites = (materialId) => {
+  if (galleryCallbacks.value.handleRemoveFromFavorites) {
+    galleryCallbacks.value.handleRemoveFromFavorites(materialId);
+  } else {
+    const index = favorites.value.findIndex(fav => fav.id === materialId);
+    if (index > -1) {
+      favorites.value.splice(index, 1);
+      console.log('已从收藏夹移除');
+    }
+  }
+};
+
 
 
 // --- “返回顶部”按钮的逻辑 ---
@@ -64,6 +153,14 @@ const showScrollTopButton = ref(false);
 const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
+
+// Provide favorites state and callbacks to child components
+provide('appFavorites', {
+  favorites,
+  addToFavorites
+});
+
+provide('galleryCallbacks', galleryCallbacks);
 
 // 4. 在组件挂载时，监听整个窗口的滚动事件
 onMounted(() => {
@@ -165,6 +262,15 @@ const handleNavClick = (event) => {
 
 <template>
   <div id="app">
+    <!-- 全局左侧抽屉 -->
+    <SideDrawer 
+      :favorites="favorites"
+      @showMedia="handleShowMedia"
+      @removeFromFavorites="handleRemoveFromFavorites"
+      @applyFilter="handleQuickFilter"
+      @submitFeedback="handleFeedbackSubmit"
+    />
+
     <nav class="main-nav" ref="mainNav">
       <div class="nav-slider" ref="navSlider"></div>
       <router-link to="/" @click="handleNavClick">素材库</router-link>

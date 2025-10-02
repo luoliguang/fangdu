@@ -1,11 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, onActivated } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, onActivated, inject } from 'vue';
 import apiClient from '../axiosConfig.js';
 import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
 import TutorialGuide from '../components/TutorialGuide.vue';
-import SideDrawer from '../components/SideDrawer.vue';
 import tutorialManager from '../utils/tutorialManager.js';
 
 // 简单的 UUID 生成函数
@@ -28,8 +27,12 @@ const isTagsExpanded = ref(false); //控制标签面板是否展开
 const tagsContainerRef = ref(null); // 标签容器引用
 const visibleTagsCount = ref(20); // 动态计算的可见标签数量
 
-// --- 收藏夹状态 ---
-const favorites = ref([]);
+// --- 收藏夹状态（使用全局状态） ---
+const appFavorites = inject('appFavorites', { favorites: ref([]), addToFavorites: () => {} });
+const favorites = appFavorites.favorites;
+
+// --- 注入Gallery回调引用 ---
+const galleryCallbacks = inject('galleryCallbacks', ref({}));
 
 // 快速筛选处理方法
 const handleQuickFilter = (filterValue) => {
@@ -62,7 +65,7 @@ const handleQuickFilter = (filterValue) => {
 const addToFavorites = (material) => {
   const exists = favorites.value.find(fav => fav.id === material.id);
   if (!exists) {
-    favorites.value.push(material);
+    appFavorites.addToFavorites(material);
     showCustomToast('已添加到收藏夹', 'success');
   }
 };
@@ -391,6 +394,11 @@ const setupObserver = () => {
 };
 
 onMounted(() => {
+    // 注册Gallery页面的回调函数到全局
+    galleryCallbacks.value.handleQuickFilter = handleQuickFilter;
+    galleryCallbacks.value.handleShowMedia = showMedia;
+    galleryCallbacks.value.handleRemoveFromFavorites = removeFromFavorites;
+    
     // 只在首次挂载时加载数据
     if (!isDataLoaded.value) {
         handleFilterChange();
@@ -416,6 +424,13 @@ onActivated(() => {
 });
 
 onUnmounted(() => {
+    // 清除Gallery页面的回调引用
+    if (galleryCallbacks.value) {
+        galleryCallbacks.value.handleQuickFilter = null;
+        galleryCallbacks.value.handleShowMedia = null;
+        galleryCallbacks.value.handleRemoveFromFavorites = null;
+    }
+    
     if (observer && observerEl.value) {
         observer.unobserve(observerEl.value);
     }
@@ -507,16 +522,6 @@ showFeedbackForm.value = true;
 </script>
 
 <template>
-  <!-- 左侧抽屉触发按钮 -->
-  <!-- 左侧抽屉组件 -->
-  <SideDrawer 
-    :favorites="favorites"
-    @showMedia="showMedia"
-    @removeFromFavorites="removeFromFavorites"
-    @applyFilter="handleQuickFilter"
-    @submitFeedback="handleFeedbackSubmit"
-  />
-
   <header class="hero-header">
     <div class="hero-content">
       <h1 class="hero-title">方度实拍图</h1>
