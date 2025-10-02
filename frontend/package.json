@@ -12,8 +12,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ffmpeg/core": "^0.10.0",
-    "@ffmpeg/ffmpeg": "^0.10.1",
     "axios": "^1.11.0",
     "chroma-js": "^3.1.2",
     "copy-image-clipboard": "^2.1.2",

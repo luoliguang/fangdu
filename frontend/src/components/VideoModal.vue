@@ -29,7 +29,7 @@
                 <button class="btn-retry" @click="retryVideo">重试播放</button>
                 <button v-if="hasAlternativeSource" class="btn-alternative" @click="tryAlternativeFormat">尝试其他格式</button>
                 <button v-if="hasLowResSource" class="btn-lowres" @click="tryLowResolutionSource">尝试低清版本</button>
-                <button v-if="isOssVideo && !isTranscoding" class="btn-transcode" @click="transcodeVideo">使用FFmpeg转码</button>
+
                 <button class="btn-download" @click.stop="downloadVideo">下载到本地</button>
                 <button class="btn-close" @click="$emit('close')">关闭</button>
             </div>
@@ -37,14 +37,8 @@
         </div>
       </div>
         
-        <!-- 转码进度提示 -->
-        <div v-if="isTranscoding" class="transcoding-tip">
-          <div class="loading-spinner"></div>
-          <p>正在转码视频，请稍候... {{ transcodingProgress }}%</p>
-        </div>
-        
         <!-- 常规视频控制按钮区域 -->
-        <div v-if="!showErrorTip && !isTranscoding" class="video-controls" @click.stop>
+        <div v-if="!showErrorTip" class="video-controls" @click.stop>
           <div class="control-buttons">
             <button class="btn-download-normal" @click.stop="downloadVideo" title="下载视频" type="button">
               <span class="download-icon">⬇</span>
@@ -67,7 +61,6 @@
 import { watch, onMounted, onUnmounted, ref, nextTick } from 'vue';
 import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
-import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
 import { useToast } from 'vue-toastification';
 
 const props = defineProps({
@@ -207,9 +200,6 @@ const deviceInfo = ref({
 });
 const hasAlternativeSource = ref(false);
 const hasLowResSource = ref(false);
-const isTranscoding = ref(false);
-const transcodingProgress = ref(0);
-const ffmpeg = ref(null);
 const downloadUrl = ref('');
 
 // 监听 visible 变化，控制 body 滚动和重置错误状态
@@ -1042,79 +1032,6 @@ const retryVideo = () => {
     });
     
     setupLoadingTimeout();
-  }
-};
-
-// 使用FFmpeg转码视频
-const transcodeVideo = async () => {
-  try {
-    isTranscoding.value = true;
-    transcodingProgress.value = 0;
-    
-    // 初始化FFmpeg - 使用兼容的0.10.x版本API
-    if (!ffmpeg.value) {
-      ffmpeg.value = createFFmpeg({
-        log: true,
-        progress: ({ ratio }) => {
-          transcodingProgress.value = Math.floor(ratio * 100);
-        },
-        corePath: 'https://unpkg.com/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js' // 指定Core库路径
-      });
-      await ffmpeg.value.load();
-    }
-    
-    // 获取视频文件名
-    const fileName = props.src.split('/').pop() || 'video.mp4';
-    const outputFileName = 'transcoded_' + fileName;
-    
-    // 获取视频文件
-    const videoData = await fetchFile(props.src);
-    
-    // 写入FFmpeg文件系统
-    ffmpeg.value.FS('writeFile', fileName, videoData);
-    
-    // 执行转码，转为H.264编码的MP4
-    await ffmpeg.value.run(
-      '-i', fileName,
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '22',
-      '-c:a', 'aac',
-      '-b:a', '128k',
-      outputFileName
-    );
-    
-    // 从FFmpeg文件系统读取转码后的文件
-    const data = ffmpeg.value.FS('readFile', outputFileName);
-    
-    // 创建Blob URL - 在0.10.x版本中，data已经是Uint8Array
-    const blob = new Blob([data], { type: 'video/mp4' });
-    const transcodedUrl = URL.createObjectURL(blob);
-    
-    // 重新初始化播放器使用转码后的视频
-    if (player.value) {
-      player.value.src({
-        src: transcodedUrl,
-        type: 'video/mp4'
-      });
-      player.value.load();
-      player.value.play().catch(err => {
-        console.error('转码后视频播放失败:', err);
-      });
-    }
-    
-    // 清理FFmpeg文件系统
-    ffmpeg.value.FS('unlink', fileName);
-    ffmpeg.value.FS('unlink', outputFileName);
-    
-    showErrorTip.value = false;
-    
-  } catch (error) {
-    console.error('视频转码失败:', error);
-    errorMessage.value = '视频转码失败: ' + error.message;
-    showErrorTip.value = true;
-  } finally {
-    isTranscoding.value = false;
   }
 };
 
