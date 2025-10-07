@@ -11,6 +11,12 @@ function createVisitRoutes(db) {
   // 记录访问
   router.post('/record', visitController.recordVisit.bind(visitController));
 
+  // 心跳接口（更新在线状态）
+  router.post('/heartbeat', visitController.heartbeat.bind(visitController));
+
+  // 离线接口（用户离开）
+  router.post('/offline', visitController.offline.bind(visitController));
+
   // 获取当前在线人数
   router.get('/online', visitController.getCurrentOnlineCount.bind(visitController));
 

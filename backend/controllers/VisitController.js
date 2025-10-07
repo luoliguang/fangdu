@@ -14,10 +14,11 @@ class VisitController {
    */
   async recordVisit(req, res) {
     try {
-      // 从请求体或URL获取页面路径
-      const { page, referrer } = req.body;
+      // 从请求体或URL获取页面路径和会话ID
+      const { page, sessionId, referrer } = req.body;
       const visitData = {
         ipAddress: this.getClientIP(req),
+        sessionId: sessionId || null,
         userAgent: req.get('User-Agent'),
         page: page || req.path || '/',
         referrer: referrer || req.get('Referer')
@@ -30,6 +31,62 @@ class VisitController {
       res.status(500).json({
         success: false,
         message: error.message || '记录访问失败'
+      });
+    }
+  }
+
+  /**
+   * 心跳接口（更新在线状态）
+   */
+  async heartbeat(req, res) {
+    try {
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          message: '会话ID不能为空'
+        });
+      }
+
+      const visitData = {
+        sessionId,
+        ipAddress: this.getClientIP(req),
+        userAgent: req.get('User-Agent')
+      };
+
+      const result = await this.visitService.updateHeartbeat(visitData);
+      res.json(result);
+    } catch (error) {
+      console.error('心跳更新失败:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || '心跳更新失败'
+      });
+    }
+  }
+
+  /**
+   * 离线接口（用户主动离开）
+   */
+  async offline(req, res) {
+    try {
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          message: '会话ID不能为空'
+        });
+      }
+
+      const result = await this.visitService.removeSession(sessionId);
+      res.json(result);
+    } catch (error) {
+      console.error('离线处理失败:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || '离线处理失败'
       });
     }
   }
@@ -436,7 +493,7 @@ class VisitController {
   shouldRecordVisit(path) {
     // 中间件不记录任何访问，避免与前端路由守卫重复记录
     // 所有访问记录由前端主动调用 /api/v1/visits/record 接口完成
-    return false;
+      return false;
   }
 
   /**

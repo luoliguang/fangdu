@@ -36,7 +36,7 @@ const addToFavorites = (material) => {
   const exists = favorites.value.find(fav => fav.id === material.id);
   if (!exists) {
     favorites.value.push(material);
-    console.log('已添加到收藏夹');
+    // 已添加到收藏夹
   }
 };
 
@@ -92,7 +92,7 @@ const handleFeedbackSubmit = async (feedbackData) => {
     
     if (response.data.success) {
       // 显示成功提示（可以使用Element Plus的消息提示）
-      console.log('留言成功，感谢您的反馈！');
+      // 留言成功，感谢反馈
     }
   } catch (error) {
     console.error('提交留言失败:', error);
@@ -111,7 +111,7 @@ const handleQuickFilter = (filterValue) => {
   if (galleryCallbacks.value.handleQuickFilter) {
     galleryCallbacks.value.handleQuickFilter(filterValue);
   } else {
-    console.log('快速筛选:', filterValue);
+    // 快速筛选
   }
 };
 
@@ -120,7 +120,7 @@ const handleShowMedia = (material) => {
   if (galleryCallbacks.value.handleShowMedia) {
     galleryCallbacks.value.handleShowMedia(material);
   } else {
-    console.log('显示媒体:', material);
+    // 显示媒体
   }
 };
 
@@ -132,7 +132,7 @@ const handleRemoveFromFavorites = (materialId) => {
     const index = favorites.value.findIndex(fav => fav.id === materialId);
     if (index > -1) {
       favorites.value.splice(index, 1);
-      console.log('已从收藏夹移除');
+      // 已从收藏夹移除
     }
   }
 };

@@ -13,6 +13,7 @@ class Visit {
   async recordVisit(visitData) {
     const {
       ipAddress,
+      sessionId = null,
       userAgent = null,
       page = '/',
       referrer = null
@@ -23,22 +24,57 @@ class Visit {
     }
 
     const sql = `
-      INSERT INTO visits (ip_address, user_agent, page, visit_time) 
-      VALUES (?, ?, ?, datetime('now'))
+      INSERT INTO visits (ip_address, session_id, user_agent, page, visit_time) 
+      VALUES (?, ?, ?, ?, datetime('now'))
     `;
     
-    const result = await this.run(sql, [ipAddress, userAgent, page]);
+    const result = await this.run(sql, [ipAddress, sessionId, userAgent, page]);
     return { id: result.lastID, ...visitData };
   }
 
   /**
-   * 获取当前在线人数（最近5分钟内的唯一IP）
+   * 更新心跳（用户在线状态）
+   */
+  async updateHeartbeat(sessionId, ipAddress, userAgent) {
+    if (!sessionId) {
+      throw new Error('会话ID不能为空');
+    }
+
+    const sql = `
+      INSERT INTO online_sessions (session_id, ip_address, user_agent, last_heartbeat, first_seen)
+      VALUES (?, ?, ?, datetime('now'), datetime('now'))
+      ON CONFLICT(session_id) 
+      DO UPDATE SET 
+        last_heartbeat = datetime('now'),
+        ip_address = excluded.ip_address,
+        user_agent = excluded.user_agent
+    `;
+    
+    await this.run(sql, [sessionId, ipAddress, userAgent]);
+    return { success: true };
+  }
+
+  /**
+   * 移除会话（用户离线）
+   */
+  async removeSession(sessionId) {
+    if (!sessionId) {
+      return { success: false, message: '会话ID不能为空' };
+    }
+
+    const sql = `DELETE FROM online_sessions WHERE session_id = ?`;
+    await this.run(sql, [sessionId]);
+    return { success: true };
+  }
+
+  /**
+   * 获取当前在线人数（基于心跳机制，1分钟内有心跳算在线）
    */
   async getCurrentOnlineCount() {
     const sql = `
-      SELECT COUNT(DISTINCT ip_address) as count 
-      FROM visits 
-      WHERE visit_time >= datetime('now', '-5 minutes')
+      SELECT COUNT(*) as count 
+      FROM online_sessions 
+      WHERE last_heartbeat >= datetime('now', '-1 minute')
     `;
     
     const result = await this.queryOne(sql);
@@ -53,7 +89,12 @@ class Visit {
       SELECT 
         DATE(visit_time) as date,
         COUNT(*) as visits,
-        COUNT(DISTINCT ip_address) as unique_visitors
+        COUNT(DISTINCT 
+          CASE 
+            WHEN session_id IS NOT NULL AND session_id != '' THEN session_id
+            ELSE ip_address || '|' || COALESCE(user_agent, '')
+          END
+        ) as unique_visitors
       FROM visits 
       WHERE visit_time >= datetime('now', '-${days} days')
       GROUP BY DATE(visit_time)
@@ -235,30 +276,52 @@ class Visit {
   }
 
   /**
-   * 检查IP是否在指定时间内访问过
+   * 检查是否在指定时间内有重复访问
+   * 优先使用 sessionId，其次使用 ipAddress
    */
-  async hasRecentVisit(ipAddress, minutes = 1, page = null) {
+  async hasRecentVisit(ipAddress, minutes = 1, page = null, sessionId = null) {
     let sql, params;
     
-    if (page) {
-      // 检查特定页面的重复访问
-      sql = `
-        SELECT COUNT(*) as count 
-        FROM visits 
-        WHERE ip_address = ? 
-        AND page = ?
-        AND visit_time >= datetime('now', '-${minutes} minutes')
-      `;
-      params = [ipAddress, page];
+    if (sessionId) {
+      // 如果有 sessionId，使用 sessionId 判断
+      if (page) {
+        sql = `
+          SELECT COUNT(*) as count 
+          FROM visits 
+          WHERE session_id = ? 
+          AND page = ?
+          AND visit_time >= datetime('now', '-${minutes} minutes')
+        `;
+        params = [sessionId, page];
+      } else {
+        sql = `
+          SELECT COUNT(*) as count 
+          FROM visits 
+          WHERE session_id = ? 
+          AND visit_time >= datetime('now', '-${minutes} minutes')
+        `;
+        params = [sessionId];
+      }
     } else {
-      // 检查任意页面的重复访问
-      sql = `
-        SELECT COUNT(*) as count 
-        FROM visits 
-        WHERE ip_address = ? 
-        AND visit_time >= datetime('now', '-${minutes} minutes')
-      `;
-      params = [ipAddress];
+      // 没有 sessionId，使用 IP 判断
+      if (page) {
+        sql = `
+          SELECT COUNT(*) as count 
+          FROM visits 
+          WHERE ip_address = ? 
+          AND page = ?
+          AND visit_time >= datetime('now', '-${minutes} minutes')
+        `;
+        params = [ipAddress, page];
+      } else {
+        sql = `
+          SELECT COUNT(*) as count 
+          FROM visits 
+          WHERE ip_address = ? 
+          AND visit_time >= datetime('now', '-${minutes} minutes')
+        `;
+        params = [ipAddress];
+      }
     }
     
     const result = await this.queryOne(sql, params);

@@ -9,7 +9,7 @@
 [![Express](https://img.shields.io/badge/Express-4.x-000000?style=flat-square&logo=express)](https://expressjs.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
-[功能特性](#-功能特性) • [快速开始](#-快速开始) • [部署指南](#-部署指南) • [开发文档](#-开发文档) • [技术栈](#-技术栈)
+[功能特性](#-功能特性) • [快速开始](#-快速开始) • [技术栈](#-技术栈) • [部署指南](./DEPLOY.md) • [快速参考](./QUICK_START.md)
 
 ![项目预览](/project-images/image%20copy.png)
 
@@ -228,27 +228,33 @@ fangdu/
 
 ### 📋 前置要求
 
-在开始之前，请确保您的系统已安装：
-
-- ✅ **Node.js** ≥20.19.0 或 ≥22.12.0 ([下载](https://nodejs.org/))
+- ✅ **Node.js** ≥20.19.0 ([下载](https://nodejs.org/))
 - ✅ **npm** ≥8.0.0 (随 Node.js 安装)
-- ✅ **Git** 最新版本 ([下载](https://git-scm.com/))
+- ✅ **Git** ([下载](https://git-scm.com/))
 
-<details>
-<summary><b>验证安装</b></summary>
+### ⚡ 一键部署
 
+**Linux/macOS:**
 ```bash
-# 检查 Node.js 版本
-node --version  # 应显示 v20.19.0 或更高
-
-# 检查 npm 版本
-npm --version   # 应显示 8.x.x 或更高
-
-# 检查 Git 版本
-git --version   # 应显示 git version 2.x.x
+git clone https://github.com/luoliguang/fangdu.git
+cd fangdu
+cp backend/env.example backend/.env  # 配置环境变量
+chmod +x deploy.sh
+./deploy.sh
 ```
 
-</details>
+**Windows:**
+```powershell
+git clone https://github.com/luoliguang/fangdu.git
+cd fangdu
+copy backend\env.example backend\.env  # 配置环境变量
+.\deploy.ps1
+```
+
+> 📖 **详细部署文档**: [DEPLOY.md](./DEPLOY.md)
+
+<details>
+<summary><b>手动部署步骤（可选）</b></summary>
 
 ### 📦 一、克隆项目
 
@@ -404,6 +410,8 @@ npm run preview
    - 使用 `.env` 中配置的管理员账号登录
    - 进入后台管理素材、查看统计数据
 
+</details>
+
 ---
 
 ## 📚 核心功能使用
@@ -538,11 +546,11 @@ sudo apt install -y nginx
 
 #### 2. 部署代码
 
-```bash
+   ```bash
 # 克隆代码
-git clone https://github.com/luoliguang/fangdu.git
-cd fangdu
-
+   git clone https://github.com/luoliguang/fangdu.git
+   cd fangdu
+   
 # 安装后端依赖
 cd backend
 npm install --production
@@ -575,9 +583,9 @@ ADMIN_PASSWORD=<设置强密码>
 pm2 start server.js --name "fangdu-backend" --env production
 
 # 设置开机自启
-pm2 startup
-pm2 save
-
+   pm2 startup
+   pm2 save
+   
 # 查看运行状态
 pm2 status
 pm2 logs fangdu-backend
@@ -639,7 +647,7 @@ sudo certbot renew --dry-run
 
 ### 监控与维护
 
-```bash
+   ```bash
 # 查看 PM2 进程
 pm2 list
 pm2 monit

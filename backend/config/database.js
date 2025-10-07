@@ -60,10 +60,21 @@ class DatabaseConfig {
         sql: `CREATE TABLE IF NOT EXISTS visits (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           ip_address TEXT NOT NULL,
+          session_id TEXT,
           visit_time DATETIME DEFAULT CURRENT_TIMESTAMP,
           page TEXT,
           user_agent TEXT,
           referrer TEXT
+        )`
+      },
+      {
+        name: 'online_sessions',
+        sql: `CREATE TABLE IF NOT EXISTS online_sessions (
+          session_id TEXT PRIMARY KEY,
+          ip_address TEXT NOT NULL,
+          user_agent TEXT,
+          last_heartbeat DATETIME DEFAULT CURRENT_TIMESTAMP,
+          first_seen DATETIME DEFAULT CURRENT_TIMESTAMP
         )`
       }
     ];
@@ -189,7 +200,7 @@ class DatabaseConfig {
   }
 
   /**
-   * 定期清理过期访问记录
+   * 定期清理过期访问记录和在线会话
    */
   setupCleanupTask() {
     const cleanupOldVisits = () => {
@@ -197,16 +208,28 @@ class DatabaseConfig {
       this.db.run(`DELETE FROM visits WHERE visit_time < ?`, [thirtyDaysAgo], function(err) {
         if (err) {
           console.error('清理过期访问记录失败:', err.message);
-        } else if (this.changes > 0) {
-          console.log(`已清理 ${this.changes} 条过期访问记录`);
         }
+        // 成功清理（静默）
       });
     };
 
-    // 每24小时执行一次清理
+    const cleanupExpiredSessions = () => {
+      // 清理2分钟内没有心跳的会话
+      this.db.run(`DELETE FROM online_sessions WHERE last_heartbeat < datetime('now', '-2 minutes')`, function(err) {
+        if (err) {
+          console.error('清理过期在线会话失败:', err.message);
+        }
+        // 成功清理（静默）
+      });
+    };
+
+    // 每24小时执行一次访问记录清理
     setInterval(cleanupOldVisits, 24 * 60 * 60 * 1000);
+    // 每分钟执行一次在线会话清理
+    setInterval(cleanupExpiredSessions, 60 * 1000);
     // 启动时执行一次清理
     cleanupOldVisits();
+    cleanupExpiredSessions();
   }
 
   /**

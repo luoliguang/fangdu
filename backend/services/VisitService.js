@@ -15,7 +15,7 @@ class VisitService {
    */
   async recordVisit(visitData, options = {}) {
     try {
-      const { ipAddress, userAgent, page, referrer } = visitData;
+      const { ipAddress, sessionId, userAgent, page, referrer } = visitData;
       const { skipRateLimit = false } = options;
 
       if (!ipAddress) {
@@ -23,13 +23,12 @@ class VisitService {
       }
 
       const cleanIP = this.sanitizeIP(ipAddress);
-      console.log(`[访问记录] IP: ${cleanIP}, 页面: ${page}`);
+      const identifier = sessionId || `${cleanIP}|${userAgent}`;
 
-      // 检查是否为同一IP在短时间内的访问（防止快速切换页面刷流量）
-      // 5分钟内该IP的任何访问都不重复计数
-      const hasRecentVisit = await this.visitModel.hasRecentVisit(cleanIP, 5, null);
+      // 检查是否为同一用户在短时间内的访问（防止快速切换页面刷流量）
+      // 2分钟内该用户的任何访问都不重复计数（减少到2分钟，更合理）
+      const hasRecentVisit = await this.visitModel.hasRecentVisit(cleanIP, 2, null, sessionId);
       if (hasRecentVisit) {
-        console.log(`[访问记录] IP ${cleanIP} 在5分钟内已访问过，跳过记录`);
         return {
           success: true,
           message: '访问记录已跳过（会话内访问）',
@@ -37,9 +36,8 @@ class VisitService {
         };
       }
 
-      // 检查频率限制（防刷机制）- 改为按页面+IP组合限制
-      if (!skipRateLimit && !this.checkRateLimit(cleanIP, page)) {
-        console.log(`[访问记录] IP ${cleanIP} 访问页面 ${page} 过于频繁，跳过记录`);
+      // 检查频率限制（防刷机制）
+      if (!skipRateLimit && !this.checkRateLimit(identifier, page)) {
         return {
           success: true,
           message: '访问记录已跳过（频率限制）',
@@ -50,15 +48,14 @@ class VisitService {
       // 记录访问
       const visit = await this.visitModel.recordVisit({
         ipAddress: cleanIP,
+        sessionId: sessionId || null,
         userAgent: this.sanitizeUserAgent(userAgent),
         page: this.sanitizePage(page),
         referrer: this.sanitizeReferrer(referrer)
       });
 
-      console.log(`[访问记录] IP ${cleanIP} 访问 ${page} 记录成功`);
-
       // 更新频率限制缓存
-      this.updateRateLimit(cleanIP);
+      this.updateRateLimit(identifier);
 
       return {
         success: true,
@@ -71,6 +68,59 @@ class VisitService {
       return {
         success: false,
         message: '访问记录失败',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * 更新心跳（用户在线状态）
+   */
+  async updateHeartbeat(visitData) {
+    try {
+      const { sessionId, ipAddress, userAgent } = visitData;
+
+      if (!sessionId) {
+        throw new Error('会话ID不能为空');
+      }
+
+      const cleanIP = this.sanitizeIP(ipAddress);
+      await this.visitModel.updateHeartbeat(sessionId, cleanIP, this.sanitizeUserAgent(userAgent));
+
+      return {
+        success: true,
+        message: '心跳更新成功'
+      };
+    } catch (error) {
+      console.error('更新心跳失败:', error);
+      return {
+        success: false,
+        message: '心跳更新失败',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * 移除会话（用户离线）
+   */
+  async removeSession(sessionId) {
+    try {
+      if (!sessionId) {
+        throw new Error('会话ID不能为空');
+      }
+
+      await this.visitModel.removeSession(sessionId);
+
+      return {
+        success: true,
+        message: '离线成功'
+      };
+    } catch (error) {
+      console.error('移除会话失败:', error);
+      return {
+        success: false,
+        message: '离线失败',
         error: error.message
       };
     }
@@ -455,7 +505,7 @@ class VisitService {
     setInterval(async () => {
       try {
         await this.cleanupOldVisits(30);
-        console.log('定期清理过期访问记录完成');
+        // 定期清理完成（静默）
       } catch (error) {
         console.error('定期清理过期访问记录失败:', error);
       }
