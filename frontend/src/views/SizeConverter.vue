@@ -111,7 +111,7 @@ export default {
       decrementCount: 3,
       conversionResult: [],
       copySuccess: false,
-      sizeOrder: ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL', '11XL','12XL','13XL','14XL'],
+      sizeOrder: ['XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL', '11XL','12XL','13XL','14XL'],
       CopyDocument: markRaw(CopyDocument) // 使用 markRaw 包裹图标组件，避免变成响应式对象
     }
   },
