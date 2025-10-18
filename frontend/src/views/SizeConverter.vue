@@ -2,6 +2,7 @@
   <div class="size-converter-container">
     <div class="header">
       <h1>尺码工具</h1>
+      <p>主要用于换码标，以及尺码推荐，方便制单</p>
     </div>
     
     <div class="card">

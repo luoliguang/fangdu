@@ -617,8 +617,7 @@ const copyImageNative = async (imageUrl, material) => {
       <input type="text" v-model="searchTerm" placeholder="请以关键词的形式搜索 如：圆领短袖 插肩" class="search-input-cool">
     </div>
   </header>
-
-  <main>
+  
     <div class="tags-container" :class="{ 'tags-expanded': isTagsExpanded }" ref="tagsContainerRef">
       <TransitionGroup name="tag-list">
         <button @click="filterByTag('')" :class="{ active: activeTag === '' }" key="all-btn">
@@ -644,7 +643,6 @@ const copyImageNative = async (imageUrl, material) => {
         </button>
       </TransitionGroup>
     </div>
-
     <TransitionGroup name="gallery" tag="div" class="grid-container">
       <div 
         v-for="material in materials" 
@@ -708,10 +706,6 @@ const copyImageNative = async (imageUrl, material) => {
             </div>
         </div>
     </div>
-    <div ref="observerEl" class="observer"></div>
-
-  </main>
-
   <!-- 高端提示框 -->
   <div v-if="showToast" class="custom-toast" :class="`toast-${toastType}`">
     <div class="toast-content">
