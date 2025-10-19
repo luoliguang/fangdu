@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, onActivated, inject } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, onActivated, inject, nextTick } from 'vue';
 import apiClient from '../axiosConfig.js';
 import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
@@ -381,6 +381,11 @@ watch(searchTerm, () => {
 });
 
 const setupObserver = () => {
+    // 清理之前的观察器
+    if (observer) {
+        observer.disconnect();
+    }
+    
     observer = new IntersectionObserver((entries) => {
         const firstEntry = entries[0];
         if (firstEntry.isIntersecting && hasMore.value && !isLoading.value) {
@@ -389,9 +394,12 @@ const setupObserver = () => {
         }
     });
 
-    if (observerEl.value) {
-        observer.observe(observerEl.value);
-    }
+    // 使用nextTick确保DOM已更新
+    nextTick(() => {
+        if (observerEl.value) {
+            observer.observe(observerEl.value);
+        }
+    });
 };
 
 onMounted(() => {
@@ -408,7 +416,11 @@ onMounted(() => {
         initTutorial(); // 初始化教程
         isDataLoaded.value = true;
     }
-    setupObserver();
+    
+    // 使用nextTick确保DOM完全渲染后再设置观察器
+    nextTick(() => {
+        setupObserver();
+    });
     
     // 监听窗口大小变化
     window.addEventListener('resize', () => {
@@ -421,7 +433,9 @@ onMounted(() => {
 // keep-alive组件激活时的逻辑
 onActivated(() => {
     // 重新设置观察器，因为组件可能被缓存
-    setupObserver();
+    nextTick(() => {
+        setupObserver();
+    });
 });
 
 onUnmounted(() => {
@@ -705,6 +719,8 @@ const copyImageNative = async (imageUrl, material) => {
                 <button @click="submitFeedback" class="feedback-btn">提交留言</button>
             </div>
         </div>
+        <!-- 无限滚动观察器元素 -->
+        <div ref="observerEl" class="observer"></div>
     </div>
   <!-- 高端提示框 -->
   <div v-if="showToast" class="custom-toast" :class="`toast-${toastType}`">
