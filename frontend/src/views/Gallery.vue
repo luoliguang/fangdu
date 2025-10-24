@@ -1375,7 +1375,7 @@ const copyImageNative = async (imageUrl, material) => {
   
   /* 英雄区域移动端适配 */
   .hero-header {
-    padding: 2rem 1rem;
+    padding: 6.2rem 0.8rem 0.8rem 0.8rem;
   }
   
   .hero-title {
