@@ -189,6 +189,9 @@ class VisitService {
    */
   async getOverallStats() {
     try {
+      // 先进行数据一致性检查
+      await this.visitModel.checkDataConsistency();
+      
       const stats = await this.visitModel.getOverallStats();
       
       // 计算增长率
@@ -490,6 +493,19 @@ class VisitService {
     
     // 限制长度
     return referrer.substring(0, 500);
+  }
+
+  /**
+   * 数据一致性检查
+   */
+  async checkDataConsistency() {
+    try {
+      const result = await this.visitModel.checkDataConsistency();
+      return result;
+    } catch (error) {
+      console.error('数据一致性检查失败:', error);
+      throw error;
+    }
   }
 
   /**

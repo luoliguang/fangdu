@@ -89,14 +89,13 @@ class Visit {
       SELECT 
         DATE(visit_time) as date,
         COUNT(*) as visits,
-        COUNT(DISTINCT 
-          CASE 
-            WHEN session_id IS NOT NULL AND session_id != '' THEN session_id
-            ELSE ip_address || '|' || COALESCE(user_agent, '')
-          END
-        ) as unique_visitors
+        COUNT(DISTINCT ip_address) as unique_visitors
       FROM visits 
       WHERE visit_time >= datetime('now', '-${days} days')
+      AND visit_time IS NOT NULL
+      AND ip_address IS NOT NULL 
+      AND ip_address != '' 
+      AND ip_address != 'unknown'
       GROUP BY DATE(visit_time)
       ORDER BY date ASC
     `;
@@ -142,62 +141,81 @@ class Visit {
    * 获取访问统计总览
    */
   async getOverallStats() {
-    // 总访问量
-    const totalVisitsSql = `SELECT COUNT(*) as total FROM visits`;
-    const totalVisits = await this.queryOne(totalVisitsSql);
+    try {
+      // 总访问量 - 确保数据一致性
+      const totalVisitsSql = `SELECT COUNT(*) as total FROM visits WHERE visit_time IS NOT NULL`;
+      const totalVisits = await this.queryOne(totalVisitsSql);
 
-    // 唯一访客数
-    const uniqueVisitorsSql = `SELECT COUNT(DISTINCT ip_address) as unique_visitors FROM visits`;
-    const uniqueVisitors = await this.queryOne(uniqueVisitorsSql);
+      // 唯一访客数 - 使用更稳定的计算方式
+      const uniqueVisitorsSql = `
+        SELECT COUNT(DISTINCT ip_address) as unique_visitors 
+        FROM visits 
+        WHERE ip_address IS NOT NULL AND ip_address != '' AND ip_address != 'unknown'
+      `;
+      const uniqueVisitors = await this.queryOne(uniqueVisitorsSql);
 
-    // 今日访问量 - 使用当天的00:00作为起始时间
-    const todayVisitsSql = `
-      SELECT COUNT(*) as today 
-      FROM visits 
-      WHERE visit_time >= datetime('now', 'start of day')
-    `;
-    const todayVisits = await this.queryOne(todayVisitsSql);
+      // 今日访问量 - 使用当天的00:00作为起始时间
+      const todayVisitsSql = `
+        SELECT COUNT(*) as today 
+        FROM visits 
+        WHERE visit_time >= datetime('now', 'start of day')
+        AND visit_time IS NOT NULL
+      `;
+      const todayVisits = await this.queryOne(todayVisitsSql);
 
-    // 今日唯一访客 - 使用当天的00:00作为起始时间
-    const todayUniqueVisitorsSql = `
-      SELECT COUNT(DISTINCT ip_address) as today_unique 
-      FROM visits 
-      WHERE visit_time >= datetime('now', 'start of day')
-    `;
-    const todayUniqueVisitors = await this.queryOne(todayUniqueVisitorsSql);
+      // 今日唯一访客 - 使用当天的00:00作为起始时间
+      const todayUniqueVisitorsSql = `
+        SELECT COUNT(DISTINCT ip_address) as today_unique 
+        FROM visits 
+        WHERE visit_time >= datetime('now', 'start of day')
+        AND ip_address IS NOT NULL AND ip_address != '' AND ip_address != 'unknown'
+      `;
+      const todayUniqueVisitors = await this.queryOne(todayUniqueVisitorsSql);
 
-    // 本周访问量
-    const weekVisitsSql = `
-      SELECT COUNT(*) as week 
-      FROM visits 
-      WHERE visit_time >= datetime('now', '-7 days')
-    `;
-    const weekVisits = await this.queryOne(weekVisitsSql);
+      // 本周访问量
+      const weekVisitsSql = `
+        SELECT COUNT(*) as week 
+        FROM visits 
+        WHERE visit_time >= datetime('now', '-7 days')
+        AND visit_time IS NOT NULL
+      `;
+      const weekVisits = await this.queryOne(weekVisitsSql);
 
-    // 本月访问量
-    const monthVisitsSql = `
-      SELECT COUNT(*) as month 
-      FROM visits 
-      WHERE visit_time >= datetime('now', 'start of month')
-    `;
-    const monthVisits = await this.queryOne(monthVisitsSql);
+      // 本月访问量
+      const monthVisitsSql = `
+        SELECT COUNT(*) as month 
+        FROM visits 
+        WHERE visit_time >= datetime('now', 'start of month')
+        AND visit_time IS NOT NULL
+      `;
+      const monthVisits = await this.queryOne(monthVisitsSql);
 
-    return {
-      total: {
-        visits: totalVisits.total || 0,
-        uniqueVisitors: uniqueVisitors.unique_visitors || 0
-      },
-      today: {
-        visits: todayVisits.today || 0,
-        uniqueVisitors: todayUniqueVisitors.today_unique || 0
-      },
-      week: {
-        visits: weekVisits.week || 0
-      },
-      month: {
-        visits: monthVisits.month || 0
-      }
-    };
+      return {
+        total: {
+          visits: totalVisits.total || 0,
+          uniqueVisitors: uniqueVisitors.unique_visitors || 0
+        },
+        today: {
+          visits: todayVisits.today || 0,
+          uniqueVisitors: todayUniqueVisitors.today_unique || 0
+        },
+        week: {
+          visits: weekVisits.week || 0
+        },
+        month: {
+          visits: monthVisits.month || 0
+        }
+      };
+    } catch (error) {
+      console.error('获取访问统计总览失败:', error);
+      // 返回默认值，确保不会因为数据库错误导致统计页面崩溃
+      return {
+        total: { visits: 0, uniqueVisitors: 0 },
+        today: { visits: 0, uniqueVisitors: 0 },
+        week: { visits: 0 },
+        month: { visits: 0 }
+      };
+    }
   }
 
   /**
@@ -273,6 +291,60 @@ class Visit {
     
     const result = await this.run(sql);
     return result.changes;
+  }
+
+  /**
+   * 数据一致性检查和修复
+   */
+  async checkDataConsistency() {
+    try {
+      // 检查并修复无效的访问记录
+      const invalidRecordsSql = `
+        SELECT COUNT(*) as count 
+        FROM visits 
+        WHERE visit_time IS NULL 
+        OR ip_address IS NULL 
+        OR ip_address = '' 
+        OR ip_address = 'unknown'
+      `;
+      
+      const invalidCount = await this.queryOne(invalidRecordsSql);
+      
+      if (invalidCount.count > 0) {
+        console.log(`发现 ${invalidCount.count} 条无效访问记录`);
+        
+        // 可以选择删除无效记录或修复它们
+        // 这里我们选择删除无效记录
+        const cleanupSql = `
+          DELETE FROM visits 
+          WHERE visit_time IS NULL 
+          OR ip_address IS NULL 
+          OR ip_address = '' 
+          OR ip_address = 'unknown'
+        `;
+        
+        const cleanupResult = await this.run(cleanupSql);
+        console.log(`已清理 ${cleanupResult.changes} 条无效访问记录`);
+        
+        return {
+          success: true,
+          cleanedRecords: cleanupResult.changes,
+          message: `已清理 ${cleanupResult.changes} 条无效访问记录`
+        };
+      }
+      
+      return {
+        success: true,
+        cleanedRecords: 0,
+        message: '数据一致性检查通过，无需清理'
+      };
+    } catch (error) {
+      console.error('数据一致性检查失败:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 
   /**

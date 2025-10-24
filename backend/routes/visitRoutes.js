@@ -56,6 +56,9 @@ function createVisitRoutes(db) {
   // 获取统计仪表板数据
   router.get('/dashboard', visitController.getDashboardStats.bind(visitController));
 
+  // 数据一致性检查和修复
+  router.post('/check-consistency', visitController.checkDataConsistency.bind(visitController));
+
   // 导出访问数据
   router.get('/export', 
     visitController.validateStatsQuery.bind(visitController),

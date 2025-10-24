@@ -381,6 +381,22 @@ class VisitController {
   }
 
   /**
+   * 数据一致性检查和修复
+   */
+  async checkDataConsistency(req, res) {
+    try {
+      const result = await this.visitService.checkDataConsistency();
+      res.json(result);
+    } catch (error) {
+      console.error('数据一致性检查失败:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || '数据一致性检查失败'
+      });
+    }
+  }
+
+  /**
    * 导出访问数据
    */
   async exportVisitData(req, res) {
