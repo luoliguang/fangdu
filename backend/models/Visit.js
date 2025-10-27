@@ -85,17 +85,21 @@ class Visit {
    * 获取访问趋势数据
    */
   async getVisitTrends(days = 7) {
+    // 修复：访问量应该统计所有记录（包括无效IP），唯一访客才过滤无效IP
+    // 这确保与 getOverallStats() 的逻辑一致
     const sql = `
       SELECT 
         DATE(visit_time) as date,
         COUNT(*) as visits,
-        COUNT(DISTINCT ip_address) as unique_visitors
+        COUNT(DISTINCT CASE 
+          WHEN ip_address IS NOT NULL 
+          AND ip_address != '' 
+          AND ip_address != 'unknown' 
+          THEN ip_address 
+        END) as unique_visitors
       FROM visits 
       WHERE visit_time >= datetime('now', '-${days} days')
       AND visit_time IS NOT NULL
-      AND ip_address IS NOT NULL 
-      AND ip_address != '' 
-      AND ip_address != 'unknown'
       GROUP BY DATE(visit_time)
       ORDER BY date ASC
     `;
@@ -108,11 +112,17 @@ class Visit {
    */
   async getPageStats(limit = 50) {
     // 获取所有页面的访问统计，按访问量排序
+    // 修复：统一统计口径，访问量统计所有记录，唯一访客过滤无效IP
     const sql = `
       SELECT 
         page,
         COUNT(*) as visits,
-        COUNT(DISTINCT ip_address) as unique_visitors
+        COUNT(DISTINCT CASE 
+          WHEN ip_address IS NOT NULL 
+          AND ip_address != '' 
+          AND ip_address != 'unknown' 
+          THEN ip_address 
+        END) as unique_visitors
       FROM visits 
       WHERE page NOT LIKE '/api/%'
         AND page NOT LIKE '/stats/%'
@@ -128,6 +138,7 @@ class Visit {
         AND page NOT LIKE '/tags/%'
         AND page NOT LIKE '/filters%'
         AND page NOT LIKE '/user/%'
+        AND visit_time IS NOT NULL
       GROUP BY page 
       ORDER BY visits DESC
       LIMIT ?
@@ -222,14 +233,21 @@ class Visit {
    * 获取热门页面
    */
   async getPopularPages(limit = 5) {
+    // 修复：统一统计口径，访问量统计所有记录，唯一访客过滤无效IP
     const sql = `
       SELECT 
         page,
         COUNT(*) as visits,
-        COUNT(DISTINCT ip_address) as unique_visitors,
+        COUNT(DISTINCT CASE 
+          WHEN ip_address IS NOT NULL 
+          AND ip_address != '' 
+          AND ip_address != 'unknown' 
+          THEN ip_address 
+        END) as unique_visitors,
         MAX(visit_time) as last_visit
       FROM visits 
       WHERE visit_time >= datetime('now', '-30 days')
+      AND visit_time IS NOT NULL
       GROUP BY page 
       ORDER BY visits DESC 
       LIMIT ?
@@ -242,12 +260,14 @@ class Visit {
    * 获取访问来源统计
    */
   async getReferrerStats(limit = 10) {
+    // 修复：添加时间有效性检查
     const sql = `
       SELECT 
         '直接访问' as source,
         COUNT(*) as visits
       FROM visits 
       WHERE visit_time >= datetime('now', '-30 days')
+      AND visit_time IS NOT NULL
       ORDER BY visits DESC 
       LIMIT ?
     `;
@@ -259,12 +279,14 @@ class Visit {
    * 获取访问时段分布
    */
   async getHourlyDistribution() {
+    // 修复：添加时间有效性检查，确保只统计有效访问
     const sql = `
       SELECT 
         CAST(strftime('%H', visit_time) AS INTEGER) as hour,
         COUNT(*) as visits
       FROM visits 
       WHERE visit_time >= datetime('now', '-7 days')
+      AND visit_time IS NOT NULL
       GROUP BY hour 
       ORDER BY hour ASC
     `;
