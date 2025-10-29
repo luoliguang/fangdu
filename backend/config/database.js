@@ -1,6 +1,9 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
+// 自动清理配置（默认关闭）。管理员可改为 true 启用按天自动清理旧 visits。
+const AUTO_CLEAN_VISITS = false;
+
 /**
  * 数据库配置和连接管理
  */
@@ -204,12 +207,12 @@ class DatabaseConfig {
    */
   setupCleanupTask() {
     const cleanupOldVisits = () => {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      this.db.run(`DELETE FROM visits WHERE visit_time < ?`, [thirtyDaysAgo], function(err) {
+      this.db.run(`DELETE FROM visits WHERE visit_time < datetime('now', '-30 days')`, function(err) {
         if (err) {
           console.error('清理过期访问记录失败:', err.message);
+          return;
         }
-        // 成功清理（静默）
+        console.log(`cleanupOldVisits deleted ${this.changes} rows`);
       });
     };
 
@@ -223,12 +226,16 @@ class DatabaseConfig {
       });
     };
 
-    // 每24小时执行一次访问记录清理
-    setInterval(cleanupOldVisits, 24 * 60 * 60 * 1000);
+    // 每24小时执行一次访问记录清理（受 AUTO_CLEAN_VISITS 控制）
+    if (AUTO_CLEAN_VISITS) {
+      setInterval(cleanupOldVisits, 24 * 60 * 60 * 1000);
+    }
     // 每分钟执行一次在线会话清理
     setInterval(cleanupExpiredSessions, 60 * 1000);
     // 启动时执行一次清理
-    cleanupOldVisits();
+    if (AUTO_CLEAN_VISITS) {
+      cleanupOldVisits();
+    }
     cleanupExpiredSessions();
   }
 
