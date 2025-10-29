@@ -43,6 +43,5 @@ jobs:
           echo ">>> Deploying frontend..."
           cd ../frontend
           npm install
-          npm run build
 
           echo ">>> Deployment finished!"
