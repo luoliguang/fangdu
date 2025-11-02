@@ -806,7 +806,7 @@ const copyImageNative = async (imageUrl, material) => {
 
 <style>
   body { font-family: sans-serif; background-color: #f0f2f5; margin: 0; overflow-y: scroll; }
-  main { padding: 1rem; max-width: 1200px; margin: 0 auto; min-height: 50vh; }
+  main { padding: 1rem; max-width: 1200px; margin: 100px auto; min-height: 50vh; }
 
   .fade-enter-active, .fade-leave-active {
     transition: opacity 0.3s ease;
@@ -1375,7 +1375,7 @@ const copyImageNative = async (imageUrl, material) => {
   
   /* 英雄区域移动端适配 */
   .hero-header {
-    padding: 6.2rem 0.8rem 0.8rem 0.8rem;
+    /* padding: 6.2rem 0.8rem 0.8rem 0.8rem; */
   }
   
   .hero-title {

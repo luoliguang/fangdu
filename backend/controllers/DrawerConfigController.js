@@ -12,6 +12,7 @@ class DrawerConfigController {
   // 获取完整的抽屉配置
   static async getDrawerConfig(req, res) {
     try {
+      const now = new Date();
       const [tabs, announcements, tutorials, quickFilters, contactInfos] = await Promise.all([
         DrawerTab.findAll({
           where: { is_active: true },
@@ -20,13 +21,19 @@ class DrawerConfigController {
         Announcement.findAll({
           where: { 
             is_active: true,
-            [Op.or]: [
-              { start_date: null },
-              { start_date: { [Op.lte]: new Date() } }
-            ],
-            [Op.or]: [
-              { end_date: null },
-              { end_date: { [Op.gte]: new Date() } }
+            [Op.and]: [
+              {
+                [Op.or]: [
+                  { start_date: null },
+                  { start_date: { [Op.lte]: now } }
+                ]
+              },
+              {
+                [Op.or]: [
+                  { end_date: null },
+                  { end_date: { [Op.gte]: now } }
+                ]
+              }
             ]
           },
           order: [['sort_order', 'ASC'], ['created_at', 'DESC']]
@@ -68,16 +75,23 @@ class DrawerConfigController {
   // 获取公告列表
   static async getAnnouncements(req, res) {
     try {
+      const now = new Date();
       const announcements = await Announcement.findAll({
         where: { 
           is_active: true,
-          [Op.or]: [
-            { start_date: null },
-            { start_date: { [Op.lte]: new Date() } }
-          ],
-          [Op.or]: [
-            { end_date: null },
-            { end_date: { [Op.gte]: new Date() } }
+          [Op.and]: [
+            {
+              [Op.or]: [
+                { start_date: null },
+                { start_date: { [Op.lte]: now } }
+              ]
+            },
+            {
+              [Op.or]: [
+                { end_date: null },
+                { end_date: { [Op.gte]: now } }
+              ]
+            }
           ]
         },
         order: [['sort_order', 'ASC'], ['created_at', 'DESC']]
@@ -100,13 +114,21 @@ class DrawerConfigController {
   // 创建公告
   static async createAnnouncement(req, res) {
     try {
-      const { title, content, type, is_new, start_date, end_date, sort_order } = req.body;
+      const { title, content, type, is_new, start_date, end_date, sort_order, show_in_top } = req.body;
 
       if (!title || !content) {
         return res.status(400).json({
           success: false,
           message: '标题和内容不能为空'
         });
+      }
+
+      // 如果设置 show_in_top 为 true，需要将其他公告的 show_in_top 设为 false
+      if (show_in_top === true) {
+        await Announcement.update(
+          { show_in_top: false },
+          { where: { show_in_top: true } }
+        );
       }
 
       const announcement = await Announcement.create({
@@ -116,7 +138,8 @@ class DrawerConfigController {
         is_new: is_new !== undefined ? is_new : true,
         start_date,
         end_date,
-        sort_order: sort_order || 0
+        sort_order: sort_order || 0,
+        show_in_top: show_in_top || false
       });
 
       res.status(201).json({
@@ -140,6 +163,19 @@ class DrawerConfigController {
       const { id } = req.params;
       const updateData = req.body;
 
+      // 如果设置 show_in_top 为 true，需要将其他公告的 show_in_top 设为 false
+      if (updateData.show_in_top === true) {
+        await Announcement.update(
+          { show_in_top: false },
+          { 
+            where: { 
+              id: { [Op.ne]: id },
+              show_in_top: true 
+            } 
+          }
+        );
+      }
+
       const [updatedRows] = await Announcement.update(updateData, {
         where: { id }
       });
@@ -162,6 +198,55 @@ class DrawerConfigController {
       res.status(500).json({
         success: false,
         message: '更新公告失败',
+        error: error.message
+      });
+    }
+  }
+
+  // 获取顶部公告
+  static async getTopAnnouncement(req, res) {
+    try {
+      const now = new Date();
+      const topAnnouncement = await Announcement.findOne({
+        where: { 
+          show_in_top: true,
+          is_active: true,
+          [Op.and]: [
+            {
+              [Op.or]: [
+                { start_date: null },
+                { start_date: { [Op.lte]: now } }
+              ]
+            },
+            {
+              [Op.or]: [
+                { end_date: null },
+                { end_date: { [Op.gte]: now } }
+              ]
+            }
+          ]
+        },
+        order: [['created_at', 'DESC']]
+      });
+
+      if (!topAnnouncement) {
+        return res.json({
+          success: true,
+          data: null,
+          message: '暂无顶部公告'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: topAnnouncement,
+        message: '获取顶部公告成功'
+      });
+    } catch (error) {
+      console.error('获取顶部公告失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取顶部公告失败',
         error: error.message
       });
     }

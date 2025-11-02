@@ -12,14 +12,14 @@
           :class="{ active: activeTab === 'sizeConversion' }" 
           @click="activeTab = 'sizeConversion'"
         >
-          <i class="tab-icon">🔄</i>换码标
+          <i class="tab-icon"></i>换码标
         </div>
         <div 
           class="tab" 
           :class="{ active: activeTab === 'sizeRecommendation' }" 
           @click="activeTab = 'sizeRecommendation'"
         >
-          <i class="tab-icon">📊</i>尺码推荐
+          <i class="tab-icon"></i>尺码推荐
         </div>
       </div>
 
@@ -83,7 +83,7 @@
 
       <div v-else-if="activeTab === 'sizeRecommendation'" class="recommendation-container">
         <div class="coming-soon">
-          <i class="coming-soon-icon">🚧</i>
+          <i class="coming-soon-icon"></i>
           <p>尺码推荐功能正在开发中...</p>
         </div>
       </div>
