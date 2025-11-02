@@ -806,7 +806,15 @@ const copyImageNative = async (imageUrl, material) => {
 
 <style>
   body { font-family: sans-serif; background-color: #f0f2f5; margin: 0; overflow-y: scroll; }
-  main { padding: 1rem; max-width: 1200px; margin: 100px auto; min-height: 50vh; }
+  main { 
+    padding: 1rem; 
+    max-width: 1200px; 
+    margin-top: calc(0px + var(--announcement-height, 0px)); /* 导航栏高度 + 公告栏高度 */
+    margin-left: auto;
+    margin-right: auto;
+    min-height: 50vh;
+    transition: margin-top 0.3s ease; /* 平滑过渡 */
+  }
 
   .fade-enter-active, .fade-leave-active {
     transition: opacity 0.3s ease;
@@ -1371,12 +1379,12 @@ const copyImageNative = async (imageUrl, material) => {
   /* 主要内容区域适配 */
   main {
     padding: 0.5rem;
+    margin-top: calc(60px + var(--announcement-height, 0px)); /* 移动端导航栏高度 + 公告栏高度 */
+    transition: margin-top 0.3s ease; /* 平滑过渡 */
   }
   
   /* 英雄区域移动端适配 */
-  .hero-header {
-    /* padding: 6.2rem 0.8rem 0.8rem 0.8rem; */
-  }
+  /* .hero-header 样式在桌面端已定义，移动端无需额外调整 */
   
   .hero-title {
     font-size: 2.5rem;
@@ -1496,6 +1504,11 @@ const copyImageNative = async (imageUrl, material) => {
 
 /* 小屏幕设备进一步优化 */
 @media (max-width: 480px) {
+  main {
+    margin-top: calc(60px + var(--announcement-height, 0px)); /* 小屏幕导航栏高度 + 公告栏高度 */
+    transition: margin-top 0.3s ease; /* 平滑过渡 */
+  }
+  
   .hero-title {
     font-size: 2rem;
   }
