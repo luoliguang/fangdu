@@ -7,6 +7,7 @@ router.get('/config', DrawerConfigController.getDrawerConfig);
 
 // 公告相关路由
 router.get('/announcements', DrawerConfigController.getAnnouncements);
+router.get('/top-announcement', DrawerConfigController.getTopAnnouncement);
 router.post('/announcements', DrawerConfigController.createAnnouncement);
 router.put('/announcements/:id', DrawerConfigController.updateAnnouncement);
 router.delete('/announcements/:id', DrawerConfigController.deleteAnnouncement);

@@ -78,6 +78,11 @@ const Announcement = sequelize.define('Announcement', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
     comment: '排序顺序'
+  },
+  show_in_top: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    comment: '是否在顶部显示'
   }
 }, {
   tableName: 'announcements',

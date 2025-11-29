@@ -2,6 +2,14 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../axiosConfig.js';
+import {
+  Upload,
+  PictureRounded,
+  ChatDotRound,
+  DataAnalysis,
+  Setting,
+  SwitchButton
+} from '@element-plus/icons-vue';
 
 const router = useRouter();
 const pendingFeedbacksCount = ref(0);
@@ -92,7 +100,7 @@ onMounted(() => {
           @click="navigateTo('UploadMaterial')"
         >
           <span class="nav-hover-effect"></span>
-          <i class="nav-icon">📤</i>
+          <el-icon class="nav-icon"><Upload /></el-icon>
           <span class="nav-text">上传素材</span>
         </div>
         <div 
@@ -101,7 +109,7 @@ onMounted(() => {
           @click="navigateTo('MaterialManagement')"
         >
           <span class="nav-hover-effect"></span>
-          <i class="nav-icon">🖼️</i>
+          <el-icon class="nav-icon"><PictureRounded /></el-icon>
           <span class="nav-text">素材管理</span>
         </div>
         <div 
@@ -110,7 +118,7 @@ onMounted(() => {
           @click="navigateTo('FeedbackManagement')"
         >
           <span class="nav-hover-effect"></span>
-          <i class="nav-icon">💬</i>
+          <el-icon class="nav-icon"><ChatDotRound /></el-icon>
           <span class="nav-text">留言管理</span>
           <span v-if="pendingFeedbacksCount > 0" class="badge">{{ pendingFeedbacksCount }}</span>
         </div>
@@ -120,7 +128,7 @@ onMounted(() => {
           @click="navigateTo('Statistics')"
         >
           <span class="nav-hover-effect"></span>
-          <i class="nav-icon">📊</i>
+          <el-icon class="nav-icon"><DataAnalysis /></el-icon>
           <span class="nav-text">访问统计</span>
         </div>
         <div 
@@ -129,7 +137,7 @@ onMounted(() => {
           @click="navigateTo('DrawerConfig')"
         >
           <span class="nav-hover-effect"></span>
-          <i class="nav-icon">🎛️</i>
+          <el-icon class="nav-icon"><Setting /></el-icon>
           <span class="nav-text">抽屉配置</span>
         </div>
       </div>
@@ -138,7 +146,7 @@ onMounted(() => {
       <div class="sidebar-footer">
         <div class="nav-item logout-item" @click="showLogoutDialog">
           <span class="nav-hover-effect"></span>
-          <i class="nav-icon">🚪</i>
+          <el-icon class="nav-icon"><SwitchButton /></el-icon>
           <span class="nav-text">退出登录</span>
         </div>
       </div>
@@ -259,6 +267,18 @@ onMounted(() => {
 .nav-icon {
   margin-right: 1rem;
   font-size: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+.nav-item:hover .nav-icon {
+  transform: scale(1.1);
+}
+
+.nav-item.active .nav-icon {
+  transform: scale(1.15);
 }
 
 .nav-text {
@@ -371,6 +391,9 @@ onMounted(() => {
   .nav-icon {
     margin-right: 0.5rem;
     font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .nav-text {

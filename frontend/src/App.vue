@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted,watch,nextTick, computed, provide  } from '
 import { useRoute, useRouter  } from 'vue-router';
 import apiClient from './axiosConfig.js';
 import SideDrawer from './components/SideDrawer.vue';
+import TopAnnouncement from './components/TopAnnouncement.vue';
 
 
 // --- 新增：导航栏滑动效果的逻辑 ---
@@ -287,6 +288,10 @@ const handleNavClick = (event) => {
         </router-link>
       </template>
     </nav>
+    
+    <!-- 顶部公告通知 -->
+    <TopAnnouncement />
+    
     <main>
       <router-view v-slot="{ Component }">
         <keep-alive>
@@ -317,7 +322,8 @@ const handleNavClick = (event) => {
   
   /* 为main元素添加上边距，避免被固定导航栏遮挡 */
   main {
-    margin-top: 80px; /* 根据导航栏高度调整，大约是padding(1rem*2) + 文字高度 + gap */
+    margin-top: calc(80px + var(--announcement-height, 0px)); /* 导航栏高度 + 公告高度 */
+    transition: margin-top 0.3s ease; /* 平滑过渡 */
   }
   .main-nav {
     background-color: #2c3e50;
@@ -325,12 +331,13 @@ const handleNavClick = (event) => {
     display: flex;
     gap: 1.5rem;
     position: fixed; /* 固定定位 */
-    top: 0; /* 固定在顶部 */
+    top: var(--announcement-height, 0px); /* 紧跟公告 */
     left: 0; /* 从左边开始 */
     right: 0; /* 到右边结束 */
     width: 100%; /* 占满整个宽度 */
     z-index: 1000; /* 确保在最顶层 */
     box-sizing: border-box; /* 确保padding不会影响总宽度 */
+    transition: top 0.3s ease; /* 平滑过渡 */
   }
   /* 2. 定义滑块的样式和动画 */
   .nav-slider {

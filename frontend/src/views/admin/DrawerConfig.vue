@@ -14,7 +14,7 @@
         :class="{ active: activeTab === tab.key }"
         class="tab-button"
       >
-        <span class="tab-icon">{{ tab.icon }}</span>
+        <el-icon class="tab-icon"><component :is="tab.icon" /></el-icon>
         <span class="tab-label">{{ tab.label }}</span>
       </button>
     </div>
@@ -24,34 +24,35 @@
       <div class="section-header">
         <h2>公告管理</h2>
         <button @click="showAnnouncementForm = true" class="add-button">
-          <span>➕</span> 添加公告
+          <el-icon><Plus /></el-icon>
+          <span>添加公告</span>
         </button>
       </div>
       
       <div class="announcements-list">
         <div v-if="announcements.length === 0" class="empty-list">
-          <p>📢 暂无公告，点击右上角"添加公告"开始创建</p>
+          <p><el-icon style="vertical-align: middle; margin-right: 4px;"><Bell /></el-icon>暂无公告，点击右上角"添加公告"开始创建</p>
         </div>
         <div v-for="announcement in announcements" :key="announcement.id" class="announcement-card">
           <div class="card-header">
             <h3>{{ announcement.title }}</h3>
             <div class="card-actions" style="display: flex !important; gap: 8px;">
-              <button 
+              <el-button 
                 @click="editAnnouncement(announcement)" 
-                class="edit-btn" 
-                title="编辑此公告"
-                style="background: #4CAF50 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+                type="success"
+                size="small"
+                :icon="Edit"
               >
-                ✏️ 编辑
-              </button>
-              <button 
+                编辑
+              </el-button>
+              <el-button 
                 @click="deleteAnnouncement(announcement.id)" 
-                class="delete-btn" 
-                title="删除此公告"
-                style="background: #f44336 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+                type="danger"
+                size="small"
+                :icon="Delete"
               >
-                🗑️ 删除
-              </button>
+                删除
+              </el-button>
             </div>
           </div>
           <div class="announcement-content markdown-content">
@@ -68,6 +69,9 @@
             <span class="status" :class="{ active: announcement.is_active }">
               {{ announcement.is_active ? '已发布' : '草稿' }}
             </span>
+            <span v-if="announcement.show_in_top" class="top-badge" style="background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+              <el-icon><Top /></el-icon>顶部显示
+            </span>
           </div>
         </div>
       </div>
@@ -78,13 +82,14 @@
       <div class="section-header">
         <h2>教程管理</h2>
         <button @click="showTutorialForm = true" class="add-button">
-          <span>➕</span> 添加教程
+          <el-icon><Plus /></el-icon>
+          <span>添加教程</span>
         </button>
       </div>
       
       <div class="tutorials-list">
         <div v-if="tutorials.length === 0" class="empty-list">
-          <p>📚 暂无教程，点击右上角"添加教程"开始创建</p>
+          <p><el-icon style="vertical-align: middle; margin-right: 4px;"><Notebook /></el-icon>暂无教程，点击右上角"添加教程"开始创建</p>
         </div>
         <div v-for="tutorial in tutorials" :key="tutorial.id" class="tutorial-card">
           <div class="card-header">
@@ -93,22 +98,22 @@
               <h3>{{ tutorial.title }}</h3>
             </div>
             <div class="card-actions" style="display: flex !important; gap: 8px;">
-              <button 
+              <el-button 
                 @click="editTutorial(tutorial)" 
-                class="edit-btn" 
-                title="编辑此教程"
-                style="background: #4CAF50 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+                type="success"
+                size="small"
+                :icon="Edit"
               >
-                ✏️ 编辑
-              </button>
-              <button 
+                编辑
+              </el-button>
+              <el-button 
                 @click="deleteTutorial(tutorial.id)" 
-                class="delete-btn" 
-                title="删除此教程"
-                style="background: #f44336 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+                type="danger"
+                size="small"
+                :icon="Delete"
               >
-                🗑️ 删除
-              </button>
+                删除
+              </el-button>
             </div>
           </div>
           <div class="tutorial-content markdown-content">
@@ -134,13 +139,14 @@
       <div class="section-header">
         <h2>快速筛选器管理</h2>
         <button @click="showFilterForm = true" class="add-button">
-          <span>➕</span> 添加筛选器
+          <el-icon><Plus /></el-icon>
+          <span>添加筛选器</span>
         </button>
       </div>
       
       <div class="filters-list">
         <div v-if="quickFilters.length === 0" class="empty-list">
-          <p>🔍 暂无筛选器，点击右上角"添加筛选器"开始创建</p>
+          <p><el-icon style="vertical-align: middle; margin-right: 4px;"><Search /></el-icon>暂无筛选器，点击右上角"添加筛选器"开始创建</p>
         </div>
         <div v-for="filter in quickFilters" :key="filter.id" class="filter-card">
           <div class="card-header">
@@ -149,22 +155,22 @@
               <h3>{{ filter.name }}</h3>
             </div>
             <div class="card-actions" style="display: flex !important; gap: 8px;">
-              <button 
+              <el-button 
                 @click="editFilter(filter)" 
-                class="edit-btn" 
-                title="编辑此筛选器"
-                style="background: #4CAF50 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+                type="success"
+                size="small"
+                :icon="Edit"
               >
-                ✏️ 编辑
-              </button>
-              <button 
+                编辑
+              </el-button>
+              <el-button 
                 @click="deleteFilter(filter.id)" 
-                class="delete-btn" 
-                title="删除此筛选器"
-                style="background: #f44336 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+                type="danger"
+                size="small"
+                :icon="Delete"
               >
-                🗑️ 删除
-              </button>
+                删除
+              </el-button>
             </div>
           </div>
           <div class="filter-details">
@@ -186,13 +192,14 @@
       <div class="section-header">
         <h2>联系信息管理</h2>
         <button @click="showContactForm = true" class="add-button">
-          <span>➕</span> 添加联系方式
+          <el-icon><Plus /></el-icon>
+          <span>添加联系方式</span>
         </button>
       </div>
       
       <div class="contacts-list">
         <div v-if="contactInfos.length === 0" class="empty-list">
-          <p>📞 暂无联系方式，点击右上角"添加联系方式"开始创建</p>
+          <p><el-icon style="vertical-align: middle; margin-right: 4px;"><Phone /></el-icon>暂无联系方式，点击右上角"添加联系方式"开始创建</p>
         </div>
         <div v-for="contact in contactInfos" :key="contact.id" class="contact-card">
           <div class="card-header">
@@ -201,22 +208,22 @@
               <h3>{{ contact.label }}</h3>
             </div>
             <div class="card-actions" style="display: flex !important; gap: 8px;">
-              <button 
+              <el-button 
                 @click="editContact(contact)" 
-                class="edit-btn" 
-                title="编辑此联系方式"
-                style="background: #4CAF50 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+                type="success"
+                size="small"
+                :icon="Edit"
               >
-                ✏️ 编辑
-              </button>
-              <button 
+                编辑
+              </el-button>
+              <el-button 
                 @click="deleteContact(contact.id)" 
-                class="delete-btn" 
-                title="删除此联系方式"
-                style="background: #f44336 !important; color: white !important; padding: 8px 16px !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 13px;"
+                type="danger"
+                size="small"
+                :icon="Delete"
               >
-                🗑️ 删除
-              </button>
+                删除
+              </el-button>
             </div>
           </div>
           <p class="contact-value">{{ contact.value }}</p>
@@ -275,6 +282,12 @@
             <label>
               <input v-model="announcementForm.is_active" type="checkbox">
               立即发布
+            </label>
+          </div>
+          <div class="form-group">
+            <label>
+              <input v-model="announcementForm.show_in_top" type="checkbox">
+              显示在顶部（同时只会有一条公告显示在顶部）
             </label>
           </div>
           <div class="form-actions">
@@ -447,6 +460,19 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import 'element-plus/dist/index.css';
 import { MdEditor, MdPreview } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
+import {
+  Bell,
+  Notebook,
+  Search,
+  Phone,
+  Plus,
+  Edit,
+  Delete,
+  Top,
+  Document,
+  Check,
+  Message
+} from '@element-plus/icons-vue';
 
 // 响应式数据
 const activeTab = ref('announcements');
@@ -475,7 +501,8 @@ const announcementForm = ref({
   title: '',
   content: '',
   type: 'info',
-  is_active: true
+  is_active: true,
+  show_in_top: false
 });
 
 const tutorialForm = ref({
@@ -506,10 +533,10 @@ const contactForm = ref({
 
 // 标签页配置
 const configTabs = [
-  { key: 'announcements', label: '公告', icon: '📢' },
-  { key: 'tutorials', label: '教程', icon: '📚' },
-  { key: 'filters', label: '筛选器', icon: '🔍' },
-  { key: 'contacts', label: '联系信息', icon: '📞' }
+  { key: 'announcements', label: '公告', icon: Bell, iconName: 'bell' },
+  { key: 'tutorials', label: '教程', icon: Notebook, iconName: 'notebook' },
+  { key: 'filters', label: '筛选器', icon: Search, iconName: 'search' },
+  { key: 'contacts', label: '联系信息', icon: Phone, iconName: 'phone' }
 ];
 
 // 获取配置数据
@@ -536,6 +563,7 @@ const fetchConfig = async () => {
             content: item.content || '',
             type: item.type || 'info',
             is_active: item.is_active !== undefined ? item.is_active : true,
+            show_in_top: item.show_in_top !== undefined ? item.show_in_top : false,
             created_at: item.created_at || new Date().toISOString()
           }))
         : [];
@@ -595,7 +623,8 @@ const closeAnnouncementForm = () => {
     title: '',
     content: '',
     type: 'info',
-    is_active: true
+    is_active: true,
+    show_in_top: false
   };
 };
 
@@ -922,6 +951,12 @@ onMounted(() => {
 }
 
 .tab-icon {
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.add-button el-icon {
   font-size: 16px;
 }
 
