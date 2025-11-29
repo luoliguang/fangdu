@@ -250,6 +250,32 @@ class MaterialController {
   }
 
   /**
+   * 获取搜索关键词建议
+   */
+  async getSearchSuggestions(req, res) {
+    try {
+      const { q: query, limit } = req.query;
+      
+      if (!query || query.trim().length === 0) {
+        return res.json({
+          success: true,
+          data: []
+        });
+      }
+
+      const suggestionLimit = parseInt(limit) || 5;
+      const result = await this.materialService.getSearchSuggestions(query, suggestionLimit);
+      res.json(result);
+    } catch (error) {
+      console.error('获取搜索建议失败:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || '获取搜索建议失败'
+      });
+    }
+  }
+
+  /**
    * 获取素材统计信息
    */
   async getMaterialStats(req, res) {

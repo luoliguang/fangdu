@@ -14,6 +14,9 @@ function createMaterialRoutes(db) {
   // 获取所有标签（必须在 /:id 之前）
   router.get('/tags/all', materialController.getAllTags.bind(materialController));
 
+  // 获取搜索关键词建议（必须在 /:id 之前）
+  router.get('/suggestions', materialController.getSearchSuggestions.bind(materialController));
+
   // 获取素材统计信息（必须在 /:id 之前）
   router.get('/stats/overview', materialController.getMaterialStats.bind(materialController));
 

@@ -352,6 +352,111 @@ class MaterialService {
       throw new Error('搜索素材失败');
     }
   }
+
+  /**
+   * 获取搜索关键词建议
+   * 根据用户输入，返回相似的关键词建议
+   */
+  async getSearchSuggestions(userInput, limit = 5) {
+    try {
+      if (!userInput || userInput.trim().length === 0) {
+        return {
+          success: true,
+          data: []
+        };
+      }
+
+      const trimmedInput = userInput.trim().toLowerCase();
+      const allKeywords = await this.materialModel.getAllKeywords();
+      
+      // 计算每个关键词与用户输入的相似度
+      const suggestions = allKeywords
+        .map(keyword => ({
+          keyword,
+          score: this.calculateSimilarity(trimmedInput, keyword.toLowerCase())
+        }))
+        .filter(item => item.score > 0) // 只保留有相似度的
+        .sort((a, b) => b.score - a.score) // 按相似度降序排序
+        .slice(0, limit) // 只返回前N个
+        .map(item => item.keyword); // 只返回关键词
+
+      return {
+        success: true,
+        data: suggestions
+      };
+    } catch (error) {
+      console.error('获取搜索建议失败:', error);
+      throw new Error('获取搜索建议失败');
+    }
+  }
+
+  /**
+   * 计算字符串相似度
+   * 使用多种策略：包含匹配、前缀匹配、编辑距离
+   */
+  calculateSimilarity(input, keyword) {
+    // 完全匹配，最高分
+    if (input === keyword) {
+      return 100;
+    }
+
+    // 关键词包含输入，高分
+    if (keyword.includes(input)) {
+      return 80 + (input.length / keyword.length) * 10;
+    }
+
+    // 输入包含关键词，中等分
+    if (input.includes(keyword)) {
+      return 60 + (keyword.length / input.length) * 10;
+    }
+
+    // 前缀匹配，中等分
+    if (keyword.startsWith(input)) {
+      return 70;
+    }
+
+    // 计算编辑距离相似度
+    const editDistance = this.levenshteinDistance(input, keyword);
+    const maxLength = Math.max(input.length, keyword.length);
+    const similarity = (1 - editDistance / maxLength) * 50;
+
+    // 如果相似度太低，返回0
+    return similarity > 20 ? similarity : 0;
+  }
+
+  /**
+   * 计算Levenshtein编辑距离
+   */
+  levenshteinDistance(str1, str2) {
+    const len1 = str1.length;
+    const len2 = str2.length;
+    const matrix = [];
+
+    // 初始化矩阵
+    for (let i = 0; i <= len1; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= len2; j++) {
+      matrix[0][j] = j;
+    }
+
+    // 填充矩阵
+    for (let i = 1; i <= len1; i++) {
+      for (let j = 1; j <= len2; j++) {
+        if (str1[i - 1] === str2[j - 1]) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j] + 1,     // 删除
+            matrix[i][j - 1] + 1,     // 插入
+            matrix[i - 1][j - 1] + 1  // 替换
+          );
+        }
+      }
+    }
+
+    return matrix[len1][len2];
+  }
 }
 
 module.exports = MaterialService;

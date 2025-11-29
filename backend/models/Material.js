@@ -163,6 +163,42 @@ class Material {
   }
 
   /**
+   * 获取所有关键词（标签 + 名称中的关键词）
+   * 用于搜索建议功能
+   */
+  async getAllKeywords() {
+    const sql = "SELECT DISTINCT tags, name FROM materials";
+    const rows = await this.queryAll(sql);
+    
+    const keywords = new Set();
+    
+    rows.forEach(row => {
+      // 添加所有标签
+      if (row.tags) {
+        row.tags.split(',').forEach(tag => {
+          const trimmedTag = tag.trim();
+          if (trimmedTag) {
+            keywords.add(trimmedTag);
+          }
+        });
+      }
+      
+      // 从名称中提取关键词（按空格分割）
+      if (row.name) {
+        row.name.split(/\s+/).forEach(word => {
+          const trimmedWord = word.trim();
+          // 只添加长度大于1的词，避免单字符
+          if (trimmedWord && trimmedWord.length > 1) {
+            keywords.add(trimmedWord);
+          }
+        });
+      }
+    });
+    
+    return Array.from(keywords);
+  }
+
+  /**
    * 格式化标签字符串
    */
   formatTags(tags) {

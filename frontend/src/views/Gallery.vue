@@ -160,6 +160,11 @@ const currentVideoName = ref(''); // 添加当前视频名称
 const currentVideoPoster = ref(''); // 添加当前视频封面
 const feedbackMessage = ref(''); // 用户留言内容（页面底部）
 
+// --- 搜索建议相关状态 ---
+const searchSuggestions = ref([]); // 搜索建议列表
+const showSuggestions = ref(false); // 是否显示建议
+const isFetchingSuggestions = ref(false); // 是否正在获取建议
+
 // 新增：提交留言功能（页面底部）
 const submitFeedback = async () => {
   // 确保留言内容非空且去除首尾空格
@@ -257,12 +262,25 @@ const fetchMaterials = async (isLoadMore = false) => {
                 materials.value = data;
             }
             totalPages.value = meta.totalPages;
+            
+            // 如果没有搜索结果且有搜索词，获取建议
+            if (data.length === 0 && searchTerm.value.trim().length > 0 && !isLoadMore) {
+                await fetchSearchSuggestions();
+            } else {
+                showSuggestions.value = false;
+                searchSuggestions.value = [];
+            }
         } else {
             // 如果后端返回数据格式不正确，清空并打印警告
             console.warn("后端返回数据格式不正确，缺少 meta 信息");
             materials.value = [];
             // 当没有素材且不在加载中时，显示留言表单
             showFeedbackForm.value = materials.value.length === 0 && !isLoading.value;
+            
+            // 如果有搜索词，获取建议
+            if (searchTerm.value.trim().length > 0) {
+                await fetchSearchSuggestions();
+            }
         }
     } catch (error) {
         console.error('获取素材失败:', error);
@@ -271,6 +289,71 @@ const fetchMaterials = async (isLoadMore = false) => {
         // 当没有素材且不在加载中时，显示留言表单
         showFeedbackForm.value = materials.value.length === 0 && !isLoading.value;
     }
+};
+
+// 获取搜索建议
+const fetchSearchSuggestions = async () => {
+    const trimmedSearch = searchTerm.value.trim();
+    if (!trimmedSearch || trimmedSearch.length === 0) {
+        searchSuggestions.value = [];
+        showSuggestions.value = false;
+        return;
+    }
+
+    // 如果搜索词太短，不获取建议
+    if (trimmedSearch.length < 1) {
+        searchSuggestions.value = [];
+        showSuggestions.value = false;
+        return;
+    }
+
+    isFetchingSuggestions.value = true;
+    try {
+        const response = await apiClient.get(`/api/v1/materials/suggestions`, {
+            params: {
+                q: trimmedSearch,
+                limit: 5
+            }
+        });
+
+        if (response.data && response.data.success) {
+            searchSuggestions.value = response.data.data || [];
+            showSuggestions.value = searchSuggestions.value.length > 0;
+        } else {
+            searchSuggestions.value = [];
+            showSuggestions.value = false;
+        }
+    } catch (error) {
+        console.error('获取搜索建议失败:', error);
+        searchSuggestions.value = [];
+        showSuggestions.value = false;
+    } finally {
+        isFetchingSuggestions.value = false;
+    }
+};
+
+// 点击建议项，使用建议的关键词进行搜索
+const useSuggestion = (suggestion) => {
+    searchTerm.value = suggestion;
+    showSuggestions.value = false;
+    searchSuggestions.value = [];
+    handleFilterChange();
+};
+
+// 处理搜索框获得焦点
+const handleSearchFocus = () => {
+    // 如果已有建议且搜索词不为空，显示建议
+    if (searchSuggestions.value.length > 0 && searchTerm.value.trim().length > 0) {
+        showSuggestions.value = true;
+    }
+};
+
+// 处理搜索框失去焦点（延迟关闭，以便点击建议）
+const handleSearchBlur = () => {
+    // 延迟关闭，以便用户能点击建议
+    setTimeout(() => {
+        showSuggestions.value = false;
+    }, 200);
 };
 
 // 提示框状态
@@ -377,7 +460,23 @@ const filterByTag = (tag) => {
 
 watch(searchTerm, () => {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(handleFilterChange, 300);
+    debounceTimer = setTimeout(() => {
+        handleFilterChange();
+        // 如果搜索词不为空，延迟获取建议（避免频繁请求）
+        if (searchTerm.value.trim().length > 0) {
+            // 只有在没有搜索结果时才显示建议
+            if (materials.value.length === 0) {
+                setTimeout(() => {
+                    fetchSearchSuggestions();
+                }, 500);
+            } else {
+                showSuggestions.value = false;
+            }
+        } else {
+            showSuggestions.value = false;
+            searchSuggestions.value = [];
+        }
+    }, 300);
 });
 
 const setupObserver = () => {
@@ -427,6 +526,14 @@ onMounted(() => {
       setTimeout(async () => {
         await calculateVisibleTags();
       }, 100);
+    });
+    
+    // 点击外部关闭搜索建议
+    document.addEventListener('click', (e) => {
+      const searchWrapper = document.querySelector('.search-wrapper');
+      if (searchWrapper && !searchWrapper.contains(e.target)) {
+        showSuggestions.value = false;
+      }
     });
 });
 
@@ -628,7 +735,33 @@ const copyImageNative = async (imageUrl, material) => {
     <div class="hero-content">
       <h1 class="hero-title">方度实拍图</h1>
       <p class="hero-subtitle">您可以在这里获取到各种面料、款式、等实拍图素材</p>
-      <input type="text" v-model="searchTerm" placeholder="请以关键词的形式搜索 如：圆领短袖 插肩" class="search-input-cool">
+      <div class="search-wrapper">
+        <input 
+          type="text" 
+          v-model="searchTerm" 
+          placeholder="请以关键词的形式搜索 如：圆领短袖 插肩" 
+          class="search-input-cool"
+          @focus="handleSearchFocus"
+          @blur="handleSearchBlur"
+        >
+        <!-- 搜索建议下拉列表 -->
+        <div v-if="showSuggestions && searchSuggestions.length > 0" class="search-suggestions">
+          <div class="suggestions-header">
+            <span class="suggestions-icon">💡</span>
+            <span class="suggestions-title">为您推荐以下关键词：</span>
+          </div>
+          <div class="suggestions-list">
+            <button
+              v-for="(suggestion, index) in searchSuggestions"
+              :key="index"
+              @click="useSuggestion(suggestion)"
+              class="suggestion-item"
+            >
+              {{ suggestion }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
   
@@ -712,7 +845,21 @@ const copyImageNative = async (imageUrl, material) => {
         <p v-if="!hasMore && materials && materials.length > 0 && !isLoading" class="load-complete">已加载全部素材</p>
         <p v-if="(!materials || materials.length === 0) && !isLoading && (!searchTerm || searchTerm.trim().length === 0) && (!activeTag || activeTag === '')" class="no-results">输入关键词探索素材</p>
         <div v-if="(!materials || materials.length === 0) && !isLoading && ((searchTerm && searchTerm.trim().length > 0) || (activeTag && activeTag !== ''))" class="no-results">
-            <p>私密马赛~ 暂未找到匹配的素材</p>
+            <p>暂无更多的素材</p>
+            <!-- 搜索建议区域 -->
+            <div v-if="searchSuggestions && searchSuggestions.length > 0" class="search-suggestions-inline">
+              <p class="suggestions-hint">💡 试试这些关键词：</p>
+              <div class="suggestions-buttons">
+                <button
+                  v-for="(suggestion, index) in searchSuggestions"
+                  :key="index"
+                  @click="useSuggestion(suggestion)"
+                  class="suggestion-btn"
+                >
+                  {{ suggestion }}
+                </button>
+              </div>
+            </div>
             <p>如果找到您想要的素材？请告诉我们您的需求，我们会尽快处理！</p>
             <div class="feedback-form">
                 <textarea v-model="feedbackMessage" placeholder="请描述您想要的素材，例如：复合双层拉链风衣" rows="3"></textarea>
@@ -868,6 +1015,131 @@ const copyImageNative = async (imageUrl, material) => {
   outline: none; 
   box-shadow: 0 8px 30px rgba(0,0,0,0.25), 0 0 0 4px rgba(138, 43, 226, 0.4); /* 调整焦点效果颜色 */
   transform: translateY(-2px); /* 略微上浮效果 */
+}
+
+/* 搜索框包装器 */
+.search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* 搜索建议下拉列表 */
+.search-suggestions {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideDown 0.3s ease-out;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.suggestions-header {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggestions-icon {
+  font-size: 1.2em;
+}
+
+.suggestions-title {
+  font-size: 0.9em;
+  color: #555;
+  font-weight: 500;
+}
+
+.suggestions-list {
+  padding: 8px;
+}
+
+.suggestion-item {
+  width: 100%;
+  padding: 12px 16px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #333;
+  font-size: 1em;
+  margin-bottom: 4px;
+} 
+
+.suggestion-item:hover {
+  background: linear-gradient(135deg, #1c7863 0%, #0eeeba 100%);
+  color: white;
+  transform: translateX(4px);
+}
+
+.suggestion-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 无结果区域的搜索建议 */
+.search-suggestions-inline {
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.suggestions-hint {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.suggestions-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: center;
+}
+
+.suggestion-btn {
+  padding: 0.7rem 1.4rem;
+  background: white;
+  border: 2px solid #23d5ab;
+  border-radius: 25px;
+  color: #5be3c4;
+  font-size: 0.95em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(138, 43, 226, 0.2);
+}
+
+.suggestion-btn:hover {
+  background: linear-gradient(135deg, rgb(151, 165, 228) 0%, #5be3c4 100%);
+  color: white;
+  border-color: transparent;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(138, 43, 226, 0.4);
 }
   
 .tags-container { 
@@ -1099,6 +1371,37 @@ const copyImageNative = async (imageUrl, material) => {
   .search-input-cool{
     width: 90%;
     padding: 1rem 1.5rem;
+  }
+  
+  /* 移动端搜索建议 */
+  .search-suggestions {
+    border-radius: 8px;
+    max-height: 250px;
+  }
+  
+  .suggestions-header {
+    padding: 10px 12px;
+    font-size: 0.85em;
+  }
+  
+  .suggestion-item {
+    padding: 10px 14px;
+    font-size: 0.9em;
+  }
+  
+  .search-suggestions-inline {
+    padding: 1rem;
+    margin: 1rem 0;
+  }
+  
+  .suggestions-hint {
+    font-size: 1em;
+    margin-bottom: 0.8rem;
+  }
+  
+  .suggestion-btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.85em;
   }
 }
 
