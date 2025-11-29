@@ -934,17 +934,18 @@ const exportColorCards = () => {
       margin-bottom: 10px;
     }
     .export-note {
+      font-size: 40px;
       font-style: italic;
       color: #666;
       margin-bottom: 10px;
     }
     .export-material {
-      font-weight: 500;
+      font-size: 40px;
       color: #555;
       margin-bottom: 10px;
     }
     .export-date {
-      font-size: 0.8em;
+      font-size: 2em;
       color: #999;
     }
     .export-cards {
