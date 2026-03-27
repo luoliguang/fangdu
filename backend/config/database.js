@@ -45,7 +45,8 @@ class DatabaseConfig {
           file_path TEXT NOT NULL,
           tags TEXT,
           media_type TEXT NOT NULL,
-          cover_image_path TEXT 
+          cover_image_path TEXT,
+          view_count INTEGER DEFAULT 0
         )`
       },
       {
@@ -78,6 +79,18 @@ class DatabaseConfig {
           user_agent TEXT,
           last_heartbeat DATETIME DEFAULT CURRENT_TIMESTAMP,
           first_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`
+      },
+      {
+        name: 'search_logs',
+        sql: `CREATE TABLE IF NOT EXISTS search_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          keyword TEXT NOT NULL,
+          page TEXT,
+          session_id TEXT,
+          ip_address TEXT,
+          user_agent TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`
       }
     ];
@@ -121,6 +134,14 @@ class DatabaseConfig {
       {
         name: 'idx_visits_ip_time',
         sql: 'CREATE INDEX IF NOT EXISTS idx_visits_ip_time ON visits(ip_address, visit_time)'
+      },
+      {
+        name: 'idx_search_logs_keyword_time',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_search_logs_keyword_time ON search_logs(keyword, created_at)'
+      },
+      {
+        name: 'idx_search_logs_session_time',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_search_logs_session_time ON search_logs(session_id, created_at)'
       }
     ];
 
@@ -150,9 +171,19 @@ class DatabaseConfig {
         sql: 'ALTER TABLE materials ADD COLUMN cover_image_path TEXT'
       },
       {
+        table: 'materials',
+        column: 'view_count',
+        sql: 'ALTER TABLE materials ADD COLUMN view_count INTEGER DEFAULT 0'
+      },
+      {
         table: 'feedbacks',
         column: 'user_id',
         sql: 'ALTER TABLE feedbacks ADD COLUMN user_id TEXT'
+      },
+      {
+        table: 'visits',
+        column: 'referrer_source',
+        sql: 'ALTER TABLE visits ADD COLUMN referrer_source TEXT'
       }
     ];
 

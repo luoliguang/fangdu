@@ -16,7 +16,8 @@ class Visit {
       sessionId = null,
       userAgent = null,
       page = '/',
-      referrer = null
+      referrer = null,
+      referrerSource = '直接访问'
     } = visitData;
 
     if (!ipAddress) {
@@ -24,11 +25,11 @@ class Visit {
     }
 
     const sql = `
-      INSERT INTO visits (ip_address, session_id, user_agent, page, visit_time) 
-      VALUES (?, ?, ?, ?, datetime('now'))
+      INSERT INTO visits (ip_address, session_id, user_agent, page, referrer, referrer_source, visit_time) 
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
     `;
     
-    const result = await this.run(sql, [ipAddress, sessionId, userAgent, page]);
+    const result = await this.run(sql, [ipAddress, sessionId, userAgent, page, referrer, referrerSource]);
     return { id: result.lastID, ...visitData };
   }
 
@@ -260,18 +261,57 @@ class Visit {
    * 获取访问来源统计
    */
   async getReferrerStats(limit = 10) {
-    // 修复：添加时间有效性检查
     const sql = `
       SELECT 
-        '直接访问' as source,
+        COALESCE(referrer_source, '直接访问') as source,
         COUNT(*) as visits
       FROM visits 
       WHERE visit_time >= datetime('now', '-30 days')
       AND visit_time IS NOT NULL
+      GROUP BY COALESCE(referrer_source, '直接访问')
       ORDER BY visits DESC 
       LIMIT ?
     `;
-    
+
+    return await this.queryAll(sql, [limit]);
+  }
+
+  /**
+   * 记录搜索关键词
+   */
+  async recordSearchKeyword(data) {
+    const {
+      keyword,
+      page = '/',
+      sessionId = null,
+      ipAddress = null,
+      userAgent = null
+    } = data;
+
+    const sql = `
+      INSERT INTO search_logs (keyword, page, session_id, ip_address, user_agent, created_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `;
+
+    const result = await this.run(sql, [keyword, page, sessionId, ipAddress, userAgent]);
+    return { id: result.lastID, ...data };
+  }
+
+  /**
+   * 获取热门搜索关键词
+   */
+  async getTopSearchKeywords(limit = 10) {
+    const sql = `
+      SELECT keyword, COUNT(*) as search_count
+      FROM search_logs
+      WHERE keyword IS NOT NULL
+        AND TRIM(keyword) != ''
+        AND created_at >= datetime('now', '-30 days')
+      GROUP BY keyword
+      ORDER BY search_count DESC, MAX(created_at) DESC
+      LIMIT ?
+    `;
+
     return await this.queryAll(sql, [limit]);
   }
 

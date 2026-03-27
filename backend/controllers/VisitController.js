@@ -36,6 +36,35 @@ class VisitController {
   }
 
   /**
+   * 记录搜索关键词
+   */
+  async recordSearchKeyword(req, res) {
+    try {
+      const { keyword, page, sessionId } = req.body;
+
+      const result = await this.visitService.recordSearchKeyword({
+        keyword,
+        page: page || req.path || '/',
+        sessionId: sessionId || null,
+        ipAddress: this.getClientIP(req),
+        userAgent: req.get('User-Agent')
+      });
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error('记录搜索关键词失败:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || '记录搜索关键词失败'
+      });
+    }
+  }
+
+  /**
    * 心跳接口（更新在线状态）
    */
   async heartbeat(req, res) {
@@ -202,6 +231,25 @@ class VisitController {
       res.status(500).json({
         success: false,
         message: error.message || '获取访问来源统计失败'
+      });
+    }
+  }
+
+  /**
+   * 获取热门搜索关键词
+   */
+  async getTopSearchKeywords(req, res) {
+    try {
+      const { limit = 10 } = req.query;
+      const limitNum = Math.min(parseInt(limit) || 10, 50);
+
+      const result = await this.visitService.getTopSearchKeywords(limitNum);
+      res.json(result);
+    } catch (error) {
+      console.error('获取热门搜索关键词失败:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || '获取热门搜索关键词失败'
       });
     }
   }

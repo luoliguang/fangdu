@@ -276,6 +276,25 @@ class MaterialController {
   }
 
   /**
+   * 获取热门素材
+   */
+  async getTopMaterials(req, res) {
+    try {
+      const { limit = 5 } = req.query;
+      const limitNum = Math.min(parseInt(limit) || 5, 20);
+
+      const result = await this.materialService.getTopMaterials(limitNum);
+      res.json(result);
+    } catch (error) {
+      console.error('获取热门素材失败:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || '获取热门素材失败'
+      });
+    }
+  }
+
+  /**
    * 获取素材统计信息
    */
   async getMaterialStats(req, res) {
@@ -367,6 +386,37 @@ class MaterialController {
       res.status(500).json({
         success: false,
         message: error.message || '搜索素材失败'
+      });
+    }
+  }
+
+  /**
+   * 记录素材查看
+   */
+  async trackMaterialView(req, res) {
+    try {
+      const { id } = req.params;
+
+      if (!id || isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: '无效的素材ID'
+        });
+      }
+
+      const result = await this.materialService.incrementMaterialViewCount(parseInt(id));
+      res.json(result);
+    } catch (error) {
+      console.error('记录素材查看失败:', error);
+
+      let statusCode = 500;
+      if (error.message.includes('不存在')) {
+        statusCode = 404;
+      }
+
+      res.status(statusCode).json({
+        success: false,
+        message: error.message || '记录素材查看失败'
       });
     }
   }

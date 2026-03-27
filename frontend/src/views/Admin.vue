@@ -176,355 +176,273 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 主容器样式 */
-.admin-container { 
-  max-width: 1250px; /* 增加最大宽度 */
-  margin: 2.5rem auto; /* 调整外边距 */
-  display: flex; 
-  gap: 2.5rem; /* 增加卡片间距 */
-  padding: 0 1.5rem; /* 增加左右内边距 */
-  height: calc(100vh - 5rem); /* 设置高度为视口高度减去上下边距 */
-  overflow: hidden; /* 防止内容溢出 */
+.admin-container {
+  max-width: 1360px;
+  margin: 1.25rem auto;
+  padding: 0 1rem;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 1rem;
+  min-height: calc(100vh - 2.5rem);
+  color: #f1f5f9;
 }
 
-/* 侧边栏样式 */
 .sidebar {
-  width: 250px;
-  background: linear-gradient(135deg, #42b883, #35495e);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(168, 85, 247, 0.18) 0%, rgba(168, 85, 247, 0) 55%),
+    linear-gradient(180deg, #0f1117 0%, #0b0d12 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
-  color: white;
-  flex-shrink: 0;
+  backdrop-filter: blur(10px);
 }
 
 .sidebar-header {
-  padding: 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.25rem 1.25rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-header h2 {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: white;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 650;
+  color: #f8fafc;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  padding: 1rem 0;
+  gap: 0.35rem;
+  padding: 0.9rem;
   flex: 1;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  padding: 1rem 1.5rem;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   position: relative;
-  overflow: hidden;
+  color: #e2e8f0;
+  border: 1px solid transparent;
 }
 
 .nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .nav-item.active {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-.nav-hover-effect {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%);
-  transform: scale(0);
-  opacity: 0;
-  transition: transform 0.5s ease, opacity 0.5s ease;
-  pointer-events: none;
-}
-
-.nav-item:hover .nav-hover-effect {
-  transform: scale(2);
-  opacity: 1;
+  color: #ffffff;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.32), rgba(168, 85, 247, 0.22));
+  border-color: rgba(168, 85, 247, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .nav-item.active::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  height: 100%;
-  width: 4px;
-  background-color: white;
+  left: -1px;
+  top: 20%;
+  width: 3px;
+  height: 60%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #c084fc, #a855f7);
+}
+
+.nav-hover-effect {
+  display: none;
 }
 
 .nav-icon {
-  margin-right: 1rem;
-  font-size: 1.2rem;
+  margin-right: 0;
+  font-size: 1rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.3s ease;
-}
-
-.nav-item:hover .nav-icon {
-  transform: scale(1.1);
-}
-
-.nav-item.active .nav-icon {
-  transform: scale(1.15);
 }
 
 .nav-text {
-  font-weight: 500;
+  font-size: 0.95rem;
+  font-weight: 540;
 }
 
 .badge {
-  background-color: #ff4757;
-  color: white;
-  border-radius: 50%;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.8rem;
   margin-left: auto;
-  box-shadow: 0 2px 4px rgba(255, 71, 87, 0.3);
-  animation: pulse 2s infinite;
+  background: #f43f5e;
+  color: white;
+  border-radius: 999px;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  padding: 0 0.35rem;
+  box-shadow: 0 4px 14px rgba(244, 63, 94, 0.45);
 }
 
-/* 脉冲动画效果 */
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 2px 4px rgba(255, 71, 87, 0.3);
-  }
-  50% {
-    transform: scale(1.1);
-    box-shadow: 0 4px 8px rgba(255, 71, 87, 0.5);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 2px 4px rgba(255, 71, 87, 0.3);
-  }
-}
-
-/* 内容区域样式 */
 .content-area {
-  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 1.5rem;
-  background-color: #f8f9fa;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  position: relative; /* 为绝对定位的卡片提供定位上下文 */
-  min-height: 500px; /* 确保内容区域有最小高度 */
-  display: block; /* 确保内容区域是块级元素 */
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #1a1a1a;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+  padding: 1rem;
 }
 
-/* 过渡动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  position: relative;
-  height: 100%;
-  width: 100%;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(10px);
-}
-
-@media (max-width: 768px) {
-  .admin-container {
-    flex-direction: column;
-    height: auto;
-    padding: 0 0.5rem;
-    margin: 0.5rem auto;
-    gap: 1rem;
-  }
-  
-  .sidebar {
-    width: 100%;
-    margin-bottom: 0;
-  }
-  
-  .sidebar-header {
-    padding: 1rem;
-  }
-  
-  .sidebar-header h2 {
-    font-size: 1.3rem;
-  }
-  
-  .sidebar-nav {
-    flex-direction: row;
-    overflow-x: auto;
-    padding: 0.5rem 0;
-    scrollbar-width: thin;
-  }
-  
-  .sidebar-nav::-webkit-scrollbar {
-    height: 4px;
-  }
-  
-  .sidebar-nav::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-  }
-  
-  .sidebar-nav::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 2px;
-  }
-  
-  .nav-item {
-    padding: 0.75rem 1rem;
-    white-space: nowrap;
-    min-width: fit-content;
-  }
-  
-  .nav-icon {
-    margin-right: 0.5rem;
-    font-size: 1rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .nav-text {
-    font-size: 0.9rem;
-  }
-  
-  .content-area {
-    padding: 1rem;
-    min-height: 400px;
-  }
-}
-
-@media (max-width: 480px) {
-  .admin-container {
-    padding: 0 0.25rem;
-    margin: 0.25rem auto;
-  }
-  
-  .sidebar-header h2 {
-    font-size: 1.2rem;
-  }
-  
-  .nav-item {
-    padding: 0.6rem 0.8rem;
-  }
-  
-  .nav-text {
-    font-size: 0.85rem;
-  }
-  
-  .content-area {
-    padding: 0.75rem;
-  }
-}
-
-/* 侧边栏底部样式 */
 .sidebar-footer {
   margin-top: auto;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.9rem;
 }
 
-/* 退出登录按钮样式 */
 .logout-item {
-  color: #ff6b6b !important;
+  color: #fda4af !important;
 }
 
 .logout-item:hover {
-  background: rgba(255, 107, 107, 0.1) !important;
+  color: #ffe4e6 !important;
+  background: rgba(244, 63, 94, 0.12) !important;
+  border-color: rgba(244, 63, 94, 0.28) !important;
 }
 
-.logout-item .nav-hover-effect {
-  background: #ff6b6b !important;
-}
-
-/* 确认对话框样式 */
 .logout-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: rgba(2, 6, 23, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 1100;
 }
 
 .logout-dialog {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  min-width: 320px;
-  max-width: 400px;
+  background: linear-gradient(180deg, #121722 0%, #0d1117 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  min-width: 340px;
+  max-width: 420px;
   overflow: hidden;
 }
 
 .dialog-header {
-  padding: 1.5rem 1.5rem 1rem;
-  border-bottom: 1px solid #eee;
+  padding: 1.2rem 1.2rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .dialog-header h3 {
   margin: 0;
-  font-size: 1.2rem;
-  color: #333;
+  color: #f8fafc;
+  font-size: 1.05rem;
 }
 
 .dialog-content {
-  padding: 1.5rem;
+  padding: 1.2rem;
 }
 
 .dialog-content p {
   margin: 0;
-  color: #666;
-  line-height: 1.5;
+  color: #cbd5e1;
+  line-height: 1.6;
 }
 
 .dialog-actions {
-  padding: 1rem 1.5rem 1.5rem;
+  padding: 0.9rem 1.2rem 1.2rem;
   display: flex;
-  gap: 0.75rem;
+  gap: 0.7rem;
   justify-content: flex-end;
 }
 
 .btn-cancel,
 .btn-confirm {
-  padding: 0.5rem 1.2rem;
-  border: none;
-  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   transition: all 0.2s ease;
 }
 
 .btn-cancel {
-  background: #f5f5f5;
-  color: #666;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
 }
 
 .btn-cancel:hover {
-  background: #e0e0e0;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .btn-confirm {
-  background: #ff6b6b;
-  color: white;
+  background: linear-gradient(135deg, #fb7185, #f43f5e);
+  color: #fff;
 }
 
 .btn-confirm:hover {
-  background: #ff5252;
+  filter: brightness(1.08);
+}
+
+@media (max-width: 1024px) {
+  .admin-container {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .sidebar {
+    width: 100%;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0.75rem;
+  }
+
+  .nav-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .content-area {
+    min-height: 65vh;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-container {
+    margin: 0.75rem auto;
+    padding: 0 0.55rem;
+    gap: 0.75rem;
+  }
+
+  .sidebar-header h2 {
+    font-size: 0.92rem;
+  }
+
+  .nav-item {
+    padding: 0.65rem 0.75rem;
+  }
+
+  .nav-text {
+    font-size: 0.88rem;
+  }
+
+  .content-area {
+    padding: 0.7rem;
+  }
 }
 </style>

@@ -218,7 +218,19 @@ const imageSources = computed(() => {
         .map(m => m.file_path);
 });
 
+const recordMaterialView = async (material) => {
+    if (!material?.id) return;
+
+    try {
+      await apiClient.post(`/api/v1/materials/${material.id}/view`);
+    } catch (error) {
+      // 静默失败，不影响用户查看
+    }
+};
+
 const showMedia = (material) => {
+    recordMaterialView(material);
+
     if (material.media_type === 'image') {
         if (!materials.value || !Array.isArray(materials.value)) {
             return;
@@ -445,11 +457,38 @@ const fetchTags = async () => {
 // --- 数据缓存状态 ---
 const isDataLoaded = ref(false); // 标记数据是否已加载
 
+const getSessionId = () => {
+    let sessionId = localStorage.getItem('visitor_session_id');
+    if (!sessionId) {
+        sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('visitor_session_id', sessionId);
+    }
+    return sessionId;
+};
+
+const recordSearchKeyword = async () => {
+    const keyword = searchTerm.value.trim();
+    if (!keyword) return;
+
+    try {
+        await apiClient.post('/api/v1/visits/search', {
+            keyword,
+            page: window.location.pathname,
+            sessionId: getSessionId()
+        });
+    } catch (error) {
+        // 静默失败，不影响主流程
+    }
+};
+
 const handleFilterChange = () => {
     currentPage.value = 1;
     totalPages.value = 1;
     // 不立即清空，让 fetchMaterials 直接替换，避免闪烁
     fetchMaterials(false); // 传入 false 表示是全新加载
+
+    // 记录搜索关键词
+    recordSearchKeyword();
 };
 
 const filterByTag = (tag) => {

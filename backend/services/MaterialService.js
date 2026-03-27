@@ -190,6 +190,46 @@ class MaterialService {
   }
 
   /**
+   * 增加素材查看次数
+   */
+  async incrementMaterialViewCount(id) {
+    try {
+      const viewCount = await this.materialModel.incrementViewCount(id);
+      return {
+        success: true,
+        message: '素材查看次数已更新',
+        data: { id, viewCount }
+      };
+    } catch (error) {
+      console.error('更新素材查看次数失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取热门素材
+   */
+  async getTopMaterials(limit = 5) {
+    try {
+      const materials = await this.materialModel.getTopMaterials(Math.min(limit, 20));
+      const data = materials.map(material => ({
+        ...material,
+        file_path: this.ensureHttpsUrl(material.file_path),
+        thumbnail_url: material.thumbnail_url ? this.ensureHttpsUrl(material.thumbnail_url) : null,
+        cover_image_path: material.cover_image_path ? this.ensureHttpsUrl(material.cover_image_path) : null
+      }));
+
+      return {
+        success: true,
+        data
+      };
+    } catch (error) {
+      console.error('获取热门素材失败:', error);
+      throw new Error('获取热门素材失败');
+    }
+  }
+
+  /**
    * 获取所有标签
    */
   async getAllTags() {

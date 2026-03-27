@@ -11,6 +11,9 @@ function createVisitRoutes(db) {
   // 记录访问
   router.post('/record', visitController.recordVisit.bind(visitController));
 
+  // 记录搜索关键词
+  router.post('/search', visitController.recordSearchKeyword.bind(visitController));
+
   // 心跳接口（更新在线状态）
   router.post('/heartbeat', visitController.heartbeat.bind(visitController));
 
@@ -37,6 +40,9 @@ function createVisitRoutes(db) {
 
   // 获取访问来源统计
   router.get('/referrers', visitController.getReferrerStats.bind(visitController));
+
+  // 获取热门搜索关键词
+  router.get('/search/top', visitController.getTopSearchKeywords.bind(visitController));
 
   // 获取访问时段分布
   router.get('/hourly', visitController.getHourlyDistribution.bind(visitController));

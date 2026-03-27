@@ -11,6 +11,7 @@ const navSlider = ref(null); // 滑块元素的引用
 const mainNav = ref(null);  // 导航容器的引用
 const route = useRoute();   // 获取当前路由信息
 const router = useRouter(); //获取 router 实例
+const isAdminRoute = computed(() => route.path.startsWith('/admin'));
 
 // 登录状态管理
 const loginState = ref(!!localStorage.getItem('authToken'));
@@ -143,11 +144,24 @@ const handleRemoveFromFavorites = (materialId) => {
 // --- “返回顶部”按钮的逻辑 ---
 // 1. 创建一个 ref 来控制按钮的显示和隐藏
 const showScrollTopButton = ref(false);
+const showNavBar = ref(true);
+const lastScrollY = ref(0);
 
 // 2. 处理滚动事件的函数
-  // 当页面垂直滚动的距离 > 300px 时，显示按钮，否则隐藏
-  const handleScroll = () => {
-  showScrollTopButton.value = window.scrollY > 300;
+// 当页面垂直滚动的距离 > 300px 时，显示按钮，否则隐藏
+const handleScroll = () => {
+  const currentY = window.scrollY;
+  showScrollTopButton.value = currentY > 300;
+
+  if (currentY < 80) {
+    showNavBar.value = true;
+  } else if (currentY > lastScrollY.value + 6) {
+    showNavBar.value = false;
+  } else if (currentY < lastScrollY.value - 6) {
+    showNavBar.value = true;
+  }
+
+  lastScrollY.value = currentY;
 };
 
 // 3. 点击按钮后，平滑滚动到页面顶部的函数
@@ -247,7 +261,9 @@ onUnmounted(() => {
 watch(() => route.path, updateSlider);
 
 // 处理导航链接点击事件
-const handleNavClick = (event) => {
+const handleNavClick = () => {
+  showNavBar.value = true;
+
   // 延迟更长时间后更新滑块，确保路由状态和DOM都已更新
   setTimeout(() => {
     updateSlider();
@@ -257,6 +273,10 @@ const handleNavClick = (event) => {
   nextTick(() => {
     setTimeout(updateSlider, 50);
   });
+};
+
+const goToFrontendHome = () => {
+  router.push('/');
 };
 
 </script>
@@ -272,7 +292,16 @@ const handleNavClick = (event) => {
       @submitFeedback="handleFeedbackSubmit"
     />
 
-    <nav class="main-nav" ref="mainNav">
+    <div v-if="isAdminRoute" class="admin-topbar">
+      <div class="admin-topbar__brand">
+        <span class="admin-topbar__dot"></span>
+        管理后台
+      </div>
+      <div class="admin-topbar__meta">专注内容与数据运营</div>
+      <button class="admin-topbar__back" @click="goToFrontendHome">返回前台</button>
+    </div>
+
+    <nav v-if="!isAdminRoute" class="main-nav" :class="{ 'is-hidden': !showNavBar }" ref="mainNav">
       <div class="nav-slider" ref="navSlider"></div>
       <router-link to="/" @click="handleNavClick">🥼实拍库</router-link>
       <a href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank">面料细节</a>
@@ -322,51 +351,112 @@ const handleNavClick = (event) => {
   
   /* 为main元素添加上边距，避免被固定导航栏遮挡 */
   main {
-    margin-top: calc(80px + var(--announcement-height, 0px)); /* 导航栏高度 + 公告高度 */
+    margin-top: calc(64px + var(--announcement-height, 0px)); /* 导航栏高度 + 公告高度 */
     transition: margin-top 0.3s ease; /* 平滑过渡 */
   }
-  .main-nav {
-    background-color: #2c3e50;
-    padding: 1rem 2rem;
+
+  .admin-topbar {
+    position: fixed;
+    top: calc(var(--announcement-height, 0px) + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(1360px, calc(100vw - 32px));
+    height: 52px;
+    border-radius: 14px;
     display: flex;
-    gap: 1.5rem;
-    position: fixed; /* 固定定位 */
-    top: var(--announcement-height, 0px); /* 紧跟公告 */
-    left: 0; /* 从左边开始 */
-    right: 0; /* 到右边结束 */
-    width: 100%; /* 占满整个宽度 */
-    z-index: 1000; /* 确保在最顶层 */
-    box-sizing: border-box; /* 确保padding不会影响总宽度 */
-    transition: top 0.3s ease; /* 平滑过渡 */
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    z-index: 1000;
+    background: rgba(9, 12, 18, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #e2e8f0;
   }
-  /* 2. 定义滑块的样式和动画 */
+
+  .admin-topbar__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .admin-topbar__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.7);
+  }
+
+  .admin-topbar__meta {
+    font-size: 0.8rem;
+    color: #94a3b8;
+  }
+  .main-nav {
+    background: rgba(10, 12, 20, 0.72);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    padding: 0.68rem 2.1rem;
+    min-height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2.1rem;
+    position: fixed;
+    top: calc(var(--announcement-height, 0px) + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(980px, calc(100vw - 32px));
+    border-radius: 999px;
+    z-index: 1000;
+    box-sizing: border-box;
+    transition: top 0.3s ease, transform 0.35s ease, opacity 0.35s ease;
+  }
+
+  .main-nav.is-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -18px);
+  }
   .nav-slider {
     position: absolute;
     top: 0.5rem; /* 直接设置顶部距离，避免transform冲突 */
     left: 0;
     height: calc(100% - 1rem); /* 高度留出上下边距 */
-    background-color: #42b983; /* 这是我们的"滑块"颜色 */
+    background: linear-gradient(135deg, #ec4899, #a855f7);
     border-radius: 4px;
     transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease; /* 添加opacity过渡动画 */
     z-index: 1; /* 置于底层 */
     opacity: 1; /* 默认显示 */
   }
   .main-nav a {
-    color: #fff;
+    color: rgba(244, 248, 255, 0.88);
     text-decoration: none;
-    font-weight: bold;
-    font-size: 1rem;
-    padding: 0.5rem;
-    border-radius: 4px;
-    position: relative; /* 3. 链接设为相对定位 */
+    font-weight: 500;
+    font-size: 1.06rem;
+    letter-spacing: 0.02em;
+    padding: 0.45rem 0.1rem;
+    border-radius: 0;
+    position: relative;
     z-index: 2; /* 置于上层，确保可点击 */
-    transition: color 0.4s ease; /* 文字颜色也添加过渡效果 */
+    transition: color 0.3s ease, opacity 0.3s ease;
     cursor: pointer; /* 确保退出登录链接有手型光标 */
   }
 
-  /* 移除旧的激活样式，因为现在由滑块负责背景 */
+  .main-nav a:hover {
+    color: #ffffff;
+  }
+
   .main-nav a.router-link-exact-active {
-    color: #fff; /* 确保激活时文字颜色不变或更突出 */
+    color: #ffffff;
   }
 
 
@@ -413,15 +503,29 @@ const handleNavClick = (event) => {
   /* --- 移动端适配样式 --- */
   @media (max-width: 768px) {
     .main-nav {
-      padding: 0.8rem 1rem;
-      gap: 0.8rem;
+      padding: 0.55rem 1.1rem;
+      min-height: 60px;
+      gap: 1rem;
       flex-wrap: wrap;
       justify-content: center;
+      width: min(100%, calc(100vw - 24px));
+    }
+
+    .admin-topbar {
+      width: calc(100vw - 20px);
+      height: 46px;
+      border-radius: 12px;
+      padding: 0 0.8rem;
+      top: calc(var(--announcement-height, 0px) + 8px);
+    }
+
+    .admin-topbar__meta {
+      display: none;
     }
     
     .main-nav a {
-      font-size: 0.9rem;
-      padding: 0.4rem 0.8rem;
+      font-size: 0.95rem;
+      padding: 0.35rem 0.1rem;
       white-space: nowrap;
     }
     
@@ -441,13 +545,15 @@ const handleNavClick = (event) => {
   
   @media (max-width: 480px) {
     .main-nav {
-      padding: 0.6rem 0.8rem;
-      gap: 0.5rem;
+      padding: 0.5rem 0.8rem;
+      min-height: 56px;
+      gap: 0.75rem;
+      width: calc(100vw - 16px);
     }
     
     .main-nav a {
-      font-size: 0.8rem;
-      padding: 0.3rem 0.6rem;
+      font-size: 0.86rem;
+      padding: 0.3rem 0.08rem;
     }
     
     .scroll-to-top-btn {

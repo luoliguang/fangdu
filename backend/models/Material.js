@@ -42,7 +42,7 @@ class Material {
 
     // 获取分页数据
     const dataSql = `
-      SELECT id, name, file_path, tags, media_type, cover_image_path 
+      SELECT id, name, file_path, tags, media_type, cover_image_path, view_count 
       FROM materials${whereClause} 
       ORDER BY id DESC 
       LIMIT ? OFFSET ?
@@ -81,6 +81,21 @@ class Material {
   }
 
   /**
+   * 增加素材查看次数
+   */
+  async incrementViewCount(id) {
+    const sql = `UPDATE materials SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?`;
+    const result = await this.run(sql, [id]);
+
+    if (result.changes === 0) {
+      throw new Error('素材不存在');
+    }
+
+    const material = await this.getById(id);
+    return material?.view_count || 0;
+  }
+
+  /**
    * 创建新素材
    */
   async create(materialData) {
@@ -89,18 +104,19 @@ class Material {
       filePath,
       tags,
       mediaType,
-      coverImagePath = null
+      coverImagePath = null,
+      viewCount = 0
     } = materialData;
 
     // 格式化标签
     const formattedTags = this.formatTags(tags);
 
     const sql = `
-      INSERT INTO materials (name, file_path, tags, media_type, cover_image_path) 
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO materials (name, file_path, tags, media_type, cover_image_path, view_count) 
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
     
-    const result = await this.run(sql, [name, filePath, formattedTags, mediaType, coverImagePath]);
+    const result = await this.run(sql, [name, filePath, formattedTags, mediaType, coverImagePath, viewCount]);
     return { id: result.lastID, ...materialData };
   }
 
@@ -327,6 +343,49 @@ class Material {
         totalPages: Math.ceil(total / limit)
       }
     };
+  }
+
+  /**
+   * 增加素材查看次数
+   */
+  async incrementViewCount(id) {
+    const updateSql = `UPDATE materials SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?`;
+    const result = await this.run(updateSql, [id]);
+
+    if (result.changes === 0) {
+      throw new Error('素材不存在');
+    }
+
+    const row = await this.queryOne('SELECT view_count FROM materials WHERE id = ?', [id]);
+    return row?.view_count || 0;
+  }
+
+  /**
+   * 获取热门素材
+   */
+  async getTopMaterials(limit = 5) {
+    const sql = `
+      SELECT id, name, file_path, thumbnail_url, cover_image_path, media_type, COALESCE(view_count, 0) as view_count
+      FROM (
+        SELECT 
+          id,
+          name,
+          file_path,
+          cover_image_path,
+          media_type,
+          COALESCE(view_count, 0) as view_count,
+          CASE
+            WHEN media_type = 'image' THEN file_path || '?x-oss-process=image/resize,w_200'
+            WHEN media_type = 'video' AND cover_image_path IS NOT NULL THEN cover_image_path
+            ELSE NULL
+          END as thumbnail_url
+        FROM materials
+      )
+      ORDER BY view_count DESC, id DESC
+      LIMIT ?
+    `;
+
+    return await this.queryAll(sql, [limit]);
   }
 
   /**

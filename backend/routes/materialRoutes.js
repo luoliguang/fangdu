@@ -20,6 +20,9 @@ function createMaterialRoutes(db) {
   // 获取素材统计信息（必须在 /:id 之前）
   router.get('/stats/overview', materialController.getMaterialStats.bind(materialController));
 
+  // 获取热门素材（必须在 /:id 之前）
+  router.get('/stats/top', materialController.getTopMaterials.bind(materialController));
+
   // 搜索素材（必须在 /:id 之前）
   router.get('/search/query', materialController.searchMaterials.bind(materialController));
 
@@ -37,6 +40,9 @@ function createMaterialRoutes(db) {
 
   // 批量删除素材
   router.post('/batch/delete', materialController.batchDeleteMaterials.bind(materialController));
+
+  // 记录素材查看次数
+  router.post('/:id/view', materialController.trackMaterialView.bind(materialController));
 
   // 获取单个素材详情（必须在具体路径之后）
   router.get('/:id', materialController.getMaterialById.bind(materialController));

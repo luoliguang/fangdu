@@ -1,91 +1,99 @@
 <template>
   <div class="statistics-container">
-    <div class="stats-header">
-      <h2>网站访问统计</h2>
-      <div class="refresh-btn" @click="refreshData" :class="{ 'refreshing': isRefreshing }">
-        <i class="refresh-icon" :class="{ 'spinning': isRefreshing }">🔄</i>
+    <div class="page-header reveal" :class="{ 'is-ready': pageReady }" style="--d: 0ms;">
+      <div>
+        <h2>访问统计总览</h2>
+        <p>实时掌握流量趋势、来源质量与内容热度</p>
+      </div>
+      <button class="refresh-btn" @click="refreshData" :disabled="isRefreshing">
+        <span :class="['refresh-icon', { spinning: isRefreshing }]">↻</span>
         {{ isRefreshing ? '刷新中...' : '刷新数据' }}
+      </button>
+    </div>
+
+    <!-- 顶部4个核心指标 -->
+    <div class="kpi-grid reveal" :class="{ 'is-ready': pageReady }" style="--d: 90ms;">
+      <div class="kpi-card">
+        <span class="kpi-label">今日访问</span>
+        <span class="kpi-value">{{ formatNumber(displayedOverview.todayVisits) }}</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">本周访问</span>
+        <span class="kpi-value">{{ formatNumber(displayedOverview.weekVisits) }}</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">总访问量</span>
+        <span class="kpi-value">{{ formatNumber(displayedOverview.totalVisits) }}</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">当前在线</span>
+        <span class="kpi-value">{{ formatNumber(displayedOverview.onlineCount) }}</span>
       </div>
     </div>
 
-    <!-- 统计概览卡片 -->
-    <div class="overview-cards">
-      <div class="stat-card">
-        <div class="stat-number">{{ overview.totalVisits }}</div>
-        <div class="stat-label">总访问量</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number">{{ overview.totalUniqueVisitors }}</div>
-        <div class="stat-label">独立访客</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number">{{ overview.todayVisits }}</div>
-        <div class="stat-label">今日访问</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number">{{ onlineCount }}</div>
-        <div class="stat-label">当前在线</div>
-      </div>
-      <div class="stat-card growth" :class="{ positive: overview.growth > 0, negative: overview.growth < 0 }">
-        <div class="stat-number">{{ overview.growth }}%</div>
-        <div class="stat-label">较昨日增长</div>
-      </div>
-    </div>
-
-    <!-- 图表区域 -->
-    <div class="charts-container">
-      <!-- 访问趋势图 -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3>访问趋势</h3>
-          <div class="time-range-selector">
-            <button 
-              v-for="range in timeRanges" 
-              :key="range.value"
-              :class="{ active: selectedRange === range.value }"
-              @click="changeTimeRange(range.value)"
-            >
-              {{ range.label }}
-            </button>
-          </div>
+    <!-- 中间访问趋势 -->
+    <div class="panel trend-panel reveal" :class="{ 'is-ready': pageReady }" style="--d: 170ms;">
+      <div class="panel-header">
+        <h3>访问趋势</h3>
+        <div class="range-switch">
+          <button
+            v-for="item in timeRanges"
+            :key="item.value"
+            :class="{ active: selectedRange === item.value }"
+            @click="changeTimeRange(item.value)"
+          >
+            {{ item.label }}
+          </button>
         </div>
-        <div ref="trendChart" class="chart" style="height: 300px;"></div>
       </div>
-
-      <!-- 页面访问排行 -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3>页面访问排行</h3>
-        </div>
-        <div ref="pageChart" class="chart" style="height: 300px;"></div>
-      </div>
+      <div ref="trendChartRef" class="chart-area"></div>
     </div>
 
-    <!-- 页面访问详情表格 -->
-    <div class="table-card">
-      <h3>页面访问详情</h3>
-      <div class="table-container">
-        <table class="stats-table">
-          <thead>
-            <tr>
-              <th>页面路径</th>
-              <th>访问次数</th>
-              <th>独立访客</th>
-              <th>访问率</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="page in pageStats" :key="page.page">
-              <td class="page-path">
-                <div class="page-name">{{ getPageDisplayName(page.page) }}</div>
-                <div class="page-url">{{ page.page }}</div>
-              </td>
-              <td>{{ page.visits }}</td>
-              <td>{{ page.unique_visitors }}</td>
-              <td>{{ ((page.visits / totalPageVisits) * 100).toFixed(1) }}%</td>
-            </tr>
-          </tbody>
-        </table>
+    <!-- 下方三列 -->
+    <div class="bottom-grid">
+      <div class="panel reveal" :class="{ 'is-ready': pageReady }" style="--d: 250ms;">
+        <div class="panel-header">
+          <h3>访客来源分布</h3>
+        </div>
+        <div ref="sourceChartRef" class="chart-area chart-small"></div>
+      </div>
+
+      <div class="panel reveal" :class="{ 'is-ready': pageReady }" style="--d: 330ms;">
+        <div class="panel-header">
+          <h3>热门搜索关键词 Top 10</h3>
+        </div>
+        <ul class="keyword-list">
+          <li v-for="(item, index) in topKeywords" :key="`${item.keyword}-${index}`">
+            <span class="rank">{{ index + 1 }}</span>
+            <span class="keyword">{{ item.keyword }}</span>
+            <span class="count">{{ item.search_count }}</span>
+          </li>
+          <li v-if="topKeywords.length === 0" class="empty-state">
+            <span class="empty-icon">⌕</span>
+            <span class="empty-title">暂无关键词数据</span>
+            <span class="empty-desc">当用户进行搜索后，这里会展示热词排行</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="panel reveal" :class="{ 'is-ready': pageReady }" style="--d: 410ms;">
+        <div class="panel-header">
+          <h3>热门素材 Top 5</h3>
+        </div>
+        <ul class="material-list">
+          <li v-for="item in topMaterials" :key="item.id" class="material-item">
+            <img :src="item.thumbnail_url || item.cover_image_path || item.file_path" :alt="item.name" class="thumb" />
+            <div class="material-meta">
+              <p class="material-name">{{ item.name }}</p>
+              <p class="material-views">查看 {{ item.view_count || 0 }} 次</p>
+            </div>
+          </li>
+          <li v-if="topMaterials.length === 0" class="empty-state">
+            <span class="empty-icon">◈</span>
+            <span class="empty-title">暂无素材热度数据</span>
+            <span class="empty-desc">素材被查看后，将在这里显示热度排行</span>
+          </li>
+        </ul>
       </div>
     </div>
   </div>
@@ -99,396 +107,284 @@ export default {
   name: 'Statistics',
   data() {
     return {
+      isRefreshing: false,
       overview: {
-        totalVisits: 0,
-        totalUniqueVisitors: 0,
         todayVisits: 0,
-        yesterdayVisits: 0,
-        growth: 0
+        weekVisits: 0,
+        totalVisits: 0
       },
+      displayedOverview: {
+        todayVisits: 0,
+        weekVisits: 0,
+        totalVisits: 0,
+        onlineCount: 0
+      },
+      pageReady: false,
       onlineCount: 0,
-      trendData: [],
-      pageStats: [],
-      selectedRange: '7d',
+      selectedRange: '7',
       timeRanges: [
-        { label: '今日', value: '1d' },
-        { label: '7天', value: '7d' },
-        { label: '30天', value: '30d' }
+        { label: '今日', value: '1' },
+        { label: '7天', value: '7' },
+        { label: '30天', value: '30' }
       ],
+      trendData: [],
+      referrerData: [],
+      topKeywords: [],
+      topMaterials: [],
       trendChart: null,
-      pageChart: null,
+      sourceChart: null,
       refreshTimer: null,
-      resizeHandler: null,
-      midnightTimer: null, // 每日00:00刷新定时器
-      isRefreshing: false  // 刷新动画状态
-    }
-  },
-  computed: {
-    totalPageVisits() {
-      return this.pageStats.reduce((sum, page) => sum + page.visits, 0)
+      resizeHandler: null
     }
   },
   async mounted() {
-    await this.loadData()
+    await this.loadAllData()
     this.startAutoRefresh()
-    this.setupMidnightRefresh() // 设置每日00:00刷新
+    this.setupResize()
+    this.$nextTick(() => {
+      requestAnimationFrame(() => {
+        this.pageReady = true
+      })
+    })
   },
   beforeUnmount() {
-    if (this.refreshTimer) {
-      clearInterval(this.refreshTimer)
-    }
-    if (this.midnightTimer) {
-      clearTimeout(this.midnightTimer)
-    }
-    // 清理resize事件监听器
-    if (this.resizeHandler) {
-      window.removeEventListener('resize', this.resizeHandler)
-    }
-    // 清理图表实例
-    if (this.trendChart) {
-      this.trendChart.dispose()
-      this.trendChart = null
-    }
-    if (this.pageChart) {
-      this.pageChart.dispose()
-      this.pageChart = null
-    }
+    if (this.refreshTimer) clearInterval(this.refreshTimer)
+    if (this.resizeHandler) window.removeEventListener('resize', this.resizeHandler)
+    if (this.trendChart) this.trendChart.dispose()
+    if (this.sourceChart) this.sourceChart.dispose()
   },
   methods: {
-    async loadData() {
-      try {
-        await Promise.all([
-          this.loadOverview(),
-          this.loadOnlineCount(),
-          this.loadTrendData(),
-          this.loadPageStats()
-        ])
-      } catch (error) {
-        console.error('加载统计数据失败:', error)
-      }
+    formatNumber(num) {
+      return Number(num || 0).toLocaleString('zh-CN')
     },
-    
+
+    async loadAllData() {
+      await Promise.allSettled([
+        this.loadOverview(),
+        this.loadOnlineCount(),
+        this.loadTrendData(),
+        this.loadReferrerData(),
+        this.loadTopKeywords(),
+        this.loadTopMaterials()
+      ])
+      this.$nextTick(() => {
+        this.renderTrendChart()
+        this.renderSourceChart()
+      })
+    },
+
     async loadOverview() {
-      try {
-        const response = await apiClient.get('/api/v1/visits/overview')
-        const data = response.data.data
-        this.overview = {
-          totalVisits: data.total.visits,
-          totalUniqueVisitors: data.total.uniqueVisitors,
-          todayVisits: data.today.visits,
-          yesterdayVisits: 0, // 需要后端提供昨日数据
-          growth: data.growth?.today || 0
-        }
-      } catch (error) {
-        console.error('加载概览数据失败:', error)
+      const response = await apiClient.get('/api/v1/visits/overview')
+      const data = response.data?.data || {}
+      const nextOverview = {
+        todayVisits: data.today?.visits || 0,
+        weekVisits: data.week?.visits || 0,
+        totalVisits: data.total?.visits || 0
       }
+      this.overview = nextOverview
+      this.animateCounters({
+        ...nextOverview,
+        onlineCount: this.onlineCount
+      })
     },
-    
+
     async loadOnlineCount() {
-      try {
-        const response = await apiClient.get('/api/v1/visits/online')
-        this.onlineCount = response.data.data.onlineCount
-      } catch (error) {
-        console.error('加载在线人数失败:', error)
-      }
+      const response = await apiClient.get('/api/v1/visits/online')
+      this.onlineCount = response.data?.data?.onlineCount || 0
+      this.animateCounters({
+        ...this.overview,
+        onlineCount: this.onlineCount
+      })
     },
-    
+
     async loadTrendData() {
-      try {
-        const response = await apiClient.get(`/api/v1/visits/trends?days=${this.selectedRange.replace('d', '')}`)
-        this.trendData = response.data.data
-        this.$nextTick(() => {
-          this.renderTrendChart()
-        })
-      } catch (error) {
-        console.error('加载趋势数据失败:', error)
-      }
+      const response = await apiClient.get(`/api/v1/visits/trends?days=${this.selectedRange}`)
+      this.trendData = response.data?.data || []
     },
-    
-    async loadPageStats() {
-      try {
-        const response = await apiClient.get('/api/v1/visits/pages')
-        this.pageStats = response.data.data
-        this.$nextTick(() => {
-          this.renderPageChart()
-        })
-      } catch (error) {
-        console.error('加载页面统计失败:', error)
-      }
+
+    async loadReferrerData() {
+      const response = await apiClient.get('/api/v1/visits/referrers?limit=10')
+      this.referrerData = response.data?.data || []
     },
-    
+
+    async loadTopKeywords() {
+      const response = await apiClient.get('/api/v1/visits/search/top?limit=10')
+      this.topKeywords = response.data?.data || []
+    },
+
+    async loadTopMaterials() {
+      const response = await apiClient.get('/api/v1/materials/stats/top?limit=5')
+      this.topMaterials = response.data?.data || []
+    },
+
     async changeTimeRange(range) {
       this.selectedRange = range
       await this.loadTrendData()
+      this.$nextTick(() => this.renderTrendChart())
     },
-    
+
     async refreshData() {
-      // 添加刷新动画
       this.isRefreshing = true
-      
       try {
-        await this.loadData()
+        await this.loadAllData()
       } finally {
-        // 动画至少持续500ms，让用户能看到
         setTimeout(() => {
           this.isRefreshing = false
-        }, 500)
+        }, 400)
       }
     },
-    
+
     startAutoRefresh() {
-      // 每30秒自动刷新在线人数
-      this.refreshTimer = setInterval(() => {
-        this.loadOnlineCount()
+      this.refreshTimer = setInterval(async () => {
+        await Promise.all([this.loadOnlineCount(), this.loadOverview()])
       }, 30000)
     },
-    
-    /**
-     * 设置每日00:00自动刷新
-     */
-    setupMidnightRefresh() {
-      const scheduleNextRefresh = () => {
-        const now = new Date()
-        const tomorrow = new Date(now)
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        tomorrow.setHours(0, 0, 0, 0) // 设置为明天00:00:00
-        
-        const timeUntilMidnight = tomorrow - now
-        
-        // console.log(`下次00:00刷新将在 ${Math.round(timeUntilMidnight / 1000 / 60)} 分钟后`)
-        
-        // 设置定时器在00:00执行
-        this.midnightTimer = setTimeout(async () => {
-          console.log('执行00:00自动刷新')
-          await this.loadData()
-          // 刷新完成后，安排下一次刷新
-          scheduleNextRefresh()
-        }, timeUntilMidnight)
+
+    setupResize() {
+      this.resizeHandler = () => {
+        if (this.trendChart) this.trendChart.resize()
+        if (this.sourceChart) this.sourceChart.resize()
       }
-      
-      // 开始调度
-      scheduleNextRefresh()
+      window.addEventListener('resize', this.resizeHandler)
     },
-    
-    renderTrendChart() {
-      if (!this.$refs.trendChart) return
-      
-      // 销毁已存在的图表实例
-      if (this.trendChart) {
-        this.trendChart.dispose()
+
+    animateCounters(target) {
+      const start = {
+        ...this.displayedOverview
       }
-      
-      // 创建新的图表实例
-      this.trendChart = echarts.init(this.$refs.trendChart)
-      
-      // 如果没有数据，显示空图表
-      const dates = this.trendData.length > 0 
-        ? this.trendData.map(item => item.date)
-        : [new Date().toISOString().split('T')[0]]
-      
-      const visits = this.trendData.length > 0
-        ? this.trendData.map(item => item.visits)
-        : [0]
-      
-      const uniqueVisitors = this.trendData.length > 0
-        ? this.trendData.map(item => item.unique_visitors)
-        : [0]
-      
-      const option = {
-        title: {
-          text: '访问趋势',
-          left: 'center',
-          textStyle: {
-            fontSize: 16,
-            color: '#333'
-          }
-        },
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: {
-            type: 'cross'
-          }
-        },
-        legend: {
-          data: ['总访问量', '独立访客'],
-          top: 30
-        },
-        grid: {
-          left: '3%',
-          right: '4%',
-          bottom: '3%',
-          top: '15%',
-          containLabel: true
-        },
-        xAxis: {
-          type: 'category',
-          boundaryGap: false,
-          data: dates,
-          axisLabel: {
-            formatter: function(value) {
-              const date = new Date(value)
-              return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
-            }
-          }
-        },
-        yAxis: {
-          type: 'value',
-          minInterval: 1,
-          min: 0
-        },
-        series: [
-          {
-            name: '总访问量',
-            type: 'line',
-            data: visits,
-            smooth: true,
-            itemStyle: {
-              color: '#007bff'
-            },
-            areaStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(0, 123, 255, 0.3)' },
-                { offset: 1, color: 'rgba(0, 123, 255, 0.1)' }
-              ])
-            }
-          },
-          {
-            name: '独立访客',
-            type: 'line',
-            data: uniqueVisitors,
-            smooth: true,
-            itemStyle: {
-              color: '#28a745'
-            },
-            areaStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(40, 167, 69, 0.3)' },
-                { offset: 1, color: 'rgba(40, 167, 69, 0.1)' }
-              ])
-            }
-          }
-        ]
+      const end = {
+        todayVisits: Number(target.todayVisits || 0),
+        weekVisits: Number(target.weekVisits || 0),
+        totalVisits: Number(target.totalVisits || 0),
+        onlineCount: Number(target.onlineCount || 0)
       }
-      
-      this.trendChart.setOption(option)
-      
-      // 设置响应式调整（只设置一次）
-      if (!this.resizeHandler) {
-        this.resizeHandler = () => {
-          if (this.trendChart) {
-            this.trendChart.resize()
-          }
-          if (this.pageChart) {
-            this.pageChart.resize()
-          }
+
+      const duration = 850
+      const startTime = performance.now()
+
+      const easeOut = (t) => 1 - Math.pow(1 - t, 3)
+
+      const tick = (now) => {
+        const progress = Math.min((now - startTime) / duration, 1)
+        const eased = easeOut(progress)
+
+        this.displayedOverview = {
+          todayVisits: Math.round(start.todayVisits + (end.todayVisits - start.todayVisits) * eased),
+          weekVisits: Math.round(start.weekVisits + (end.weekVisits - start.weekVisits) * eased),
+          totalVisits: Math.round(start.totalVisits + (end.totalVisits - start.totalVisits) * eased),
+          onlineCount: Math.round(start.onlineCount + (end.onlineCount - start.onlineCount) * eased)
         }
-        window.addEventListener('resize', this.resizeHandler)
+
+        if (progress < 1) {
+          requestAnimationFrame(tick)
+        }
       }
+
+      requestAnimationFrame(tick)
     },
-    
-    renderPageChart() {
-      if (!this.$refs.pageChart) return
-      
-      // 销毁已存在的图表实例
-      if (this.pageChart) {
-        this.pageChart.dispose()
-      }
-      
-      // 创建新的图表实例
-      this.pageChart = echarts.init(this.$refs.pageChart)
-      
-      // 取前10个页面数据，如果没有数据则显示空图表
-      const topPages = this.pageStats.length > 0 ? this.pageStats.slice(0, 10) : []
-      
-      const pageNames = topPages.length > 0
-        ? topPages.map(item => this.getPageDisplayName(item.page))
-        : ['暂无数据']
-      
-      const pageVisits = topPages.length > 0
-        ? topPages.map(item => item.visits)
-        : [0]
-      
-      const option = {
-        title: {
-          text: '热门页面',
-          left: 'center',
-          textStyle: {
-            fontSize: 16,
-            color: '#333'
-          }
+
+    renderTrendChart() {
+      if (!this.$refs.trendChartRef) return
+      if (this.trendChart) this.trendChart.dispose()
+      this.trendChart = echarts.init(this.$refs.trendChartRef)
+
+      const xData = this.trendData.map((d) => d.date)
+      const yVisits = this.trendData.map((d) => d.visits)
+      const yUnique = this.trendData.map((d) => d.unique_visitors)
+
+      this.trendChart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'axis' },
+        legend: {
+          data: ['访问量', '独立访客'],
+          top: 0,
+          textStyle: { color: '#cbd5e1' }
         },
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: {
-            type: 'shadow'
-          },
-          formatter: function(params) {
-            if (topPages.length === 0) return '暂无数据'
-            const data = topPages[params[0].dataIndex]
-            return `页面: ${data.page}<br/>访问量: ${data.visits}<br/>独立访客: ${data.unique_visitors}`
-          }
-        },
-        grid: {
-          left: '3%',
-          right: '4%',
-          bottom: '3%',
-          top: '15%',
-          containLabel: true
-        },
+        grid: { left: 24, right: 16, top: 36, bottom: 24, containLabel: true },
         xAxis: {
-          type: 'value',
-          minInterval: 1,
-          min: 0
+          type: 'category',
+          data: xData,
+          axisLine: { lineStyle: { color: 'rgba(148,163,184,0.35)' } },
+          axisLabel: { color: '#94a3b8' }
         },
         yAxis: {
-          type: 'category',
-          data: pageNames,
-          axisLabel: {
-            interval: 0,
-            fontSize: 12
-          }
+          type: 'value',
+          minInterval: 1,
+          axisLine: { lineStyle: { color: 'rgba(148,163,184,0.35)' } },
+          splitLine: { lineStyle: { color: 'rgba(148,163,184,0.15)' } },
+          axisLabel: { color: '#94a3b8' }
         },
         series: [
           {
             name: '访问量',
-            type: 'bar',
-            data: pageVisits,
-            itemStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                { offset: 0, color: '#007bff' },
-                { offset: 1, color: '#0056b3' }
+            type: 'line',
+            smooth: true,
+            data: yVisits,
+            lineStyle: { width: 2.5, color: '#a855f7' },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(168,85,247,0.32)' },
+                { offset: 1, color: 'rgba(168,85,247,0.04)' }
               ])
             },
-            label: {
-              show: true,
-              position: 'right',
-              formatter: '{c}'
+            symbolSize: 6,
+            itemStyle: { color: '#c084fc' }
+          },
+          {
+            name: '独立访客',
+            type: 'line',
+            smooth: true,
+            data: yUnique,
+            lineStyle: { width: 2, color: '#8b5cf6' },
+            symbolSize: 5,
+            itemStyle: { color: '#a78bfa' },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(139,92,246,0.22)' },
+                { offset: 1, color: 'rgba(139,92,246,0.03)' }
+              ])
             }
           }
         ]
-      }
-      
-      this.pageChart.setOption(option)
+      })
     },
-    
-    /**
-     * 将路径转换为友好的显示名称
-     */
-    getPageDisplayName(path) {
-      const pageNameMap = {
-        '/': '素材库（首页）',
-        '/login': '登录页',
-        '/color-card': '色卡工具',
-        '/size-converter': '尺码转换工具',
-        '/admin': '后台管理',
-        '/admin/upload': '上传素材',
-        '/admin/materials': '素材管理',
-        '/admin/feedback': '留言管理',
-        '/admin/statistics': '访问统计',
-        '/admin/drawer-config': '抽屉配置'
-      };
-      
-      return pageNameMap[path] || path;
+
+    renderSourceChart() {
+      if (!this.$refs.sourceChartRef) return
+      if (this.sourceChart) this.sourceChart.dispose()
+      this.sourceChart = echarts.init(this.$refs.sourceChartRef)
+
+      const merged = this.normalizeSources(this.referrerData)
+      this.sourceChart.setOption({
+        tooltip: { trigger: 'item' },
+        legend: {
+          bottom: 0,
+          textStyle: { color: '#cbd5e1' }
+        },
+        series: [
+          {
+            type: 'pie',
+            radius: ['58%', '78%'],
+            avoidLabelOverlap: true,
+            itemStyle: { borderColor: '#0d1117', borderWidth: 2 },
+            label: { color: '#e2e8f0', formatter: '{b}\n{d}%' },
+            data: merged,
+            color: ['#c084fc', '#a855f7', '#7c3aed']
+          }
+        ]
+      })
+    },
+
+    normalizeSources(raw) {
+      const bucket = { 微信: 0, 直接访问: 0, 其他: 0 }
+      ;(raw || []).forEach((item) => {
+        const src = item.source || '其他来源'
+        const visits = Number(item.visits || 0)
+        if (src === '微信') bucket['微信'] += visits
+        else if (src === '直接访问') bucket['直接访问'] += visits
+        else bucket['其他'] += visits
+      })
+      return Object.entries(bucket).map(([name, value]) => ({ name, value }))
     }
   }
 }
@@ -496,53 +392,44 @@ export default {
 
 <style scoped>
 .statistics-container {
-  padding: 20px;
-  background-color: #f5f5f5;
-  min-height: 100vh;
+  padding: 0.5rem;
+  color: #e2e8f0;
 }
 
-.stats-header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 1rem;
 }
 
-.stats-header h2 {
-  color: #333;
+.page-header h2 {
   margin: 0;
+  font-size: 1.3rem;
+  color: #f8fafc;
+}
+
+.page-header p {
+  margin: 0.35rem 0 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
 }
 
 .refresh-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s;
-  user-select: none;
+  gap: 0.4rem;
 }
 
-.refresh-btn:hover {
-  background: #0056b3;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
-}
-
-.refresh-btn.refreshing {
-  background: #6c757d;
+.refresh-btn:disabled {
+  opacity: 0.7;
   cursor: not-allowed;
-  pointer-events: none;
-}
-
-.refresh-icon {
-  font-size: 14px;
-  display: inline-block;
-  transition: transform 0.3s;
 }
 
 .refresh-icon.spinning {
@@ -550,183 +437,260 @@ export default {
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-.overview-cards {
+.kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
 }
 
-.stat-card {
-  background: white;
-  padding: 20px;
+.kpi-card {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.45));
+  border-radius: 14px;
+  padding: 0.95rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.18);
+  border-color: rgba(192, 132, 252, 0.42);
+}
+
+.kpi-label {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.kpi-value {
+  color: #f8fafc;
+  font-size: 1.45rem;
+  font-weight: 650;
+}
+
+.panel {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.68), rgba(15, 23, 42, 0.48));
+  border-radius: 14px;
+  padding: 0.9rem;
+  transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(124, 58, 237, 0.14);
+  border-color: rgba(192, 132, 252, 0.34);
+}
+
+.trend-panel {
+  margin-bottom: 1rem;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.panel-header h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.range-switch {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.range-switch button {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
+
+.range-switch button.active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.52), rgba(168, 85, 247, 0.36));
+  border-color: rgba(192, 132, 252, 0.75);
+  color: #fff;
+}
+
+.chart-area {
+  width: 100%;
+  height: 320px;
+}
+
+.chart-small {
+  height: 260px;
+}
+
+.bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.keyword-list,
+.material-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.keyword-list li {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.25);
+}
+
+.keyword-list li:last-child,
+.material-item:last-child {
+  border-bottom: none;
+}
+
+.rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.25);
+  color: #ddd6fe;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+}
+
+.keyword {
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  color: #94a3b8;
+  font-size: 0.86rem;
+}
+
+.material-item {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.55rem 0;
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.25);
+}
+
+.thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.material-name {
+  margin: 0;
+  color: #f1f5f9;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.material-views {
+  margin: 0.3rem 0 0;
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.empty-tip {
+  color: #94a3b8;
+  padding: 0.75rem 0;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  padding: 1.25rem 0.5rem;
+  border: 1px dashed rgba(192, 132, 252, 0.28);
+  border-radius: 12px;
+  background: radial-gradient(120% 120% at 0% 0%, rgba(168, 85, 247, 0.12), rgba(168, 85, 247, 0.02));
+}
+
+.empty-icon {
+  font-size: 1.25rem;
+  color: #c084fc;
+}
+
+.empty-title {
+  color: #e9d5ff;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.empty-desc {
+  color: #94a3b8;
+  font-size: 0.78rem;
   text-align: center;
 }
 
-.stat-card.growth.positive {
-  background: linear-gradient(135deg, #4CAF50, #45a049);
-  color: white;
+.reveal {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+  transition-delay: var(--d, 0ms);
 }
 
-.stat-card.growth.negative {
-  background: linear-gradient(135deg, #f44336, #da190b);
-  color: white;
+.reveal.is-ready {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-.stat-number {
-  font-size: 2em;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 8px;
-}
+@media (max-width: 1180px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
-.stat-card.growth .stat-number {
-  color: white;
-}
-
-.stat-label {
-  color: #666;
-  font-size: 0.9em;
-}
-
-.stat-card.growth .stat-label {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.charts-container {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.chart-card {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.chart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.chart-header h3 {
-  margin: 0;
-  color: #333;
-}
-
-.time-range-selector {
-  display: flex;
-  gap: 8px;
-}
-
-.time-range-selector button {
-  padding: 6px 12px;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.time-range-selector button.active {
-  background: #007bff;
-  color: white;
-  border-color: #007bff;
-}
-
-.time-range-selector button:hover {
-  border-color: #007bff;
-}
-
-.chart {
-  width: 100%;
-}
-
-.table-card {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.table-card h3 {
-  margin: 0 0 20px 0;
-  color: #333;
-}
-
-.table-container {
-  overflow-x: auto;
-}
-
-.stats-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.stats-table th,
-.stats-table td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #eee;
-}
-
-.stats-table th {
-  background: #f8f9fa;
-  font-weight: 600;
-  color: #333;
-}
-
-.stats-table tr:hover {
-  background: #f8f9fa;
-}
-
-.page-path {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.page-name {
-  font-weight: 600;
-  color: #333;
-  font-size: 14px;
-}
-
-.page-url {
-  font-family: 'Courier New', monospace;
-  color: #007bff;
-  font-size: 12px;
-  opacity: 0.8;
+  .bottom-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
-  .charts-container {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .kpi-grid {
     grid-template-columns: 1fr;
   }
-  
-  .overview-cards {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  }
-  
-  .stats-header {
-    flex-direction: column;
-    gap: 15px;
-    align-items: flex-start;
+
+  .chart-area {
+    height: 280px;
   }
 }
 </style>

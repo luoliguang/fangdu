@@ -45,13 +45,16 @@ class VisitService {
         };
       }
 
+      const sanitizedReferrer = this.sanitizeReferrer(referrer);
+
       // 记录访问
       const visit = await this.visitModel.recordVisit({
         ipAddress: cleanIP,
         sessionId: sessionId || null,
         userAgent: this.sanitizeUserAgent(userAgent),
         page: this.sanitizePage(page),
-        referrer: this.sanitizeReferrer(referrer)
+        referrer: sanitizedReferrer,
+        referrerSource: this.detectReferrerSource(sanitizedReferrer)
       });
 
       // 更新频率限制缓存
@@ -185,6 +188,40 @@ class VisitService {
   }
 
   /**
+   * 记录搜索关键词
+   */
+  async recordSearchKeyword(searchData) {
+    try {
+      const { keyword, page = '/', sessionId = null, ipAddress = null, userAgent = null } = searchData;
+      const normalizedKeyword = (keyword || '').trim();
+
+      if (!normalizedKeyword) {
+        throw new Error('搜索关键词不能为空');
+      }
+
+      const result = await this.visitModel.recordSearchKeyword({
+        keyword: normalizedKeyword.substring(0, 100),
+        page: this.sanitizePage(page),
+        sessionId,
+        ipAddress: ipAddress ? this.sanitizeIP(ipAddress) : null,
+        userAgent: this.sanitizeUserAgent(userAgent)
+      });
+
+      return {
+        success: true,
+        message: '搜索关键词记录成功',
+        data: result
+      };
+    } catch (error) {
+      console.error('记录搜索关键词失败:', error);
+      return {
+        success: false,
+        message: error.message || '记录搜索关键词失败'
+      };
+    }
+  }
+
+  /**
    * 获取访问统计总览
    */
   async getOverallStats() {
@@ -238,6 +275,22 @@ class VisitService {
     } catch (error) {
       console.error('获取访问来源统计失败:', error);
       throw new Error('获取访问来源统计失败');
+    }
+  }
+
+  /**
+   * 获取热门搜索关键词
+   */
+  async getTopSearchKeywords(limit = 10) {
+    try {
+      const keywords = await this.visitModel.getTopSearchKeywords(Math.min(limit, 50));
+      return {
+        success: true,
+        data: keywords
+      };
+    } catch (error) {
+      console.error('获取热门搜索关键词失败:', error);
+      throw new Error('获取热门搜索关键词失败');
     }
   }
 
@@ -493,6 +546,24 @@ class VisitService {
     
     // 限制长度
     return referrer.substring(0, 500);
+  }
+
+  /**
+   * 识别来源类型
+   */
+  detectReferrerSource(referrer) {
+    if (!referrer) return '直接访问';
+
+    const r = String(referrer).toLowerCase();
+    if (r.includes('weixin.qq.com') || r.includes('wechat')) {
+      return '微信';
+    }
+
+    if (r.includes('baidu.com')) return '百度';
+    if (r.includes('google.')) return 'Google';
+    if (r.includes('bing.com')) return 'Bing';
+
+    return '其他来源';
   }
 
   /**
