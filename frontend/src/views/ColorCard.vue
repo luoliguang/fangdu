@@ -1,287 +1,462 @@
 <template>
   <div class="color-card-container">
-    <h1>打色块</h1>
+    <!-- 优化的标题区域 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8 8 8.67 8 9.5 7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="header-text">
+          <h1>打色卡工具</h1>
+          <p class="header-description">专业的色彩管理工具，支持多种色彩空间转换和配色方案生成</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <el-button type="primary" plain @click="resetAll" :icon="RefreshRight">
+          重置全部
+        </el-button>
+      </div>
+    </div>
     
     <div class="main-layout">
       <!-- 左侧面板：色值输入和设置 -->
       <div class="left-panel">
         <div class="tool-panel">
+          <!-- 色值输入面板 -->
           <div class="panel-section">
-            <h2>色值输入</h2>
-            <div class="input-method-selector">
+            <div class="section-header">
+              <h2>色值输入</h2>
+              <div class="quick-colors">
+                <span class="quick-label">快捷色:</span>
+                <div class="quick-color-list">
+                  <button 
+                    v-for="color in quickColors" 
+                    :key="color.hex"
+                    class="quick-color-btn"
+                    :style="{ backgroundColor: color.hex }"
+                    :title="color.name"
+                    @click="selectQuickColor(color)"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div class="input-method-tabs">
               <button 
-                :class="{ active: inputMethod === 'hex' }" 
-                @click="inputMethod = 'hex'"
-                class="input-method"
+                v-for="method in inputMethods"
+                :key="method.value"
+                :class="['tab-btn', { active: inputMethod === method.value }]" 
+                @click="inputMethod = method.value"
               >
-                HEX
-              </button>
-              <button 
-                :class="{ active: inputMethod === 'rgb' }" 
-                @click="inputMethod = 'rgb'"
-                class="input-method"
-              >
-                RGB
-              </button>
-              <button 
-                :class="{ active: inputMethod === 'cmyk' }" 
-                @click="inputMethod = 'cmyk'"
-                class="input-method"
-              >
-                CMYK
-              </button>
-              <button 
-                :class="{ active: inputMethod === 'lab' }" 
-                @click="inputMethod = 'lab'"
-                class="input-method"
-              >
-                Lab
+                <span class="tab-icon">{{ method.icon }}</span>
+                {{ method.label }}
               </button>
             </div>
             
             <!-- HEX输入 -->
             <div v-if="inputMethod === 'hex'" class="input-group">
-              <label>HEX值:</label>
+              <label>HEX值</label>
               <div class="color-input-wrapper">
                 <input 
                   type="text" 
                   v-model="currentColor.hex" 
                   @input="handleHexChange"
                   placeholder="#FFFFFF"
+                  class="hex-input"
                 />
-                <input 
-                  type="color" 
-                  v-model="currentColor.hex" 
-                  @input="handleHexChange"
-                  class="color-picker modern-picker"
-                />
-              </div>
-              <div class="alpha-slider">
-                <label>透明度:</label>
-                <div class="alpha-input-container">
+                <div class="color-picker-wrapper">
                   <input 
-                    type="range" 
-                    v-model.number="currentColor.alpha" 
-                    @input="updateColorWithAlpha"
-                    min="0" 
-                    max="1" 
-                    step="0.01"
+                    type="color" 
+                    v-model="currentColor.hex" 
+                    @input="handleHexChange"
+                    class="color-picker"
                   />
-                  <div class="alpha-value-input">
+                </div>
+              </div>
+              
+              <!-- 透明度滑块 -->
+              <div class="alpha-slider-container">
+                <div class="alpha-header">
+                  <label>透明度</label>
+                  <div class="alpha-value">
                     <input 
                       type="number" 
                       v-model.number="alphaPercentage" 
                       @input="updateAlphaFromPercentage"
                       min="0" 
                       max="100"
-                      class="alpha-percentage-input"
+                      class="alpha-input"
                     />
                     <span>%</span>
                   </div>
                 </div>
+                <el-slider 
+                  v-model="currentColor.alpha" 
+                  :min="0" 
+                  :max="1" 
+                  :step="0.01"
+                  @input="handleAlphaChange"
+                  :show-tooltip="false"
+                />
               </div>
-              <div 
-                class="color-preview" 
-                :style="{ backgroundColor: getColorWithAlpha(currentColor) }"
-              ></div>
+              
+              <div class="color-preview-row">
+                <div 
+                  class="color-preview" 
+                  :style="{ backgroundColor: getColorWithAlpha(currentColor) }"
+                ></div>
+                <div class="preview-info">
+                  <span class="preview-label">预览</span>
+                  <span class="preview-value">{{ getColorWithAlpha(currentColor) }}</span>
+                </div>
+              </div>
             </div>
             
             <!-- RGB输入 -->
-            <div v-if="inputMethod === 'rgb'" class="input-group">
-              <label>R:</label>
-              <input 
-                type="number" 
-                v-model.number="currentColor.rgb.r" 
-                @input="handleRgbChange"
-                min="0" 
-                max="255"
-              />
-              <label>G:</label>
-              <input 
-                type="number" 
-                v-model.number="currentColor.rgb.g" 
-                @input="handleRgbChange"
-                min="0" 
-                max="255"
-              />
-              <label>B:</label>
-              <input 
-                type="number" 
-                v-model.number="currentColor.rgb.b" 
-                @input="handleRgbChange"
-                min="0" 
-                max="255"
-              />
-              <div class="alpha-slider">
-                <label>透明度:</label>
-                <div class="alpha-input-container">
-                  <input 
-                    type="range" 
-                    v-model.number="currentColor.alpha" 
-                    @input="updateColorWithAlpha"
-                    min="0" 
-                    max="1" 
-                    step="0.01"
+            <div v-if="inputMethod === 'rgb'" class="input-group rgb-inputs">
+              <div class="rgb-slider-group">
+                <label>
+                  <span class="channel-label r">R</span>
+                </label>
+                <div class="slider-container">
+                  <el-slider 
+                    v-model="currentColor.rgb.r" 
+                    :min="0" 
+                    :max="255"
+                    :show-tooltip="false"
+                    :format-tooltip="val => val"
+                    @input="handleRgbChange"
                   />
-                  <div class="alpha-value-input">
-                    <input 
-                      type="number" 
-                      v-model.number="alphaPercentage" 
-                      @input="updateAlphaFromPercentage"
-                      min="0" 
-                      max="100"
-                      class="alpha-percentage-input"
-                    />
-                    <span>%</span>
-                  </div>
+                </div>
+                <input 
+                  type="number" 
+                  v-model.number="currentColor.rgb.r" 
+                  @input="handleRgbChange"
+                  min="0" 
+                  max="255"
+                  class="channel-input"
+                />
+              </div>
+              
+              <div class="rgb-slider-group">
+                <label>
+                  <span class="channel-label g">G</span>
+                </label>
+                <div class="slider-container">
+                  <el-slider 
+                    v-model="currentColor.rgb.g" 
+                    :min="0" 
+                    :max="255"
+                    :show-tooltip="false"
+                    @input="handleRgbChange"
+                  />
+                </div>
+                <input 
+                  type="number" 
+                  v-model.number="currentColor.rgb.g" 
+                  @input="handleRgbChange"
+                  min="0" 
+                  max="255"
+                  class="channel-input"
+                />
+              </div>
+              
+              <div class="rgb-slider-group">
+                <label>
+                  <span class="channel-label b">B</span>
+                </label>
+                <div class="slider-container">
+                  <el-slider 
+                    v-model="currentColor.rgb.b" 
+                    :min="0" 
+                    :max="255"
+                    :show-tooltip="false"
+                    @input="handleRgbChange"
+                  />
+                </div>
+                <input 
+                  type="number" 
+                  v-model.number="currentColor.rgb.b" 
+                  @input="handleRgbChange"
+                  min="0" 
+                  max="255"
+                  class="channel-input"
+                />
+              </div>
+              
+              <div class="alpha-slider-container">
+                <label>透明度</label>
+                <el-slider 
+                  v-model="currentColor.alpha" 
+                  :min="0" 
+                  :max="1" 
+                  :step="0.01"
+                  @input="handleAlphaChange"
+                  :show-tooltip="false"
+                />
+                <div class="alpha-value">
+                  <input 
+                    type="number" 
+                    v-model.number="alphaPercentage" 
+                    @input="updateAlphaFromPercentage"
+                    min="0" 
+                    max="100"
+                    class="alpha-input"
+                  />
+                  <span>%</span>
                 </div>
               </div>
-              <div 
-                class="color-preview" 
-                :style="{ backgroundColor: getColorWithAlpha(currentColor) }"
-              ></div>
+              
+              <div class="color-preview-row">
+                <div 
+                  class="color-preview" 
+                  :style="{ backgroundColor: getColorWithAlpha(currentColor) }"
+                ></div>
+              </div>
             </div>
             
             <!-- CMYK输入 -->
-            <div v-if="inputMethod === 'cmyk'" class="input-group">
-              <label>C:</label>
-              <input 
-                type="number" 
-                v-model.number="currentColor.cmyk.c" 
-                @input="handleCmykChange"
-                min="0" 
-                max="100"
-              />
-              <label>M:</label>
-              <input 
-                type="number" 
-                v-model.number="currentColor.cmyk.m" 
-                @input="handleCmykChange"
-                min="0" 
-                max="100"
-              />
-              <label>Y:</label>
-              <input 
-                type="number" 
-                v-model.number="currentColor.cmyk.y" 
-                @input="handleCmykChange"
-                min="0" 
-                max="100"
-              />
-              <label>K:</label>
-              <input 
-                type="number" 
-                v-model.number="currentColor.cmyk.k" 
-                @input="handleCmykChange"
-                min="0" 
-                max="100"
-              />
-              <div 
-                class="color-preview" 
-                :style="{ backgroundColor: currentColor.hex }"
-              ></div>
+            <div v-if="inputMethod === 'cmyk'" class="input-group cmyk-inputs">
+              <div class="cmyk-grid">
+                <div class="cmyk-item">
+                  <label><span class="channel-label c">C</span></label>
+                  <input 
+                    type="number" 
+                    v-model.number="currentColor.cmyk.c" 
+                    @input="handleCmykChange"
+                    min="0" 
+                    max="100"
+                  />
+                  <span class="cmyk-unit">%</span>
+                </div>
+                <div class="cmyk-item">
+                  <label><span class="channel-label m">M</span></label>
+                  <input 
+                    type="number" 
+                    v-model.number="currentColor.cmyk.m" 
+                    @input="handleCmykChange"
+                    min="0" 
+                    max="100"
+                  />
+                  <span class="cmyk-unit">%</span>
+                </div>
+                <div class="cmyk-item">
+                  <label><span class="channel-label y">Y</span></label>
+                  <input 
+                    type="number" 
+                    v-model.number="currentColor.cmyk.y" 
+                    @input="handleCmykChange"
+                    min="0" 
+                    max="100"
+                  />
+                  <span class="cmyk-unit">%</span>
+                </div>
+                <div class="cmyk-item">
+                  <label><span class="channel-label k">K</span></label>
+                  <input 
+                    type="number" 
+                    v-model.number="currentColor.cmyk.k" 
+                    @input="handleCmykChange"
+                    min="0" 
+                    max="100"
+                  />
+                  <span class="cmyk-unit">%</span>
+                </div>
+              </div>
+              
+              <div class="color-preview-row">
+                <div 
+                  class="color-preview" 
+                  :style="{ backgroundColor: currentColor.hex }"
+                ></div>
+              </div>
             </div>
             
             <!-- Lab输入 -->
-            <div v-if="inputMethod === 'lab'" class="input-group">
-              <label>L:</label>
-              <input 
-                type="number" 
-                v-model.number="currentColor.lab.L" 
-                @input="handleLabChange"
-                min="0" 
-                max="100"
-              />
-              <label>a:</label>
-              <input 
-                type="number" 
-                v-model.number="currentColor.lab.a" 
-                @input="handleLabChange"
-                min="-128" 
-                max="127"
-              />
-              <label>b:</label>
-              <input 
-                type="number" 
-                v-model.number="currentColor.lab.b" 
-                @input="handleLabChange"
-                min="-128" 
-                max="127"
-              />
-              <div 
-                class="color-preview" 
-                :style="{ backgroundColor: currentColor.hex }"
-              ></div>
-            </div>
-            
-            <div class="note-input">
-              <label>备注:</label>
-              <input 
-                type="text" 
-                v-model="currentColor.note" 
-                placeholder="针对于单个色卡备注 可忽略"
-              />
-            </div>
-            
-            <button class="add-button" @click="addColorCard">添加色卡</button>
-          </div>
-          
-          <div class="panel-section">
-            <h2>色卡设置</h2>
-            <div class="color-count-control">
-              <label>色卡数量（最多100个）:</label>
-              <div class="preset-container">
-                <div class="preset-buttons">
-                  <button class="preset-btn" @click="setColorCount(3)">3</button>
-                  <button class="preset-btn" @click="setColorCount(5)">5</button>
-                  <button class="preset-btn" @click="setColorCount(7)">7</button>
-                  <button class="preset-btn" @click="setColorCount(9)">9</button>
-                </div>
-                <div class="custom-count-input">
+            <div v-if="inputMethod === 'lab'" class="input-group lab-inputs">
+              <div class="lab-grid">
+                <div class="lab-item">
+                  <label>L</label>
                   <input 
-                    type="text" 
-                    v-model="colorCount" 
-                    placeholder="自定义数量（最多100个）"
-                    class="custom-input"
-                    @input="validateColorCount"
+                    type="number" 
+                    v-model.number="currentColor.lab.L" 
+                    @input="handleLabChange"
+                    min="0" 
+                    max="100"
+                  />
+                </div>
+                <div class="lab-item">
+                  <label>a</label>
+                  <input 
+                    type="number" 
+                    v-model.number="currentColor.lab.a" 
+                    @input="handleLabChange"
+                    min="-128" 
+                    max="127"
+                  />
+                </div>
+                <div class="lab-item">
+                  <label>b</label>
+                  <input 
+                    type="number" 
+                    v-model.number="currentColor.lab.b" 
+                    @input="handleLabChange"
+                    min="-128" 
+                    max="127"
                   />
                 </div>
               </div>
-              <button class="generate-btn" @click="generateSimilarColors">生成相似色卡</button>
+              
+              <div class="color-preview-row">
+                <div 
+                  class="color-preview" 
+                  :style="{ backgroundColor: currentColor.hex }"
+                ></div>
+              </div>
             </div>
             
-            <div class="layout-control">
-              <label>布局:</label>
-              <button 
-                :class="{ active: layoutMode === 'grid' }" 
-                @click="layoutMode = 'grid'"
-              >
-                网格
-              </button>
-              <button 
-                :class="{ active: layoutMode === 'row' }" 
-                @click="layoutMode = 'row'"
-              >
-                行
-              </button>
+            <!-- 备注输入 -->
+            <div class="note-input">
+              <label>备注</label>
+              <input 
+                type="text" 
+                v-model="currentColor.note" 
+                placeholder="针对单个色卡备注（可选）"
+              />
             </div>
             
-            <div class="export-settings-row">
-              <div class="global-note">
-                <label>备注 (这是必须的)</label>
-                <textarea 
-                  v-model="globalNote" 
-                  placeholder="这里必须要备注，不然找不到是哪一个客户。"
-                ></textarea>
+            <button class="add-button" @click="addColorCard">
+              <svg viewBox="0 0 24 24" fill="none" class="btn-icon">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              添加到色卡列表
+            </button>
+          </div>
+          
+          <!-- 色卡生成设置面板 -->
+          <div class="panel-section">
+            <h2>生成配色方案</h2>
+            
+            <div class="generation-options">
+              <div class="option-group">
+                <label>配色方案类型</label>
+                <el-select v-model="colorScheme" class="scheme-select" @change="handleSchemeChange">
+                  <el-option
+                    v-for="scheme in colorSchemes"
+                    :key="scheme.value"
+                    :label="scheme.label"
+                    :value="scheme.value"
+                  >
+                    <div class="scheme-option">
+                      <span class="scheme-name">{{ scheme.label }}</span>
+                      <span class="scheme-desc">{{ scheme.description }}</span>
+                    </div>
+                  </el-option>
+                </el-select>
               </div>
               
-              <div class="export-material-setting">
-                <label>面料 (这是必须的)</label>
-                <div class="material-select-container">
+              <div class="option-group" v-if="colorScheme === 'shades'">
+                <label>深浅程度</label>
+                <div class="shade-options">
+                  <button 
+                    v-for="shade in shadeOptions"
+                    :key="shade.value"
+                    :class="['shade-btn', { active: shadeMode === shade.value }]"
+                    @click="shadeMode = shade.value"
+                  >
+                    {{ shade.label }}
+                  </button>
+                </div>
+              </div>
+              
+              <div class="option-group" v-if="colorScheme === 'customHue'">
+                <label>色相偏移角度</label>
+                <div class="hue-control">
+                  <el-slider 
+                    v-model.number="hueOffset" 
+                    :min="-180" 
+                    :max="180"
+                    :show-tooltip="true"
+                    :format-tooltip="val => val + '°'"
+                  />
+                </div>
+              </div>
+              
+              <div class="option-group">
+                <label>生成数量</label>
+                <div class="count-control">
+                  <el-select v-model.number="colorCount" class="count-select">
+                    <el-option
+                      v-for="n in 50"
+                      :key="n"
+                      :label="n + ' 个'"
+                      :value="n"
+                    />
+                  </el-select>
+                </div>
+              </div>
+            </div>
+            
+            <button class="generate-btn" @click="generateColorScheme">
+              <svg viewBox="0 0 24 24" fill="none" class="btn-icon">
+                <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              生成配色方案
+            </button>
+            
+            <div class="layout-toggle">
+              <span class="toggle-label">布局</span>
+              <div class="toggle-buttons">
+                <button 
+                  :class="['toggle-btn', { active: layoutMode === 'grid' }]" 
+                  @click="layoutMode = 'grid'"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+                    <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+                    <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+                <button 
+                  :class="['toggle-btn', { active: layoutMode === 'row' }]" 
+                  @click="layoutMode = 'row'"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+                    <rect x="3" y="9" width="18" height="6" rx="1" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 导出设置面板 -->
+          <div class="panel-section">
+            <h2>导出设置</h2>
+            
+            <div class="export-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>备注 <span class="required">*</span></label>
+                  <textarea 
+                    v-model="globalNote" 
+                    placeholder="请填写备注信息，方便识别"
+                    rows="2"
+                  ></textarea>
+                </div>
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label>面料 <span class="required">*</span></label>
                   <el-select
                     v-model="selectedMaterial"
                     filterable
-                    placeholder="选择面料"
+                    allow-create
+                    default-first-option
+                    placeholder="选择或输入面料"
                     class="material-select"
                   >
                     <el-option
@@ -293,51 +468,70 @@
                   </el-select>
                 </div>
               </div>
-            </div>
-            
-            <div class="export-row-setting">
-              <label>导出每行色卡数量:</label>
-              <div class="row-count-input">
-                <el-select
-                  v-model.number="cardsPerRowExport"
-                  placeholder="选择每行色卡数量"
-                  class="row-count-select"
-                >
-                  <el-option
-                    v-for="n in 10"
-                    :key="n"
-                    :label="`${n} 个`"
-                    :value="n"
-                  />
-                </el-select>
+              
+              <div class="form-row">
+                <div class="form-group inline">
+                  <label>每行色卡数</label>
+                  <el-select v-model.number="cardsPerRowExport" class="row-select">
+                    <el-option
+                      v-for="n in 10"
+                      :key="n"
+                      :label="n"
+                      :value="n"
+                    />
+                  </el-select>
+                </div>
               </div>
             </div>
             
-            <div class="export-control">
-              <button class="export-button" @click="exportColorCards">导出色卡</button>
-            </div>
+            <button class="export-button" @click="exportColorCards">
+              <svg viewBox="0 0 24 24" fill="none" class="btn-icon">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              导出色卡图片
+            </button>
           </div>
         </div>
       </div>
       
       <!-- 右侧面板：色卡展示 -->
       <div class="right-panel">
+        <div class="display-header">
+          <h3>色卡列表</h3>
+          <div class="display-stats">
+            <span class="stat-item">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14">
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              {{ totalCards }} 个
+            </span>
+            <el-switch
+              v-model="showColorValues"
+              active-text="显示色值"
+              inactive-text="隐藏色值"
+              class="value-switch"
+            />
+          </div>
+        </div>
+        
         <div class="color-cards-display" :class="layoutMode">
-          <!-- 当前编辑的颜色始终显示在第一个位置 -->
+          <!-- 当前编辑的颜色 -->
           <div 
-            class="color-card current-edit-card"
+            class="color-card current-card"
             :style="{ backgroundColor: getColorWithAlpha(currentColor) }"
           >
-            <div class="color-info">
-              <div class="color-hex">HEX: {{ currentColor.hex }}</div>
+            <div class="card-badge">当前</div>
+            <div class="color-info" v-if="showColorValues">
+              <div class="color-hex">{{ currentColor.hex }}</div>
               <div class="color-rgb">RGB: {{ currentColor.rgb.r }}, {{ currentColor.rgb.g }}, {{ currentColor.rgb.b }}</div>
               <div v-if="showCmyk" class="color-cmyk">
                 CMYK: {{ currentColor.cmyk.c }}%, {{ currentColor.cmyk.m }}%, {{ currentColor.cmyk.y }}%, {{ currentColor.cmyk.k }}%
               </div>
-              <div class="color-note">{{ currentColor.note || '基础色' }}</div>
+              <div class="color-note">{{ currentColor.note || '当前编辑' }}</div>
             </div>
           </div>
           
+          <!-- 已添加的色卡 -->
           <div 
             v-for="card in colorCards" 
             :key="card.id" 
@@ -345,204 +539,317 @@
             :class="{ 'locked': card.locked }"
             :style="{ backgroundColor: getColorWithAlpha(card) }"
           >
-            <div class="color-info">
-              <div class="color-hex">HEX: {{ card.hex }}</div>
+            <div class="card-actions">
+              <button @click="toggleLock(card.id)" class="action-btn" :title="card.locked ? '解锁' : '锁定'">
+                <svg v-if="card.locked" viewBox="0 0 24 24" fill="none" width="14" height="14">
+                  <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+                  <path d="M8 11V7a4 4 0 118 0v4" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <svg v-else viewBox="0 0 24 24" fill="none" width="14" height="14">
+                  <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+                  <path d="M8 11V7a4 4 0 018 0" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </button>
+              <button @click="copyColor(card.hex)" class="action-btn" title="复制">
+                <svg viewBox="0 0 24 24" fill="none" width="14" height="14">
+                  <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2"/>
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </button>
+              <button @click="editColor(card)" class="action-btn" title="编辑">
+                <svg viewBox="0 0 24 24" fill="none" width="14" height="14">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </button>
+              <button @click="removeColorCard(card.id)" class="action-btn delete" title="删除">
+                <svg viewBox="0 0 24 24" fill="none" width="14" height="14">
+                  <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </button>
+            </div>
+            <div class="color-info" v-if="showColorValues">
+              <div class="color-hex">{{ card.hex }}</div>
               <div class="color-rgb">RGB: {{ card.rgb.r }}, {{ card.rgb.g }}, {{ card.rgb.b }}</div>
               <div v-if="showCmyk" class="color-cmyk">
                 CMYK: {{ card.cmyk.c }}%, {{ card.cmyk.m }}%, {{ card.cmyk.y }}%, {{ card.cmyk.k }}%
               </div>
               <div v-if="card.note" class="color-note">{{ card.note }}</div>
             </div>
-            <div class="card-actions">
-              <button @click="toggleLock(card.id)" class="action-btn" :title="card.locked ? '解锁色卡' : '锁定色卡'">
-                <span>{{ card.locked ? '🔒' : '🔓' }}</span>
-              </button>
-              <button @click="copyColor(card.hex)" class="action-btn" title="复制色值">
-                <span>📋</span>
-              </button>
-              <button @click="removeColorCard(card.id)" class="action-btn" title="删除色卡">
-                <span>🗑️</span>
-              </button>
-            </div>
+          </div>
+          
+          <!-- 空状态 -->
+          <div v-if="colorCards.length === 0" class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" width="48" height="48">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z" stroke="currentColor" stroke-width="1.5"/>
+            </svg>
+            <p>暂无色卡</p>
+            <span>请添加颜色或生成配色方案</span>
           </div>
         </div>
       </div>
     </div>
     
-    <!-- 自定义提示框 -->
-    <div v-if="showToastState" class="custom-toast" :class="`toast-${toastType}`">
-      <div class="toast-content">
-        <div class="toast-icon">
-          <svg v-if="toastType === 'success'" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+    <!-- Toast 提示 -->
+    <Transition name="toast">
+      <div v-if="showToastState" class="custom-toast" :class="`toast-${toastType}`">
+        <div class="toast-content">
+          <div class="toast-icon">
+            <svg v-if="toastType === 'success'" viewBox="0 0 24 24" fill="none">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none">
+              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <span class="toast-message">{{ toastMessage }}</span>
+          <button @click="showToastState = false" class="toast-close">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
-        <span class="toast-message">{{ toastMessage }}</span>
-        <button @click="showToastState = false" class="toast-close">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import chroma from 'chroma-js';
+import { ElSlider, ElButton, ElSelect, ElOption, ElSwitch } from 'element-plus';
+import { RefreshRight } from '@element-plus/icons-vue';
 
-// 提示框状态
+// ========== Toast 提示 ==========
 const showToastState = ref(false);
 const toastMessage = ref('');
-const toastType = ref('success'); // 'success' | 'error'
+const toastType = ref('success');
 
-// 显示自定义提示框
 const showToast = (message, type = 'success') => {
   toastMessage.value = message;
   toastType.value = type;
   showToastState.value = true;
-  
-  // 3秒后自动隐藏
   setTimeout(() => {
     showToastState.value = false;
-  }, 2000);
+  }, 2500);
 };
 
-// 导出设置
-const cardsPerRowExport = ref(5); // 默认每行5个色卡
-const materialSearchText = ref('');
-const selectedMaterial = ref('');
-const showMaterialDropdown = ref(false);
-const materialOptions = [
-  '速干', '莫代尔', '210克速干', '珠地', '仿棉',  '260克莫代尔', 
-  '260克珠地', '冰丝蝴蝶网', '小方格', '水蜜桃', 
-  '复合', 'T400', '斜纹', '健康布', '银狐绒'
+// ========== 输入方式定义 ==========
+const inputMethods = [
+  { value: 'hex', label: 'HEX', icon: '#' },
+  { value: 'rgb', label: 'RGB', icon: 'RGB' },
+  { value: 'cmyk', label: 'CMYK', icon: 'CMYK' },
+  { value: 'lab', label: 'Lab', icon: 'Lab' }
 ];
 
-// 过滤面料选项
-const filteredMaterials = computed(() => {
-  if (!materialSearchText.value) return materialOptions;
-  return materialOptions.filter(material => 
-    material.toLowerCase().includes(materialSearchText.value.toLowerCase())
-  );
-});
-
-// 选择面料
-const selectMaterial = (material) => {
-  selectedMaterial.value = material;
-  materialSearchText.value = material;
-  showMaterialDropdown.value = false;
-};
-
-// 处理面料输入框失焦事件
-const handleMaterialBlur = () => {
-  // 延迟关闭下拉列表，以便点击选项能够生效
-  setTimeout(() => {
-    showMaterialDropdown.value = false;
-  }, 150);
-};
-
-// 基础色时钟数据
-const basicColors = ref([
-  { name: '红色', hex: '#FF0000', rgb: {r: 255, g: 0, b: 0} },
+// ========== 快捷颜色 ==========
+const quickColors = [
+  { name: '纯红', hex: '#FF0000', rgb: {r: 255, g: 0, b: 0} },
   { name: '橙色', hex: '#FF7F00', rgb: {r: 255, g: 127, b: 0} },
   { name: '黄色', hex: '#FFFF00', rgb: {r: 255, g: 255, b: 0} },
-  { name: '黄绿色', hex: '#7FFF00', rgb: {r: 127, g: 255, b: 0} },
   { name: '绿色', hex: '#00FF00', rgb: {r: 0, g: 255, b: 0} },
-  { name: '青绿色', hex: '#00FF7F', rgb: {r: 0, g: 255, b: 127} },
   { name: '青色', hex: '#00FFFF', rgb: {r: 0, g: 255, b: 255} },
-  { name: '青蓝色', hex: '#007FFF', rgb: {r: 0, g: 127, b: 255} },
   { name: '蓝色', hex: '#0000FF', rgb: {r: 0, g: 0, b: 255} },
-  { name: '蓝紫色', hex: '#7F00FF', rgb: {r: 127, g: 0, b: 255} },
   { name: '紫色', hex: '#FF00FF', rgb: {r: 255, g: 0, b: 255} },
-  { name: '紫红色', hex: '#FF007F', rgb: {r: 255, g: 0, b: 127} }
-]);
+  { name: '粉色', hex: '#FF69B4', rgb: {r: 255, g: 105, b: 180} },
+  { name: '棕色', hex: '#8B4513', rgb: {r: 139, g: 69, b: 19} },
+  { name: '灰色', hex: '#808080', rgb: {r: 128, g: 128, b: 128} },
+  { name: '黑色', hex: '#000000', rgb: {r: 0, g: 0, b: 0} },
+  { name: '白色', hex: '#FFFFFF', rgb: {r: 255, g: 255, b: 255} }
+];
 
-// 色卡数据
-const colorCards = ref([
-  { 
-    id: 1, 
-    hex: '#E74C3C', 
-    rgb: {r: 231, g: 76, b: 60}, 
-    cmyk: {c: 0, m: 67, y: 74, k: 9}, 
-    lab: {L: 52.3, a: 50.1, b: 35.6}, 
-    note: '主色', 
-    locked: false,
-    alpha: 1
-  },
-  { 
-    id: 2, 
-    hex: '#3498DB', 
-    rgb: {r: 52, g: 152, b: 219}, 
-    cmyk: {c: 76, m: 31, y: 0, k: 14}, 
-    lab: {L: 59.6, a: -7.2, b: -41.3}, 
-    note: '辅色', 
-    locked: false,
-    alpha: 1
-  },
-  { 
-    id: 3, 
-    hex: '#2ECC71', 
-    rgb: {r: 46, g: 204, b: 113}, 
-    cmyk: {c: 77, m: 0, y: 45, k: 20}, 
-    lab: {L: 73.4, a: -48.1, b: 31.4}, 
-    note: '点缀色', 
-    locked: false,
-    alpha: 1
-  }
-]);
+// ========== 配色方案定义 ==========
+const colorSchemes = [
+  { value: 'shades', label: '深浅渐变', description: '从浅到深的同色系渐变' },
+  { value: 'complementary', label: '互补色', description: '180°色相环对立颜色' },
+  { value: 'triadic', label: '三色组', description: '120°等距的三种颜色' },
+  { value: 'analogous', label: '类似色', description: '30°相邻的和谐配色' },
+  { value: 'splitComplementary', label: '分裂互补', description: '互补色两侧的两种颜色' },
+  { value: 'tetradic', label: '四色组', description: '90°等距的四种颜色' },
+  { value: 'monochromatic', label: '单色系', description: '同色相不同饱和度' },
+  { value: 'customHue', label: '自定义色相', description: '自定义色相偏移角度' }
+];
 
-// 当前编辑的色卡
+// ========== 深浅选项 ==========
+const shadeOptions = [
+  { value: 'both', label: '浅-深' },
+  { value: 'light', label: '仅浅色' },
+  { value: 'dark', label: '仅深色' }
+];
+
+// ========== 面料选项 ==========
+const materialOptions = [
+  '速干', '莫代尔', '210克速干', '珠地', '仿棉', '260克莫代尔', 
+  '260克珠地', '冰丝蝴蝶网', '小方格', '水蜜桃', '复合', 'T400', 
+  '斜纹', '健康布', '银狐绒', '罗马布', '空气层', '牛奶丝'
+];
+
+// ========== 状态定义 ==========
+const inputMethod = ref('hex');
+const colorScheme = ref('shades');
+const shadeMode = ref('both');
+const hueOffset = ref(30);
+const colorCount = ref(5);
+const colorCards = ref([]);
+const showCmyk = ref(true);
+const showColorValues = ref(true);
+const layoutMode = ref('grid');
+const globalNote = ref('');
+const selectedMaterial = ref('');
+const cardsPerRowExport = ref(5);
+
+// ========== 当前编辑颜色 ==========
 const currentColor = reactive({
-  hex: '#FFFFFF',
-  rgb: {r: 255, g: 255, b: 255},
-  cmyk: {c: 0, m: 0, y: 0, k: 0},
-  lab: {L: 100, a: 0, b: 0},
+  hex: '#3498DB',
+  rgb: {r: 52, g: 152, b: 219},
+  cmyk: {c: 76, m: 31, y: 0, k: 14},
+  lab: {L: 60, a: -7, b: -41},
   note: '',
   alpha: 1
 });
 
-// 透明度百分比计算属性
+// ========== 计算属性 ==========
 const alphaPercentage = computed({
   get: () => Math.round(currentColor.alpha * 100),
   set: (value) => {
-    currentColor.alpha = value / 100;
-    updateColorWithAlpha();
+    currentColor.alpha = Math.max(0, Math.min(1, value / 100));
   }
 });
 
-// 色值输入方式
-const inputMethod = ref('hex'); // hex, rgb, cmyk, lab
+const totalCards = computed(() => colorCards.value.length + 1);
 
-// 色卡数量
-const colorCount = ref(5);
+// ========== 快捷颜色选择 ==========
+const selectQuickColor = (color) => {
+  currentColor.hex = color.hex;
+  currentColor.rgb = {...color.rgb};
+  handleHexChange();
+};
 
-// 全局备注
-const globalNote = ref('');
+// ========== 颜色转换函数 ==========
+const updateRgbFromHex = (hex) => {
+  try {
+    const color = chroma(hex);
+    const [r, g, b] = color.rgb();
+    return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
+  } catch {
+    hex = hex.replace('#', '');
+    return {
+      r: parseInt(hex.substring(0, 2), 16) || 0,
+      g: parseInt(hex.substring(2, 4), 16) || 0,
+      b: parseInt(hex.substring(4, 6), 16) || 0
+    };
+  }
+};
 
-// 是否显示CMYK值
-const showCmyk = ref(true);
+const updateHexFromRgb = (r, g, b) => {
+  return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`.toUpperCase();
+};
 
-// 色卡布局方式
-const layoutMode = ref('grid'); // grid, row
+const updateCmykFromRgb = (r, g, b) => {
+  try {
+    const cmyk = chroma(r, g, b).cmyk();
+    return {
+      c: Math.round(cmyk[0] * 100),
+      m: Math.round(cmyk[1] * 100),
+      y: Math.round(cmyk[2] * 100),
+      k: Math.round(cmyk[3] * 100)
+    };
+  } catch {
+    const rRatio = r / 255;
+    const gRatio = g / 255;
+    const bRatio = b / 255;
+    const k = 1 - Math.max(rRatio, gRatio, bRatio);
+    if (k === 1) return { c: 0, m: 0, y: 0, k: 100 };
+    return {
+      c: Math.round(((1 - rRatio - k) / (1 - k)) * 100),
+      m: Math.round(((1 - gRatio - k) / (1 - k)) * 100),
+      y: Math.round(((1 - bRatio - k) / (1 - k)) * 100),
+      k: Math.round(k * 100)
+    };
+  }
+};
 
-// 添加新色卡
+const updateLabFromRgb = (r, g, b) => {
+  try {
+    const lab = chroma(r, g, b).lab();
+    return {
+      L: Math.round(lab[0]),
+      a: Math.round(lab[1]),
+      b: Math.round(lab[2])
+    };
+  } catch {
+    return { L: 50, a: 0, b: 0 };
+  }
+};
+
+const getColorWithAlpha = (color) => {
+  const rgb = color.rgb;
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${color.alpha})`;
+};
+
+// ========== 事件处理 ==========
+const handleHexChange = () => {
+  const rgb = updateRgbFromHex(currentColor.hex);
+  currentColor.rgb = rgb;
+  currentColor.cmyk = updateCmykFromRgb(rgb.r, rgb.g, rgb.b);
+  currentColor.lab = updateLabFromRgb(rgb.r, rgb.g, rgb.b);
+};
+
+const handleRgbChange = () => {
+  const {r, g, b} = currentColor.rgb;
+  currentColor.hex = updateHexFromRgb(r, g, b);
+  currentColor.cmyk = updateCmykFromRgb(r, g, b);
+  currentColor.lab = updateLabFromRgb(r, g, b);
+};
+
+const handleCmykChange = () => {
+  const {c, m, y, k} = currentColor.cmyk;
+  const r = Math.round(255 * (1 - c/100) * (1 - k/100));
+  const g = Math.round(255 * (1 - m/100) * (1 - k/100));
+  const b = Math.round(255 * (1 - y/100) * (1 - k/100));
+  currentColor.rgb = {r, g, b};
+  currentColor.hex = updateHexFromRgb(r, g, b);
+  currentColor.lab = updateLabFromRgb(r, g, b);
+};
+
+const handleLabChange = () => {
+  try {
+    const rgb = chroma.lab(currentColor.lab.L, currentColor.lab.a, currentColor.lab.b).rgb();
+    currentColor.rgb = { r: Math.round(rgb[0]), g: Math.round(rgb[1]), b: Math.round(rgb[2]) };
+    const {r, g, b} = currentColor.rgb;
+    currentColor.hex = updateHexFromRgb(r, g, b);
+    currentColor.cmyk = updateCmykFromRgb(r, g, b);
+  } catch (error) {
+    console.error('Lab转换错误:', error);
+  }
+};
+
+const handleAlphaChange = () => {
+  // 透明度变化时不需要额外处理
+};
+
+const updateAlphaFromPercentage = () => {
+  currentColor.alpha = Math.max(0, Math.min(1, alphaPercentage.value / 100));
+};
+
+const handleSchemeChange = () => {
+  // 切换配色方案时触发
+};
+
+// ========== 添加色卡 ==========
 const addColorCard = () => {
+  const isDuplicate = colorCards.value.some(
+    card => card.hex.toLowerCase() === currentColor.hex.toLowerCase()
+  );
+  
+  if (isDuplicate) {
+    showToast('已存在相同色值，不能重复添加', 'error');
+    return;
+  }
+  
   const newId = colorCards.value.length > 0 
     ? Math.max(...colorCards.value.map(card => card.id)) + 1 
     : 1;
-  
-  // 检查是否已存在相同色值的色卡
-  const isDuplicate = colorCards.value.some(card => card.hex.toLowerCase() === currentColor.hex.toLowerCase());
-  
-  if (isDuplicate) {
-    showToast('已存在相同色值的色卡，不能重复添加！', 'error');
-    return;
-  }
   
   colorCards.value.push({
     id: newId,
@@ -555,115 +862,19 @@ const addColorCard = () => {
     alpha: currentColor.alpha
   });
   
-  // 重置当前编辑的色卡
-  resetCurrentColor();
+  showToast('添加成功', 'success');
 };
 
-// 获取带透明度的颜色值
-const getColorWithAlpha = (color) => {
-  const rgb = color.rgb;
-  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${color.alpha})`;
-};
-
-// 更新颜色时同时考虑透明度
-const updateColorWithAlpha = () => {
-  // 透明度改变时更新预览，但不改变基础色值
-  // 实际颜色显示会通过getColorWithAlpha方法处理
-};
-
-// 从百分比更新透明度值
-const updateAlphaFromPercentage = () => {
-  currentColor.alpha = alphaPercentage.value / 100;
-  updateColorWithAlpha();
-};
-
-// 设置色卡数量
-const setColorCount = (count) => {
-  colorCount.value = count;
-};
-
-// 验证色卡数量输入
-const validateColorCount = () => {
-  // 允许空字符串或删除操作
-  if (colorCount.value === '' || colorCount.value === null) {
-    return;
-  }
-  
-  // 确保输入是数字
-  const value = parseInt(colorCount.value);
-  if (isNaN(value)) {
-    return;
-  }
-  
-  // 限制范围在1-100之间
-  if (value < 1) {
-    colorCount.value = 1;
-  } else if (value > 100) {
-    colorCount.value = 100;
-  } else {
-    // 确保存储为数字类型
-    colorCount.value = value;
-  }
-};
-
-// 复制色值到剪贴板
-const copyColor = (color) => {
-  navigator.clipboard.writeText(color).then(() => {
-    showCopyNotification(color);
-  });
-};
-
-// 显示复制成功通知
-const showCopyNotification = (color) => {
-  const notification = document.createElement('div');
-  notification.className = 'copy-notification';
-  notification.innerHTML = `
-    <div class="notification-content">
-      <div class="color-dot" style="background-color: ${color}"></div>
-      <span>已复制色值: ${color}</span>
-    </div>
-  `;
-  document.body.appendChild(notification);
-  
-  // 添加动画效果
-  setTimeout(() => {
-    notification.classList.add('show');
-  }, 10);
-  
-  // 2秒后移除通知
-  setTimeout(() => {
-    notification.classList.remove('show');
-    notification.classList.add('hide');
-    setTimeout(() => {
-      document.body.removeChild(notification);
-    }, 300);
-  }, 2000);
-};
-// 从基础色时钟选择颜色
-const selectBasicColor = (color) => {
-  currentColor.hex = color.hex;
-  currentColor.rgb = {...color.rgb};
-  // 更新其他颜色格式
-  handleHexChange();
-};
-const resetCurrentColor = () => {
-  currentColor.hex = '#FFFFFF';
-  currentColor.rgb = {r: 255, g: 255, b: 255};
-  currentColor.cmyk = {c: 0, m: 0, y: 0, k: 0};
-  currentColor.lab = {L: 100, a: 0, b: 0};
-  currentColor.note = '';
-  currentColor.alpha = 1;
-};
-
-// 删除色卡
+// ========== 删除色卡 ==========
 const removeColorCard = (id) => {
   const index = colorCards.value.findIndex(card => card.id === id);
   if (index !== -1) {
     colorCards.value.splice(index, 1);
+    showToast('删除成功', 'success');
   }
 };
 
-// 锁定/解锁色卡
+// ========== 锁定/解锁 ==========
 const toggleLock = (id) => {
   const card = colorCards.value.find(card => card.id === id);
   if (card) {
@@ -671,221 +882,278 @@ const toggleLock = (id) => {
   }
 };
 
-// 这个函数已被上面的copyColor替代，使用showCopyNotification提供更好的用户体验
-
-// 从HEX更新RGB
-const updateRgbFromHex = (hex) => {
-  // 移除#号
-  hex = hex.replace('#', '');
-  
-  // 解析RGB值
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  
-  return {r, g, b};
+// ========== 编辑颜色 ==========
+const editColor = (card) => {
+  currentColor.hex = card.hex;
+  currentColor.rgb = {...card.rgb};
+  currentColor.cmyk = {...card.cmyk};
+  currentColor.lab = {...card.lab};
+  currentColor.note = card.note;
+  currentColor.alpha = card.alpha;
+  showToast('已加载到编辑区', 'success');
 };
 
-// 从RGB更新HEX
-const updateHexFromRgb = (r, g, b) => {
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
+// ========== 复制色值 ==========
+const copyColor = (hex) => {
+  navigator.clipboard.writeText(hex).then(() => {
+    showToast(`已复制: ${hex}`, 'success');
+  });
 };
 
-// 从RGB更新CMYK
-const updateCmykFromRgb = (r, g, b) => {
-  try {
-    // 使用chroma.js进行转换
-    const cmyk = chroma(r, g, b).cmyk();
-    return {
-      c: Math.round(cmyk[0] * 100),
-      m: Math.round(cmyk[1] * 100),
-      y: Math.round(cmyk[2] * 100),
-      k: Math.round(cmyk[3] * 100)
-    };
-  } catch (error) {
-    // 回退到简化版转换
-    const rRatio = r / 255;
-    const gRatio = g / 255;
-    const bRatio = b / 255;
-    
-    const k = 1 - Math.max(rRatio, gRatio, bRatio);
-    
-    if (k === 1) {
-      return { c: 0, m: 0, y: 0, k: 100 };
-    }
-    
-    const c = Math.round(((1 - rRatio - k) / (1 - k)) * 100);
-    const m = Math.round(((1 - gRatio - k) / (1 - k)) * 100);
-    const y = Math.round(((1 - bRatio - k) / (1 - k)) * 100);
-    
-    return { c, m, y, k: Math.round(k * 100) };
-  }
+// ========== 重置 ==========
+const resetAll = () => {
+  colorCards.value = [];
+  currentColor.hex = '#3498DB';
+  currentColor.rgb = {r: 52, g: 152, b: 219};
+  currentColor.cmyk = {c: 76, m: 31, y: 0, k: 14};
+  currentColor.lab = {L: 60, a: -7, b: -41};
+  currentColor.note = '';
+  currentColor.alpha = 1;
+  globalNote.value = '';
+  selectedMaterial.value = '';
+  showToast('已重置', 'success');
 };
 
-// 从RGB更新Lab
-const updateLabFromRgb = (r, g, b) => {
-  try {
-    // 使用chroma.js进行转换
-    const lab = chroma(r, g, b).lab();
-    return {
-      L: Math.round(lab[0] * 10) / 10,
-      a: Math.round(lab[1] * 10) / 10,
-      b: Math.round(lab[2] * 10) / 10
-    };
-  } catch (error) {
-    // 回退到简化版转换
-    // 这里只是一个非常简化的转换，不够精确
-    const L = Math.round((0.2126 * r + 0.7152 * g + 0.0722 * b) / 2.55);
-    const a = Math.round((r - g) / 2);
-    const b_val = Math.round((g - b) / 2);
-    
-    return { L, a, b: b_val };
-  }
-};
-
-// 监听HEX输入变化
-const handleHexChange = () => {
-  const rgb = updateRgbFromHex(currentColor.hex);
-  currentColor.rgb = rgb;
-  currentColor.cmyk = updateCmykFromRgb(rgb.r, rgb.g, rgb.b);
-  currentColor.lab = updateLabFromRgb(rgb.r, rgb.g, rgb.b);
-};
-
-// 监听RGB输入变化
-const handleRgbChange = () => {
-  const {r, g, b} = currentColor.rgb;
-  currentColor.hex = updateHexFromRgb(r, g, b);
-  currentColor.cmyk = updateCmykFromRgb(r, g, b);
-  currentColor.lab = updateLabFromRgb(r, g, b);
-};
-
-// 监听CMYK输入变化
-const handleCmykChange = () => {
-  // 简化版CMYK到RGB转换
-  const {c, m, y, k} = currentColor.cmyk;
-  
-  const r = Math.round(255 * (1 - c/100) * (1 - k/100));
-  const g = Math.round(255 * (1 - m/100) * (1 - k/100));
-  const b = Math.round(255 * (1 - y/100) * (1 - k/100));
-  
-  currentColor.rgb = {r, g, b};
-  currentColor.hex = updateHexFromRgb(r, g, b);
-  currentColor.lab = updateLabFromRgb(r, g, b);
-};
-
-// 监听Lab输入变化
-const handleLabChange = () => {
-  try {
-    // 使用chroma.js进行转换
-    const rgb = chroma.lab(currentColor.lab.L, currentColor.lab.a, currentColor.lab.b).rgb();
-    
-    currentColor.rgb = {
-      r: Math.round(rgb[0]),
-      g: Math.round(rgb[1]),
-      b: Math.round(rgb[2])
-    };
-    
-    const {r, g, b} = currentColor.rgb;
-    currentColor.hex = updateHexFromRgb(r, g, b);
-    currentColor.cmyk = updateCmykFromRgb(r, g, b);
-  } catch (error) {
-    console.error('Lab转换错误:', error);
-  }
-};
-
-// 生成相似颜色
-const generateSimilarColors = () => {
+// ========== 生成配色方案 ==========
+const generateColorScheme = () => {
   const baseColor = currentColor.hex;
   const count = colorCount.value;
   
   try {
-    // 使用chroma.js生成色阶
-    const scale = chroma.scale([
-      chroma(baseColor).brighten(2),
-      baseColor,
-      chroma(baseColor).darken(2)
-    ]).mode('lab').colors(count);
+    let colors = [];
     
-    // 清空现有色卡
+    switch (colorScheme.value) {
+      case 'shades':
+        colors = generateShades(baseColor, count, shadeMode.value);
+        break;
+      case 'complementary':
+        colors = generateComplementary(baseColor, count);
+        break;
+      case 'triadic':
+        colors = generateTriadic(baseColor, count);
+        break;
+      case 'analogous':
+        colors = generateAnalogous(baseColor, count);
+        break;
+      case 'splitComplementary':
+        colors = generateSplitComplementary(baseColor, count);
+        break;
+      case 'tetradic':
+        colors = generateTetradic(baseColor, count);
+        break;
+      case 'monochromatic':
+        colors = generateMonochromatic(baseColor, count);
+        break;
+      case 'customHue':
+        colors = generateCustomHue(baseColor, count, hueOffset.value);
+        break;
+      default:
+        colors = generateShades(baseColor, count, 'both');
+    }
+    
+    // 清空现有色卡并添加新生成的
     colorCards.value = [];
-    
-    // 添加生成的色卡
-    scale.forEach((color, index) => {
-      const hex = color.toUpperCase();
-      const rgb = updateRgbFromHex(hex);
-      const cmyk = updateCmykFromRgb(rgb.r, rgb.g, rgb.b);
-      const lab = updateLabFromRgb(rgb.r, rgb.g, rgb.b);
-      
+    colors.forEach((color, index) => {
+      const rgb = updateRgbFromHex(color);
       colorCards.value.push({
         id: index + 1,
-        hex,
+        hex: color.toUpperCase(),
         rgb,
-        cmyk,
-        lab,
+        cmyk: updateCmykFromRgb(rgb.r, rgb.g, rgb.b),
+        lab: updateLabFromRgb(rgb.r, rgb.g, rgb.b),
         note: '',
         locked: false,
-        alpha: currentColor.alpha // 保持与当前编辑颜色相同的透明度
+        alpha: currentColor.alpha
       });
     });
+    
+    showToast(`已生成 ${colors.length} 个配色方案`, 'success');
   } catch (error) {
-    console.error('生成相似色卡错误:', error);
+    console.error('生成配色方案错误:', error);
+    showToast('生成失败，请重试', 'error');
   }
 };
 
-// 导出色卡
+// ========== 配色方案生成函数 ==========
+const generateShades = (baseColor, count, mode) => {
+  const colors = [];
+  
+  if (mode === 'light' || mode === 'both') {
+    const lighterCount = mode === 'light' ? count : Math.floor(count / 2);
+    for (let i = 1; i <= lighterCount; i++) {
+      const factor = i / (lighterCount + 1);
+      colors.push(chroma.mix(baseColor, '#FFFFFF', factor, 'rgb').hex());
+    }
+  }
+  
+  if (mode === 'dark' || mode === 'both') {
+    const darkerCount = mode === 'dark' ? count : count - colors.length;
+    for (let i = 1; i <= darkerCount; i++) {
+      const factor = i / (darkerCount + 1);
+      colors.push(chroma.mix(baseColor, '#000000', factor, 'rgb').hex());
+    }
+  }
+  
+  return colors;
+};
+
+const generateComplementary = (baseColor, count) => {
+  const base = chroma(baseColor);
+  const colors = [baseColor];
+  
+  const comp = base.set('hsl.h', (base.get('hsl.h') + 180) % 360);
+  colors.push(comp.hex());
+  
+  // 添加中间过渡色
+  if (count > 2) {
+    const steps = count - 2;
+    for (let i = 1; i <= steps; i++) {
+      const factor = i / (steps + 1);
+      colors.splice(1, 0, chroma.mix(base, comp, factor, 'hsl').hex());
+    }
+  }
+  
+  return colors.slice(0, count);
+};
+
+const generateTriadic = (baseColor, count) => {
+  const base = chroma(baseColor);
+  const h = base.get('hsl.h');
+  const colors = [
+    baseColor,
+    base.set('hsl.h', (h + 120) % 360).hex(),
+    base.set('hsl.h', (h + 240) % 360).hex()
+  ];
+  
+  // 填充到指定数量
+  while (colors.length < count) {
+    colors.push(colors[colors.length % 3]);
+  }
+  
+  return colors.slice(0, count);
+};
+
+const generateAnalogous = (baseColor, count) => {
+  const base = chroma(baseColor);
+  const h = base.get('hsl.h');
+  const colors = [];
+  const step = 30;
+  
+  const startIdx = Math.floor(-(count - 1) / 2);
+  for (let i = 0; i < count; i++) {
+    const newH = (h + (startIdx + i) * step + 360) % 360;
+    colors.push(base.set('hsl.h', newH).hex());
+  }
+  
+  return colors;
+};
+
+const generateSplitComplementary = (baseColor, count) => {
+  const base = chroma(baseColor);
+  const h = base.get('hsl.h');
+  const colors = [
+    baseColor,
+    base.set('hsl.h', (h + 150) % 360).hex(),
+    base.set('hsl.h', (h + 210) % 360).hex()
+  ];
+  
+  while (colors.length < count) {
+    colors.push(colors[colors.length % 3]);
+  }
+  
+  return colors.slice(0, count);
+};
+
+const generateTetradic = (baseColor, count) => {
+  const base = chroma(baseColor);
+  const h = base.get('hsl.h');
+  const colors = [
+    baseColor,
+    base.set('hsl.h', (h + 90) % 360).hex(),
+    base.set('hsl.h', (h + 180) % 360).hex(),
+    base.set('hsl.h', (h + 270) % 360).hex()
+  ];
+  
+  while (colors.length < count) {
+    colors.push(colors[colors.length % 4]);
+  }
+  
+  return colors.slice(0, count);
+};
+
+const generateMonochromatic = (baseColor, count) => {
+  const base = chroma(baseColor);
+  const colors = [];
+  
+  for (let i = 0; i < count; i++) {
+    const s = 1 - (i / (count - 1)) * 0.8;
+    const l = 0.2 + (i / (count - 1)) * 0.6;
+    colors.push(base.set('hsl.s', Math.max(0, s)).set('hsl.l', l).hex());
+  }
+  
+  return colors;
+};
+
+const generateCustomHue = (baseColor, count, offset) => {
+  const base = chroma(baseColor);
+  const h = base.get('hsl.h');
+  const colors = [baseColor];
+  
+  const newH = (h + offset + 360) % 360;
+  colors.push(base.set('hsl.h', newH).hex());
+  
+  // 添加过渡色
+  if (count > 2) {
+    const steps = count - 2;
+    for (let i = 1; i <= steps; i++) {
+      const factor = i / (steps + 1);
+      colors.splice(1, 0, chroma.mix(chroma(baseColor), chroma(colors[1]), factor, 'hsl').hex());
+    }
+  }
+  
+  return colors.slice(0, count);
+};
+
+// ========== 导出功能 ==========
 const exportColorCards = () => {
-  // 检查全局备注是否填写
   if (!globalNote.value.trim()) {
-    showToast('请填写全局备注，这是必须的！', 'error');
+    showToast('请填写备注信息', 'error');
     return;
   }
   
-  // 创建一个临时容器来渲染导出内容
+  if (!selectedMaterial.value) {
+    showToast('请选择面料', 'error');
+    return;
+  }
+  
   const exportContainer = document.createElement('div');
   exportContainer.className = 'export-container';
   
-  // 添加标题和全局备注
   const header = document.createElement('div');
   header.className = 'export-header';
   header.innerHTML = `
-    <h1>🎨 色卡</h1>
-    ${globalNote.value ? `<p class="export-note">${globalNote.value}</p>` : ''}
-    ${selectedMaterial.value ? `<p class="export-material">面料: ${selectedMaterial.value}</p>` : ''}
+    <h1>色卡</h1>
+    <p class="export-note">${globalNote.value}</p>
+    <p class="export-material">面料: ${selectedMaterial.value}</p>
     <p class="export-date">导出时间: ${new Date().toLocaleString()}</p>
   `;
   exportContainer.appendChild(header);
   
-  // 添加色卡 - 使用左对齐布局
   const cardsContainer = document.createElement('div');
   cardsContainer.className = 'export-cards';
   
-  // 计算每行显示的色卡数量
-  const cardsPerRow = cardsPerRowExport.value; // 使用用户设置的每行色卡数量
-  
-  // 创建行容器
-  let currentRow = null;
-  
-  // 创建要导出的色卡数组，首先添加基础色
   const cardsToExport = [
-    {
-      id: 0,
-      hex: currentColor.hex,
-      rgb: currentColor.rgb,
-      cmyk: currentColor.cmyk,
-      lab: currentColor.lab,
-      note: '基础色',
-      locked: false,
-      alpha: currentColor.alpha
-    },
+    { ...currentColor, note: '当前色' },
     ...colorCards.value
   ];
   
+  let currentRow = null;
+  const cardsPerRow = cardsPerRowExport.value;
+  
   cardsToExport.forEach((card, index) => {
-    // 每行开始时创建新的行容器
     if (index % cardsPerRow === 0) {
       currentRow = document.createElement('div');
       currentRow.className = 'export-row';
-      currentRow.style.justifyContent = 'flex-start'; // 设置为左对齐
       cardsContainer.appendChild(currentRow);
     }
     
@@ -908,634 +1176,734 @@ const exportColorCards = () => {
   
   exportContainer.appendChild(cardsContainer);
   
-  // 计算容器宽度
-  const cardWidth = 160; // 每个色卡的宽度
-  const cardGap = 20; // 色卡之间的间距
-  const containerPadding = 60; // 左右各30px的padding
+  const cardWidth = 160;
+  const cardGap = 20;
+  const containerPadding = 60;
   const containerWidth = cardWidth * cardsPerRow + (cardsPerRow - 1) * cardGap + containerPadding;
   
-  // 添加样式
   const style = document.createElement('style');
   style.textContent = `
-    .export-container {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      padding: 30px;
-      background-color: white;
-      width: ${containerWidth}px;
-      margin: 0 auto;
-    }
-    .export-header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-    .export-header h1 {
-      font-size: 28px;
-      color: #2c3e50;
-      margin-bottom: 10px;
-    }
-    .export-note {
-      font-size: 40px;
-      font-style: italic;
-      color: #666;
-      margin-bottom: 10px;
-    }
-    .export-material {
-      font-size: 40px;
-      color: #555;
-      margin-bottom: 10px;
-    }
-    .export-date {
-      font-size: 2em;
-      color: #999;
-    }
-    .export-cards {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-    .export-row {
-      display: flex;
-      justify-content: flex-start;
-      gap: 20px;
-      flex-wrap: wrap;
-      width: 100%;
-    }
-    .export-card {
-      width: 160px;
-      height: 160px;
-      border-radius: 8px;
-      padding: 0;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-    }
-    .export-card-info {
-      background-color: rgba(255, 255, 255, 0.9);
-      padding: 10px;
-      border-radius: 0 0 8px 8px;
-      font-size: 12px;
-    }
-    .export-hex {
-      font-weight: bold;
-      font-size: 14px;
-      margin-bottom: 3px;
-    }
-    .export-card-note {
-      font-style: italic;
-      margin-top: 4px;
-      font-size: 11px;
-      color: #666;
-    }
+    .export-container { font-family: 'Segoe UI', sans-serif; padding: 30px; background: white; width: ${containerWidth}px; margin: 0 auto; }
+    .export-header { text-align: center; margin-bottom: 30px; }
+    .export-header h1 { font-size: 28px; color: #2c3e50; margin-bottom: 10px; }
+    .export-note { font-size: 24px; font-style: italic; color: #333; margin-bottom: 8px; font-weight: bold; }
+    .export-material { font-size: 20px; color: #555; margin-bottom: 8px; }
+    .export-date { font-size: 14px; color: #999; }
+    .export-cards { display: flex; flex-direction: column; gap: 20px; }
+    .export-row { display: flex; justify-content: flex-start; gap: 20px; flex-wrap: wrap; width: 100%; }
+    .export-card { width: 160px; height: 160px; border-radius: 8px; box-shadow: 0 3px 8px rgba(0,0,0,0.15); position: relative; display: flex; flex-direction: column; justify-content: flex-end; }
+    .export-card-info { background: rgba(255,255,255,0.95); padding: 10px; border-radius: 0 0 8px 8px; font-size: 11px; }
+    .export-hex { font-weight: bold; font-size: 13px; margin-bottom: 2px; }
+    .export-rgb, .export-cmyk { color: #666; font-size: 10px; margin-bottom: 1px; }
+    .export-card-note { font-style: italic; margin-top: 3px; font-size: 10px; color: #888; }
   `;
   exportContainer.appendChild(style);
   
-  // 将容器添加到文档中（但不可见）
   document.body.appendChild(exportContainer);
   exportContainer.style.position = 'absolute';
   exportContainer.style.left = '-9999px';
   
-  // 使用html2canvas将容器转换为图片
   import('html2canvas').then(html2canvasModule => {
     const html2canvas = html2canvasModule.default;
     
     html2canvas(exportContainer, {
       backgroundColor: '#ffffff',
-      scale: 2, // 提高导出图片质量
-      logging: false,
-      allowTaint: true,
-      useCORS: true
+      scale: 2,
+      logging: false
     }).then(canvas => {
-      // 创建下载链接
       const link = document.createElement('a');
-      link.download = `色卡_${new Date().toISOString().slice(0, 10)}.png`;
+      link.download = `色卡_${globalNote.value}_${new Date().toISOString().slice(0, 10)}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
       
-      // 清理DOM
       document.body.removeChild(exportContainer);
+      showToast('导出成功', 'success');
     }).catch(error => {
-      console.error('导出图片失败:', error);
-      showToast('导出图片失败，请稍后再试', 'error');
+      console.error('导出失败:', error);
+      showToast('导出失败，请重试', 'error');
       document.body.removeChild(exportContainer);
     });
   }).catch(() => {
-    showToast('正在加载导出功能，请稍后再试...', 'error');
+    showToast('导出功能加载失败', 'error');
     document.body.removeChild(exportContainer);
   });
 };
 
+// ========== 初始化 ==========
 onMounted(() => {
-  // 初始化操作
   handleHexChange();
 });
 </script>
 
 <style scoped>
 .color-card-container {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  margin-top: 30px;
-  padding: 20px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #333;
-  background-color: #f8f9fa;
-  border-radius: 12px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-}
-
-h1, h2 {
+  margin-top: 3%;
+  padding: 24px;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #2c3e50;
-  margin-bottom: 20px;
+}
+
+/* ========== 页面头部 ========== */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 14px;
+  color: white;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+}
+
+.header-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.header-text h1 {
+  margin: 0;
+  font-size: 1.75rem;
   font-weight: 600;
+  color: white;
 }
 
-h1 {
-  text-align: center;
-  font-size: 2.2rem;
-  margin-bottom: 30px;
-  background: linear-gradient(45deg, #3498db, #9b59b6);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  padding: 10px 0;
+.header-description {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
 }
 
-h2 {
-  font-size: 1.5rem;
-  border-bottom: 2px solid #e0e0e0;
-  padding-bottom: 10px;
-  margin-top: 0;
-}
-
-/* 新的左右布局 */
+/* ========== 主布局 ========== */
 .main-layout {
   display: flex;
-  gap: 25px;
+  gap: 24px;
 }
 
 .left-panel {
-  flex: 0 0 350px;
+  flex: 0 0 380px;
 }
 
 .right-panel {
   flex: 1;
-  min-width: 300px;
+  min-width: 0;
 }
 
+/* ========== 工具面板 ========== */
 .tool-panel {
-  background-color: white;
+  background: #ffffff;
   border-radius: 10px;
-  padding: 20px;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .panel-section {
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
-  margin-bottom: 20px;
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .panel-section:last-child {
-  margin-bottom: 0;
+  border-bottom: none;
 }
 
-.input-method-selector {
+.section-header {
   display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.panel-section h2 {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+/* ========== 快捷颜色 ========== */
+.quick-colors {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quick-label {
+  font-size: 0.8rem;
+  color: #7f8c8d;
+}
+
+.quick-color-list {
+  display: flex;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
-.input-method {
-  padding: 8px 15px;
-  background-color: #f1f1f1;
-  border: none;
-  border-radius: 20px;
+.quick-color-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
   cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  transition: transform 0.2s;
+}
+
+.quick-color-btn:hover {
+  transform: scale(1.2);
+}
+
+/* ========== 输入方式标签 ========== */
+.input-method-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: #f8f9fa;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.tab-btn {
   flex: 1;
-  min-width: 60px;
-  text-align: center;
-}
-
-.input-method:hover {
-  background-color: #e0e0e0;
-}
-
-.input-method.active {
-  background-color: #3498db;
-  color: white;
-  box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);
-}
-
-.input-group {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #7f8c8d;
+  transition: all 0.2s;
+  display: flex;
   align-items: center;
-  margin-bottom: 15px;
-  padding: 10px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  justify-content: center;
+  gap: 4px;
+}
+
+.tab-btn:hover {
+  color: #2c3e50;
+}
+
+.tab-btn.active {
+  background: #ffffff;
+  color: #3498db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.tab-icon {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+/* ========== 输入组 ========== */
+.input-group {
+  margin-bottom: 16px;
 }
 
 .input-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
   font-weight: 500;
-  color: #555;
-  min-width: 30px;
-}
-
-.input-group input[type="text"],
-.input-group input[type="number"] {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border 0.2s;
-}
-
-.input-group input[type="text"]:focus,
-.input-group input[type="number"]:focus {
-  border-color: #3498db;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+  color: #7f8c8d;
 }
 
 .color-input-wrapper {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  position: relative;
-}
-
-.color-picker.modern-picker {
-  width: 40px;
-  height: 40px;
-  border: #3498db 2px solid;
-  border-radius: 50%;
-  overflow: hidden;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  padding: 0;
-  background: none;
-}
-
-.color-picker.modern-picker::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.color-picker.modern-picker::-webkit-color-swatch {
-  border: none;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px white, 0 0 0 3px #ddd;
-}
-
-.color-preview {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  align-self: self-end;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 2px 5px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s;
-}
-
-.color-preview:hover {
-  transform: scale(1.1);
-}
-
-.note-input {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 15px;
-  padding: 10px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.note-input input {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.add-button {
-  width: 100%;
-  padding: 12px;
-  background: linear-gradient(45deg, #3498db, #2980b9);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-top: 10px;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
-}
-
-.add-button:hover {
-  background: linear-gradient(45deg, #2980b9, #3498db);
-  transform: translateY(-2px);
-  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15);
-}
-
-.add-button:active {
-  transform: translateY(0);
-}
-
-.color-count-control,
-.layout-control,
-.global-note {
-  margin-bottom: 20px;
-  padding: 15px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.color-count-control {
-  display: flex;
-  flex-direction: column;
   gap: 10px;
 }
 
-.color-count-control label {
-  font-weight: 600;
-  color: #333;
-}
-
-.preset-container {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.preset-buttons {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.preset-btn {
+.hex-input {
   flex: 1;
-  min-width: 40px;
-  padding: 8px 0;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
+  padding: 10px 14px;
+  border: 2px solid #e0e0e0;
   border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  font-size: 1rem;
+  font-family: monospace;
+  transition: border-color 0.2s;
 }
 
-.preset-btn:hover {
-  background-color: #e9e9e9;
-  border-color: #ccc;
-}
-
-.preset-btn:active {
-  background-color: #3498db;
-  color: white;
+.hex-input:focus {
+  outline: none;
   border-color: #3498db;
 }
 
-.custom-count-input {
-  width: 100%;
-}
-
-.custom-input {
-  width: 100%;
-  padding: 8px 0;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  text-align: center;
-}
-
-.layout-control {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.layout-control button,
-.color-count-control button {
-  padding: 8px 15px;
-  background-color: #f1f1f1;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.layout-control button:hover,
-.color-count-control button:hover {
-  background-color: #e0e0e0;
-}
-
-.layout-control button.active {
-  background-color: #3498db;
-  color: white;
-}
-
-.export-settings-row {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 15px;
-}
-
-.global-note {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 10px;
-  flex: 1;
-}
-
-.export-material-setting {
-  flex: 1;
-}
-
-.global-note textarea {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  resize: vertical;
-  min-height: 80px;
-  font-family: inherit;
-}
-
-.global-note label::after,
-.export-material-setting label::after {
-  content: ' *';
-  color: #e74c3c;
-  font-weight: bold;
-}
-
-.alpha-input-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-}
-
-.alpha-value-input {
-  display: flex;
-  align-items: center;
-  min-width: 60px;
-}
-
-.alpha-percentage-input {
-  width: 40px;
-  text-align: right;
-  padding: 4px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-/* 导出设置样式 */
-.export-row-setting,
-.export-material-setting {
-  margin-bottom: 15px;
-}
-
-.export-row-setting label,
-.export-material-setting label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.styled-select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background-color: white;
-  font-size: 14px;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.styled-select:hover {
-  border-color: #aaa;
-}
-
-.styled-select:focus {
-  border-color: #9b59b6;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.2);
-}
-
-.material-select-container {
+.color-picker-wrapper {
   position: relative;
 }
 
-.material-search-input {
-  width: 90%;
-  padding: 10px 0px;
-  padding-left: 15px; /* 增加左侧内边距 */
-  border: 1px solid #ddd;
+.color-picker {
+  width: 44px;
+  height: 44px;
+  border: none;
   border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s;
-}
-
-.material-search-input::placeholder {
-  color: #999; /* 设置placeholder颜色 */
-}
-
-.material-search-input:hover {
-  border-color: #aaa;
-}
-
-.material-search-input:focus {
-  border-color: #9b59b6;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.2);
-}
-
-.material-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  max-height: 200px;
-  overflow-y: auto;
-  background-color: white;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 100;
-}
-
-.material-option {
-  padding: 10px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  padding: 0;
 }
 
-.material-option:hover {
-  background-color: #f0f0f0;
+.color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
 }
 
-.export-control {
+.color-picker::-webkit-color-swatch {
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+/* ========== 透明度滑块 ========== */
+.alpha-slider-container {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.alpha-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.alpha-header label {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.alpha-value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+}
+
+.alpha-input {
+  width: 50px;
+  padding: 4px 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+/* ========== 颜色预览 ========== */
+.color-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.color-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.preview-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.preview-label {
+  font-size: 0.75rem;
+  color: #7f8c8d;
+}
+
+.preview-value {
+  font-size: 0.85rem;
+  font-family: monospace;
+  color: #2c3e50;
+}
+
+/* ========== RGB 滑块输入 ========== */
+.rgb-slider-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.rgb-slider-group label {
+  margin: 0;
+  width: 24px;
+}
+
+.channel-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: white;
+}
+
+.channel-label.r { background: #e74c3c; }
+.channel-label.g { background: #27ae60; }
+.channel-label.b { background: #3498db; }
+.channel-label.c { background: #00BCD4; }
+.channel-label.m { background: #E91E63; }
+.channel-label.y { background: #FFEB3B; color: #333; }
+.channel-label.k { background: #607D8B; }
+
+.slider-container {
+  flex: 1;
+}
+
+.channel-input {
+  width: 60px;
+  padding: 6px 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+/* ========== CMYK 输入 ========== */
+.cmyk-grid, .lab-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.cmyk-item, .lab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cmyk-item label, .lab-item label {
+  margin: 0;
+  width: 20px;
+}
+
+.cmyk-item input, .lab-item input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   text-align: center;
 }
 
-.export-button {
-  padding: 12px 25px;
-  background: linear-gradient(45deg, #9b59b6, #8e44ad);
-  color: white;
+.cmyk-unit {
+  font-size: 0.8rem;
+  color: #7f8c8d;
+}
+
+/* ========== 备注输入 ========== */
+.note-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.note-input label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.note-input input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+/* ========== 按钮 ========== */
+.add-button, .generate-btn, .export-button {
+  width: 100%;
+  padding: 12px 20px;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: 6px;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  color: white;
+}
+
+.add-button {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+}
+
+.add-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+}
+
+.generate-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.generate-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.export-button {
+  background: linear-gradient(135deg, #27ae60, #219a52);
 }
 
 .export-button:hover {
-  background: linear-gradient(45deg, #8e44ad, #9b59b6);
   transform: translateY(-2px);
-  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
 }
 
+.btn-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* ========== 配色方案选项 ========== */
+.generation-options {
+  margin-bottom: 16px;
+}
+
+.option-group {
+  margin-bottom: 16px;
+}
+
+.option-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #7f8c8d;
+}
+
+.scheme-select, .count-select, .material-select, .row-select {
+  width: 100%;
+}
+
+.scheme-option {
+  display: flex;
+  flex-direction: column;
+}
+
+.scheme-name {
+  font-weight: 500;
+}
+
+.scheme-desc {
+  font-size: 0.75rem;
+  color: #7f8c8d;
+}
+
+.shade-options {
+  display: flex;
+  gap: 8px;
+}
+
+.shade-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  background: #ffffff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.shade-btn:hover {
+  border-color: #3498db;
+}
+
+.shade-btn.active {
+  background: #3498db;
+  border-color: #3498db;
+  color: white;
+}
+
+/* ========== 布局切换 ========== */
+.layout-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.toggle-label {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+}
+
+.toggle-buttons {
+  display: flex;
+  gap: 4px;
+  background: #f8f9fa;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.toggle-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7f8c8d;
+  transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+  color: #2c3e50;
+}
+
+.toggle-btn.active {
+  background: #ffffff;
+  color: #3498db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ========== 导出表单 ========== */
+.export-form {
+  margin-bottom: 16px;
+}
+
+.form-row {
+  margin-bottom: 12px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #7f8c8d;
+}
+
+.form-group.inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.form-group.inline label {
+  margin-right: 12px;
+}
+
+.form-group.inline .row-select {
+  width: 80px;
+}
+
+.required {
+  color: #e74c3c;
+}
+
+.form-group textarea {
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.form-group textarea:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+/* ========== 色卡展示区域 ========== */
+.display-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.display-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.display-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+}
+
+.value-switch {
+  font-size: 0.85rem;
+}
+
+/* ========== 色卡列表 ========== */
 .color-cards-display {
   display: grid;
-  gap: 20px;
-  margin-top: 30px;
+  gap: 16px;
 }
 
 .color-cards-display.grid {
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
 
 .color-cards-display.row {
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 }
 
 .color-card {
   position: relative;
-  height: 180px;
+  height: 160px;
   border-radius: 10px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -1544,55 +1912,63 @@ h2 {
 }
 
 .color-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
 .color-card.locked {
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1), 0 0 0 3px #f39c12;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 0 0 3px #f39c12;
+}
+
+.color-card.current-card {
+  border: 3px solid #3498db;
+}
+
+.card-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 4px 10px;
+  background: #3498db;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 20px;
+  text-transform: uppercase;
 }
 
 .color-info {
-  background-color: rgba(255, 255, 255, 0.9);
-  padding: 12px;
-  border-radius: 8px 8px 0 0;
-  backdrop-filter: blur(5px);
-  transition: transform 0.3s;
-  color: #333;
-  text-align: left;
-}
-
-.color-card:hover .color-info {
-  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.95);
+  padding: 10px 12px;
+  font-size: 0.75rem;
 }
 
 .color-hex {
-  font-weight: bold;
-  font-size: 16px;
-  margin-bottom: 5px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 2px;
 }
 
 .color-rgb, .color-cmyk {
-  font-size: 12px;
-  color: #555;
-  margin-bottom: 3px;
+  color: #666;
+  font-size: 0.7rem;
 }
 
 .color-note {
-  font-style: italic;
-  font-size: 12px;
-  color: #777;
-  margin-top: 5px;
+  margin-top: 4px;
+  padding-top: 4px;
   border-top: 1px dashed #ddd;
-  padding-top: 5px;
+  font-style: italic;
+  color: #888;
 }
 
+/* ========== 色卡操作按钮 ========== */
 .card-actions {
   position: absolute;
   top: 10px;
   right: 10px;
   display: flex;
-  gap: 5px;
+  gap: 4px;
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -1602,101 +1978,102 @@ h2 {
 }
 
 .action-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
+  width: 28px;
+  height: 28px;
   border: none;
-  background-color: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(5px);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  color: #666;
   transition: all 0.2s;
 }
 
 .action-btn:hover {
-  background-color: white;
+  background: white;
+  color: #3498db;
   transform: scale(1.1);
 }
 
-/* 复制通知样式 */
-.copy-notification {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  background-color: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 0;
-  border-radius: 8px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-  z-index: 9999;
-  transform: translateY(100px);
-  opacity: 0;
-  transition: all 0.3s ease;
+.action-btn.delete:hover {
+  color: #e74c3c;
 }
 
-.copy-notification.show {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-.copy-notification.hide {
-  transform: translateY(100px);
-  opacity: 0;
-}
-
-.notification-content {
+/* ========== 空状态 ========== */
+.empty-state {
+  grid-column: 1 / -1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 12px 16px;
-  gap: 10px;
+  justify-content: center;
+  padding: 48px;
+  background: #ffffff;
+  border-radius: 10px;
+  color: #7f8c8d;
 }
 
-.color-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid white;
+.empty-state svg {
+  margin-bottom: 16px;
+  opacity: 0.5;
 }
 
-/* 高端提示框样式 */
+.empty-state p {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.empty-state span {
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+/* ========== Toast 提示 ========== */
 .custom-toast {
   position: fixed;
   top: 20px;
   right: 20px;
   z-index: 9999;
-  min-width: 320px;
-  max-width: 500px;
-  backdrop-filter: blur(20px);
-  border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1);
-  animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 300px;
+  max-width: 420px;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .toast-content {
   display: flex;
   align-items: center;
-  padding: 16px 20px;
+  padding: 14px 16px;
   gap: 12px;
+  color: white;
 }
 
 .toast-success {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(21, 128, 61, 0.95) 100%);
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, #27ae60, #219a52);
 }
 
 .toast-error {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(185, 28, 28, 0.95) 100%);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
 }
 
 .toast-icon {
-  width: 24px;
-  height: 24px;
-  color: white;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
 }
 
@@ -1706,33 +2083,26 @@ h2 {
 }
 
 .toast-message {
-  color: white;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.4;
   flex: 1;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .toast-close {
   width: 20px;
   height: 20px;
-  background: none;
   border: none;
+  background: transparent;
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
-  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
+  transition: color 0.2s;
 }
 
 .toast-close:hover {
-  background: rgba(255, 255, 255, 0.1);
   color: white;
-  transform: scale(1.1);
 }
 
 .toast-close svg {
@@ -1740,25 +2110,27 @@ h2 {
   height: 14px;
 }
 
-@keyframes toastSlideIn {
-  from {
-    transform: translateX(100%) scale(0.9);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0) scale(1);
-    opacity: 1;
-  }
+/* ========== Toast 动画 ========== */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
 }
 
-/* 响应式布局调整 */
-@media (max-width: 900px) {
+.toast-enter-from,
+.toast-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 1100px) {
   .main-layout {
     flex-direction: column;
   }
   
   .left-panel {
-    flex: 0 0 100%;
+    flex: none;
+    width: 100%;
   }
   
   .right-panel {
@@ -1767,47 +2139,28 @@ h2 {
 }
 
 @media (max-width: 768px) {
-  .tool-panel {
-    grid-template-columns: 1fr;
+  .page-header {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+  
+  .header-content {
+    flex-direction: column;
+  }
+  
+  .display-header {
+    flex-direction: column;
+    gap: 12px;
   }
   
   .color-cards-display.grid,
   .color-cards-display.row {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
   
-  .custom-toast {
-    top: 10px;
-    right: 10px;
-    left: 10px;
-    min-width: auto;
-    max-width: none;
-  }
-  
-  .toast-content {
-    padding: 14px 16px;
-  }
-  
-  .toast-message {
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 600px) {
-  .color-cards-display {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  }
-  
-  .input-group {
+  .cmyk-grid, .lab-grid {
     grid-template-columns: 1fr;
-  }
-  
-  .color-count-control {
-    grid-template-columns: 1fr;
-  }
-  
-  h1 {
-    font-size: 1.8rem;
   }
 }
 </style>
