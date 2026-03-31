@@ -303,11 +303,11 @@ const goToFrontendHome = () => {
 
     <nav v-if="!isAdminRoute" class="main-nav" :class="{ 'is-hidden': !showNavBar }" ref="mainNav">
       <div class="nav-slider" ref="navSlider"></div>
-      <router-link to="/" @click="handleNavClick">🥼实拍库</router-link>
+      <router-link to="/" @click="handleNavClick">实拍</router-link>
       <a href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank">面料细节</a>
-      <a href="https://fangdutex.cn/welcome" target="_blank">📚方度知识库</a>
+      <a href="https://fangdutex.cn/welcome" target="_blank">知识库「所有知识」</a>
       <router-link to="/color-card" @click="handleNavClick">设计专用</router-link>
-      <router-link to="/size-converter" @click="handleNavClick">尺码相关</router-link>
+      <router-link to="/size-converter" @click="handleNavClick">尺码转换</router-link>
       <!-- 未登录时显示登录链接 -->
       <router-link v-if="!isLoggedIn" to="/login" @click="handleNavClick">登录</router-link>
       <!-- 已登录时显示后台管理 -->
@@ -436,6 +436,8 @@ const goToFrontendHome = () => {
     transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease; /* 添加opacity过渡动画 */
     z-index: 1; /* 置于底层 */
     opacity: 1; /* 默认显示 */
+    padding: 0 10px; /* 左右增加 padding，让滑块更宽 */
+    box-sizing: border-box;
   }
   .main-nav a {
     color: rgba(244, 248, 255, 0.88);

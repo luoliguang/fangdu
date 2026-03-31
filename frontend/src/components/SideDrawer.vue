@@ -34,11 +34,32 @@
         class="drawer-tab"
       >
         <span class="tab-icon">
-          {{ tab.icon }}
-          <!-- 公告标签上的红点 -->
-          <span v-if="tab.key === 'announcement' && hasUnreadAnnouncements" class="tab-notification-dot"></span>
+          <!-- 公告 - 铃铛图标 -->
+          <svg v-if="tab.key === 'announcement'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <!-- 教程 - 问号图标 -->
+          <svg v-else-if="tab.key === 'tutorial'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <!-- 筛选 - 漏斗图标 -->
+          <svg v-else-if="tab.key === 'filter'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          <!-- 收藏 - 心形图标 -->
+          <svg v-else-if="tab.key === 'favorites'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          <!-- 反馈 - 消息图标 -->
+          <svg v-else-if="tab.key === 'feedback'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
         </span>
         <span class="tab-label">{{ tab.label }}</span>
+        <span v-if="tab.key === 'announcement' && hasUnreadAnnouncements" class="tab-notification-dot"></span>
       </button>
     </div>
 
@@ -78,7 +99,13 @@
       <div v-if="activeDrawerTab === 'tutorial'" class="tab-content">
         <div class="tutorial-list">
           <div v-for="step in tutorialSteps" :key="step.id" class="tutorial-item">
-            <div class="tutorial-icon">{{ step.icon }}</div>
+            <div class="tutorial-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
             <div class="tutorial-content">
               <h4 class="tutorial-title">{{ step.title }}</h4>
               <div class="tutorial-description markdown-preview">
@@ -109,7 +136,28 @@
               @click="applyQuickFilter(filter.value)"
               class="filter-button"
             >
-              <span class="filter-icon">{{ filter.icon }}</span>
+              <span class="filter-icon">
+                <!-- 最新上传 -->
+                <svg v-if="filter.value === 'latest'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <!-- 热门素材 -->
+                <svg v-else-if="filter.value === 'popular'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                <!-- 高清图片 -->
+                <svg v-else-if="filter.value === 'hd'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <!-- 视频素材 -->
+                <svg v-else-if="filter.value === 'video'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="23 7 16 12 23 17 23 7"/>
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                </svg>
+              </span>
               <span class="filter-name">{{ filter.name }}</span>
             </button>
           </div>
@@ -120,7 +168,11 @@
       <div v-if="activeDrawerTab === 'favorites'" class="tab-content">
         <div class="favorites-list">
           <div v-if="favorites.length === 0" class="empty-state">
-            <div class="empty-icon">❤️</div>
+            <div class="empty-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+            </div>
             <p>还没有收藏任何素材</p>
             <p class="empty-hint">在素材上点击收藏按钮来添加收藏</p>
           </div>
@@ -217,10 +269,10 @@ const isContactInfosLoading = ref(false);
 
 // 配置数据 - 将从后台获取
 const drawerTabs = ref([
-  { key: 'announcement', label: '公告', icon: '📢' },
-  { key: 'tutorial', label: '教程', icon: '📚' },
-  { key: 'filter', label: '筛选', icon: '🔍' },
-  { key: 'favorites', label: '收藏', icon: '❤️' },
+  { key: 'announcement', label: '公告', icon: '🔔' },
+  { key: 'tutorial', label: '教程', icon: '📖' },
+  { key: 'filter', label: '筛选', icon: '⚡' },
+  { key: 'favorites', label: '收藏', icon: '♥' },
   { key: 'feedback', label: '反馈', icon: '💬' }
 ]);
 
@@ -414,23 +466,21 @@ const loadDefaultConfig = () => {
   tutorialSteps.value = [
     {
       id: 1,
-      title: '🔍 如何搜索素材',
-      content: '在搜索框中输入关键词，如"圆领短袖"、"插肩"等，系统会智能匹配相关素材。',
-      icon: '🔍'
+      title: '如何搜索素材',
+      content: '在搜索框中输入关键词，如"圆领短袖"、"插肩"等，系统会智能匹配相关素材。'
     },
     {
       id: 2,
-      title: '🏷️ 使用标签筛选',
-      content: '点击下方的标签按钮可以快速筛选特定类型的素材，支持多标签组合。',
-      icon: '🏷️'
+      title: '使用标签筛选',
+      content: '点击下方的标签按钮可以快速筛选特定类型的素材，支持多标签组合。'
     }
   ];
 
   quickFilters.value = [
-    { name: '最新上传', value: 'latest', icon: '🆕' },
-    { name: '热门素材', value: 'popular', icon: '🔥' },
-    { name: '高清图片', value: 'hd', icon: '📸' },
-    { name: '视频素材', value: 'video', icon: '🎬' }
+    { name: '最新上传', value: 'latest' },
+    { name: '热门素材', value: 'popular' },
+    { name: '高清图片', value: 'hd' },
+    { name: '视频素材', value: 'video' }
   ];
 };
 
@@ -625,9 +675,24 @@ onMounted(() => {
 }
 
 .tab-icon {
-  font-size: 16px;
-  position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.tab-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.drawer-tab:not(.active) .tab-icon svg {
+  stroke: #666;
+}
+
+.drawer-tab.active .tab-icon svg {
+  stroke: white;
 }
 
 .tab-label {
@@ -1003,8 +1068,22 @@ onMounted(() => {
 }
 
 .tutorial-icon {
-  font-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
+}
+
+.tutorial-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: #667eea;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
 }
 
 .tutorial-content {
@@ -1063,7 +1142,21 @@ onMounted(() => {
 }
 
 .filter-icon {
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.filter-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: #667eea;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
 }
 
 .filter-name {
@@ -1080,8 +1173,22 @@ onMounted(() => {
 }
 
 .empty-icon {
-  font-size: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
   margin-bottom: 16px;
+}
+
+.empty-icon svg {
+  width: 48px;
+  height: 48px;
+  stroke: #ccc;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
 }
 
 .empty-hint {
