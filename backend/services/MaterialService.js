@@ -280,7 +280,7 @@ class MaterialService {
    * 生成缩略图URL（使用OSS图片处理）
    * @param {string} url - 原始图片URL
    * @param {number} width - 缩略图宽度，默认300
-   * @returns {string} 缩略图URL
+   * @returns {string} 缩略图URL（通过代理访问以解决跨域问题）
    */
   generateThumbnailUrl(url, width = 300) {
     if (!url) return url;
@@ -288,7 +288,12 @@ class MaterialService {
     if (url.includes('x-oss-process')) return url;
     // 添加OSS图片处理参数：固定宽高自动裁剪
     const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}x-oss-process=image/resize,m_fill,w_${width},quality,q_80`;
+    const ossThumbnailUrl = `${url}${separator}x-oss-process=image/resize,m_fill,w_${width},quality,q_80`;
+    // 返回通过后端代理的URL，解决跨域问题
+    // 自动检测当前服务器的主机和端口
+    const port = process.env.PORT || 3002;
+    // 直接返回代理URL，URL参数需要编码
+    return `/api/proxy/media?url=${encodeURIComponent(ossThumbnailUrl)}`;
   }
 
   /**

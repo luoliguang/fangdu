@@ -1,7 +1,7 @@
 # OSS 费用优化方案
 
 > 文档创建时间：2026-04-01
-> 状态：已完成基础优化，待后续深入
+> 状态：已完成基础优化 + 跨域修复
 
 ## 问题背景
 
@@ -55,6 +55,20 @@ https://material-hub-assets.oss-cn-guangzhou.aliyuncs.com/image.jpg?x-oss-proces
 - 列表页展示缩略图 (~30KB) 而非原图 (2-5MB)
 - 流量节省约 **98%**
 - 缩略图是按需生成，不占用额外存储
+
+### 4. 跨域问题修复（2026-04-01）
+
+**问题**: OSS 图片 URL 直接在前端使用时会被浏览器 CORS 策略阻止，导致：
+- 缩略图无法显示
+- 点击图片无法放大
+
+**解决方案**: 
+1. 缩略图通过后端代理 `/api/proxy/media` 访问
+2. 灯箱预览（lightbox）的图片也通过代理访问
+
+**修改文件**:
+- `backend/services/MaterialService.js` - `generateThumbnailUrl()` 返回代理 URL
+- `frontend/src/views/Gallery.vue` - `imageSources` computed 属性对跨域 URL 进行代理转换
 
 ## 费用节省预估
 

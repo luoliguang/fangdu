@@ -209,13 +209,39 @@ const showTutorial = ref(false); // 控制教程显示
 const tutorialTarget = ref('.search-input-cool'); // 教程聚焦目标
 const tutorialGuideRef = ref(null); // 教程组件引用
 
+// 获取代理URL
+const getProxyUrl = (url) => {
+  try {
+    const proxyPath = '/api/proxy/media';
+    const proxied = new URL(proxyPath, window.location.origin);
+    proxied.searchParams.set('url', url);
+    return proxied.toString();
+  } catch (error) {
+    console.error('构建代理URL失败:', error);
+    return url;
+  }
+};
+
+// 检查URL是否跨域
+const isCrossOriginUrl = (url) => {
+  try {
+    const urlObj = new URL(url, window.location.href);
+    return urlObj.origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+};
+
 const imageSources = computed(() => {
     if (!materials.value || !Array.isArray(materials.value)) {
         return [];
     }
     return materials.value
         .filter(m => m.media_type === 'image')
-        .map(m => m.file_path);
+        .map(m => {
+            // 如果是跨域 URL，使用代理访问
+            return isCrossOriginUrl(m.file_path) ? getProxyUrl(m.file_path) : m.file_path;
+        });
 });
 
 const recordMaterialView = async (material) => {
@@ -704,29 +730,6 @@ const quickCopyImage = async (material) => {
   } catch (error) {
     console.error('快捷复制图片失败:', error);
     showCustomToast('复制失败，请重试', 'error');
-  }
-};
-
-// 检查URL是否跨域
-const isCrossOriginUrl = (url) => {
-  try {
-    const urlObj = new URL(url, window.location.href);
-    return urlObj.origin !== window.location.origin;
-  } catch {
-    return false;
-  }
-};
-
-// 获取代理URL
-const getProxyUrl = (url) => {
-  try {
-    const proxyPath = '/api/proxy/media';
-    const proxied = new URL(proxyPath, window.location.origin);
-    proxied.searchParams.set('url', url);
-    return proxied.toString();
-  } catch (error) {
-    console.error('构建代理URL失败:', error);
-    return url;
   }
 };
 
