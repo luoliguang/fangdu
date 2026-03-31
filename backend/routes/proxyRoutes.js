@@ -95,6 +95,10 @@ function createProxyRoutes() {
         headers['Access-Control-Allow-Headers'] = 'Range, Accept, User-Agent';
         headers['Cross-Origin-Resource-Policy'] = 'cross-origin';
         headers['Cross-Origin-Embedder-Policy'] = 'unsafe-none';
+        // 如果上游没有返回Cache-Control，设置默认缓存时间30天
+        if (!headers['Cache-Control']) {
+          headers['Cache-Control'] = 'public, max-age=2592000';
+        }
         res.writeHead(proxyRes.statusCode || 502, headers);
         if (req.method === 'HEAD') return res.end();
         proxyRes.pipe(res);

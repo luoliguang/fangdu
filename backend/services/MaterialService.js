@@ -30,13 +30,17 @@ class MaterialService {
 
       const result = await this.materialModel.getAll(options);
       
-      // 处理文件URL，确保使用HTTPS
-      result.data = result.data.map(material => ({
-        ...material,
-        file_path: this.ensureHttpsUrl(material.file_path),
-        thumbnail_url: material.thumbnail_url ? this.ensureHttpsUrl(material.thumbnail_url) : null,
-        cover_image_path: material.cover_image_path ? this.ensureHttpsUrl(material.cover_image_path) : null
-      }));
+      // 处理文件URL，确保使用HTTPS，并生成缩略图URL
+      result.data = result.data.map(material => {
+        const httpsUrl = this.ensureHttpsUrl(material.file_path);
+        return {
+          ...material,
+          file_path: httpsUrl,
+          // 使用OSS图片处理生成缩略图（固定宽高，自动裁剪，宽度300，quality 80）
+          thumbnail_url: material.media_type === 'image' ? this.generateThumbnailUrl(httpsUrl) : (material.thumbnail_url ? this.ensureHttpsUrl(material.thumbnail_url) : null),
+          cover_image_path: material.cover_image_path ? this.ensureHttpsUrl(material.cover_image_path) : null
+        };
+      });
 
       return {
         success: true,
@@ -80,11 +84,12 @@ class MaterialService {
       // 确定媒体类型
       const mediaType = file.mimetype.startsWith('image/') ? 'image' : 'video';
       
-      // 上传到OSS，设置正确的Content-Disposition头部
+      // 上传到OSS，设置正确的Content-Disposition头部和缓存策略
       const uploadOptions = {
         headers: {
           'Content-Type': file.mimetype,
-          'Content-Disposition': 'inline' // 设置为inline，允许在浏览器中直接显示
+          'Content-Disposition': 'inline', // 设置为inline，允许在浏览器中直接显示
+          'Cache-Control': 'public, max-age=2592000' // 缓存30天，减少重复请求
         }
       };
       
@@ -212,12 +217,16 @@ class MaterialService {
   async getTopMaterials(limit = 5) {
     try {
       const materials = await this.materialModel.getTopMaterials(Math.min(limit, 20));
-      const data = materials.map(material => ({
-        ...material,
-        file_path: this.ensureHttpsUrl(material.file_path),
-        thumbnail_url: material.thumbnail_url ? this.ensureHttpsUrl(material.thumbnail_url) : null,
-        cover_image_path: material.cover_image_path ? this.ensureHttpsUrl(material.cover_image_path) : null
-      }));
+      const data = materials.map(material => {
+        const httpsUrl = this.ensureHttpsUrl(material.file_path);
+        return {
+          ...material,
+          file_path: httpsUrl,
+          // 使用OSS图片处理生成缩略图
+          thumbnail_url: material.media_type === 'image' ? this.generateThumbnailUrl(httpsUrl) : (material.thumbnail_url ? this.ensureHttpsUrl(material.thumbnail_url) : null),
+          cover_image_path: material.cover_image_path ? this.ensureHttpsUrl(material.cover_image_path) : null
+        };
+      });
 
       return {
         success: true,
@@ -265,6 +274,21 @@ class MaterialService {
   ensureHttpsUrl(url) {
     if (!url) return url;
     return url.replace(/^http:/, 'https:');
+  }
+
+  /**
+   * 生成缩略图URL（使用OSS图片处理）
+   * @param {string} url - 原始图片URL
+   * @param {number} width - 缩略图宽度，默认300
+   * @returns {string} 缩略图URL
+   */
+  generateThumbnailUrl(url, width = 300) {
+    if (!url) return url;
+    // 如果URL已经是缩略图（已包含x-oss-process），直接返回
+    if (url.includes('x-oss-process')) return url;
+    // 添加OSS图片处理参数：固定宽高自动裁剪
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}x-oss-process=image/resize,m_fill,w_${width},quality,q_80`;
   }
 
   /**

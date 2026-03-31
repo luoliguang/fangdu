@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+.env.production
+.env.test
 
 # 数据库文件
 *.db
@@ -23,6 +25,9 @@ lerna-debug.log*
 
 # 依赖目录
 node_modules/
+# 但保留 package.json 和 package-lock.json（必须提交）
+# !package.json
+# !package-lock.json
 
 # 构建输出
 dist/
@@ -60,6 +65,9 @@ Thumbs.db
 # 测试覆盖率
 coverage/
 *.lcov
+
+# Claude AI 工具缓存
+.claude/
 
 # 其他
 *.tgz
