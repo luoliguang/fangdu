@@ -217,63 +217,6 @@
               </div>
             </div>
             
-            <!-- CMYK输入 -->
-            <div v-if="inputMethod === 'cmyk'" class="input-group cmyk-inputs">
-              <div class="cmyk-grid">
-                <div class="cmyk-item">
-                  <label><span class="channel-label c">C</span></label>
-                  <input 
-                    type="number" 
-                    v-model.number="currentColor.cmyk.c" 
-                    @input="handleCmykChange"
-                    min="0" 
-                    max="100"
-                  />
-                  <span class="cmyk-unit">%</span>
-                </div>
-                <div class="cmyk-item">
-                  <label><span class="channel-label m">M</span></label>
-                  <input 
-                    type="number" 
-                    v-model.number="currentColor.cmyk.m" 
-                    @input="handleCmykChange"
-                    min="0" 
-                    max="100"
-                  />
-                  <span class="cmyk-unit">%</span>
-                </div>
-                <div class="cmyk-item">
-                  <label><span class="channel-label y">Y</span></label>
-                  <input 
-                    type="number" 
-                    v-model.number="currentColor.cmyk.y" 
-                    @input="handleCmykChange"
-                    min="0" 
-                    max="100"
-                  />
-                  <span class="cmyk-unit">%</span>
-                </div>
-                <div class="cmyk-item">
-                  <label><span class="channel-label k">K</span></label>
-                  <input 
-                    type="number" 
-                    v-model.number="currentColor.cmyk.k" 
-                    @input="handleCmykChange"
-                    min="0" 
-                    max="100"
-                  />
-                  <span class="cmyk-unit">%</span>
-                </div>
-              </div>
-              
-              <div class="color-preview-row">
-                <div 
-                  class="color-preview" 
-                  :style="{ backgroundColor: currentColor.hex }"
-                ></div>
-              </div>
-            </div>
-            
             <!-- Lab输入 -->
             <div v-if="inputMethod === 'lab'" class="input-group lab-inputs">
               <div class="lab-grid">
@@ -482,6 +425,26 @@
                   </el-select>
                 </div>
               </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label>导出图片时显示色值</label>
+                  <div class="export-color-options">
+                    <label class="checkbox-label">
+                      <input type="checkbox" v-model="exportShowHex" />
+                      <span>HEX</span>
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" v-model="exportShowRgb" />
+                      <span>RGB</span>
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" v-model="exportShowLab" />
+                      <span>Lab</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
             
             <button class="export-button" @click="exportColorCards">
@@ -524,9 +487,7 @@
             <div class="color-info" v-if="showColorValues">
               <div class="color-hex">{{ currentColor.hex }}</div>
               <div class="color-rgb">RGB: {{ currentColor.rgb.r }}, {{ currentColor.rgb.g }}, {{ currentColor.rgb.b }}</div>
-              <div v-if="showCmyk" class="color-cmyk">
-                CMYK: {{ currentColor.cmyk.c }}%, {{ currentColor.cmyk.m }}%, {{ currentColor.cmyk.y }}%, {{ currentColor.cmyk.k }}%
-              </div>
+              <div class="color-lab">Lab: {{ currentColor.lab.L }}, {{ currentColor.lab.a }}, {{ currentColor.lab.b }}</div>
               <div class="color-note">{{ currentColor.note || '当前编辑' }}</div>
             </div>
           </div>
@@ -571,9 +532,7 @@
             <div class="color-info" v-if="showColorValues">
               <div class="color-hex">{{ card.hex }}</div>
               <div class="color-rgb">RGB: {{ card.rgb.r }}, {{ card.rgb.g }}, {{ card.rgb.b }}</div>
-              <div v-if="showCmyk" class="color-cmyk">
-                CMYK: {{ card.cmyk.c }}%, {{ card.cmyk.m }}%, {{ card.cmyk.y }}%, {{ card.cmyk.k }}%
-              </div>
+              <div class="color-lab">Lab: {{ card.lab.L }}, {{ card.lab.a }}, {{ card.lab.b }}</div>
               <div v-if="card.note" class="color-note">{{ card.note }}</div>
             </div>
           </div>
@@ -638,7 +597,6 @@ const showToast = (message, type = 'success') => {
 const inputMethods = [
   { value: 'hex', label: 'HEX', icon: '#' },
   { value: 'rgb', label: 'RGB', icon: 'RGB' },
-  { value: 'cmyk', label: 'CMYK', icon: 'CMYK' },
   { value: 'lab', label: 'Lab', icon: 'Lab' }
 ];
 
@@ -691,18 +649,21 @@ const shadeMode = ref('both');
 const hueOffset = ref(30);
 const colorCount = ref(5);
 const colorCards = ref([]);
-const showCmyk = ref(true);
 const showColorValues = ref(true);
 const layoutMode = ref('grid');
 const globalNote = ref('');
 const selectedMaterial = ref('');
 const cardsPerRowExport = ref(5);
 
+// 导出时显示的色值选项
+const exportShowHex = ref(true);
+const exportShowRgb = ref(true);
+const exportShowLab = ref(true);
+
 // ========== 当前编辑颜色 ==========
 const currentColor = reactive({
   hex: '#3498DB',
   rgb: {r: 52, g: 152, b: 219},
-  cmyk: {c: 76, m: 31, y: 0, k: 14},
   lab: {L: 60, a: -7, b: -41},
   note: '',
   alpha: 1
@@ -745,30 +706,6 @@ const updateHexFromRgb = (r, g, b) => {
   return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`.toUpperCase();
 };
 
-const updateCmykFromRgb = (r, g, b) => {
-  try {
-    const cmyk = chroma(r, g, b).cmyk();
-    return {
-      c: Math.round(cmyk[0] * 100),
-      m: Math.round(cmyk[1] * 100),
-      y: Math.round(cmyk[2] * 100),
-      k: Math.round(cmyk[3] * 100)
-    };
-  } catch {
-    const rRatio = r / 255;
-    const gRatio = g / 255;
-    const bRatio = b / 255;
-    const k = 1 - Math.max(rRatio, gRatio, bRatio);
-    if (k === 1) return { c: 0, m: 0, y: 0, k: 100 };
-    return {
-      c: Math.round(((1 - rRatio - k) / (1 - k)) * 100),
-      m: Math.round(((1 - gRatio - k) / (1 - k)) * 100),
-      y: Math.round(((1 - bRatio - k) / (1 - k)) * 100),
-      k: Math.round(k * 100)
-    };
-  }
-};
-
 const updateLabFromRgb = (r, g, b) => {
   try {
     const lab = chroma(r, g, b).lab();
@@ -791,23 +728,11 @@ const getColorWithAlpha = (color) => {
 const handleHexChange = () => {
   const rgb = updateRgbFromHex(currentColor.hex);
   currentColor.rgb = rgb;
-  currentColor.cmyk = updateCmykFromRgb(rgb.r, rgb.g, rgb.b);
   currentColor.lab = updateLabFromRgb(rgb.r, rgb.g, rgb.b);
 };
 
 const handleRgbChange = () => {
   const {r, g, b} = currentColor.rgb;
-  currentColor.hex = updateHexFromRgb(r, g, b);
-  currentColor.cmyk = updateCmykFromRgb(r, g, b);
-  currentColor.lab = updateLabFromRgb(r, g, b);
-};
-
-const handleCmykChange = () => {
-  const {c, m, y, k} = currentColor.cmyk;
-  const r = Math.round(255 * (1 - c/100) * (1 - k/100));
-  const g = Math.round(255 * (1 - m/100) * (1 - k/100));
-  const b = Math.round(255 * (1 - y/100) * (1 - k/100));
-  currentColor.rgb = {r, g, b};
   currentColor.hex = updateHexFromRgb(r, g, b);
   currentColor.lab = updateLabFromRgb(r, g, b);
 };
@@ -818,7 +743,6 @@ const handleLabChange = () => {
     currentColor.rgb = { r: Math.round(rgb[0]), g: Math.round(rgb[1]), b: Math.round(rgb[2]) };
     const {r, g, b} = currentColor.rgb;
     currentColor.hex = updateHexFromRgb(r, g, b);
-    currentColor.cmyk = updateCmykFromRgb(r, g, b);
   } catch (error) {
     console.error('Lab转换错误:', error);
   }
@@ -855,7 +779,6 @@ const addColorCard = () => {
     id: newId,
     hex: currentColor.hex,
     rgb: {...currentColor.rgb},
-    cmyk: {...currentColor.cmyk},
     lab: {...currentColor.lab},
     note: currentColor.note,
     locked: false,
@@ -886,7 +809,6 @@ const toggleLock = (id) => {
 const editColor = (card) => {
   currentColor.hex = card.hex;
   currentColor.rgb = {...card.rgb};
-  currentColor.cmyk = {...card.cmyk};
   currentColor.lab = {...card.lab};
   currentColor.note = card.note;
   currentColor.alpha = card.alpha;
@@ -905,7 +827,6 @@ const resetAll = () => {
   colorCards.value = [];
   currentColor.hex = '#3498DB';
   currentColor.rgb = {r: 52, g: 152, b: 219};
-  currentColor.cmyk = {c: 76, m: 31, y: 0, k: 14};
   currentColor.lab = {L: 60, a: -7, b: -41};
   currentColor.note = '';
   currentColor.alpha = 1;
@@ -959,7 +880,6 @@ const generateColorScheme = () => {
         id: index + 1,
         hex: color.toUpperCase(),
         rgb,
-        cmyk: updateCmykFromRgb(rgb.r, rgb.g, rgb.b),
         lab: updateLabFromRgb(rgb.r, rgb.g, rgb.b),
         note: '',
         locked: false,
@@ -1163,10 +1083,21 @@ const exportColorCards = () => {
     
     const cardInfo = document.createElement('div');
     cardInfo.className = 'export-card-info';
+    
+    // 根据用户选择构建显示的色值
+    let colorValuesHTML = '';
+    if (exportShowHex.value) {
+      colorValuesHTML += `<div class="export-hex">${card.hex}</div>`;
+    }
+    if (exportShowRgb.value) {
+      colorValuesHTML += `<div class="export-rgb">RGB: ${card.rgb.r}, ${card.rgb.g}, ${card.rgb.b}</div>`;
+    }
+    if (exportShowLab.value) {
+      colorValuesHTML += `<div class="export-lab">Lab: ${card.lab.L}, ${card.lab.a}, ${card.lab.b}</div>`;
+    }
+    
     cardInfo.innerHTML = `
-      <div class="export-hex">${card.hex}</div>
-      <div class="export-rgb">RGB: ${card.rgb.r}, ${card.rgb.g}, ${card.rgb.b}</div>
-      <div class="export-cmyk">CMYK: ${card.cmyk.c}%, ${card.cmyk.m}%, ${card.cmyk.y}%, ${card.cmyk.k}%</div>
+      ${colorValuesHTML}
       ${card.note ? `<div class="export-card-note">${card.note}</div>` : ''}
     `;
     
@@ -1231,6 +1162,7 @@ const exportColorCards = () => {
 
 // ========== 初始化 ==========
 onMounted(() => {
+  // 处理初始颜色
   handleHexChange();
 });
 </script>
@@ -1570,10 +1502,6 @@ onMounted(() => {
 .channel-label.r { background: #e74c3c; }
 .channel-label.g { background: #27ae60; }
 .channel-label.b { background: #3498db; }
-.channel-label.c { background: #00BCD4; }
-.channel-label.m { background: #E91E63; }
-.channel-label.y { background: #FFEB3B; color: #333; }
-.channel-label.k { background: #607D8B; }
 
 .slider-container {
   flex: 1;
@@ -1589,34 +1517,29 @@ onMounted(() => {
 }
 
 /* ========== CMYK 输入 ========== */
-.cmyk-grid, .lab-grid {
+.lab-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
-.cmyk-item, .lab-item {
+.lab-item {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.cmyk-item label, .lab-item label {
+.lab-item label {
   margin: 0;
   width: 20px;
 }
 
-.cmyk-item input, .lab-item input {
+.lab-item input {
   flex: 1;
   padding: 8px;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   text-align: center;
-}
-
-.cmyk-unit {
-  font-size: 0.8rem;
-  color: #7f8c8d;
 }
 
 /* ========== 备注输入 ========== */
@@ -1832,6 +1755,27 @@ onMounted(() => {
   width: 80px;
 }
 
+/* 导出色值选项 */
+.export-color-options {
+  display: flex;
+  gap: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #2c3e50;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 .required {
   color: #e74c3c;
 }
@@ -1949,7 +1893,7 @@ onMounted(() => {
   margin-bottom: 2px;
 }
 
-.color-rgb, .color-cmyk {
+.color-rgb, .color-cmyk, .color-lab {
   color: #666;
   font-size: 0.7rem;
 }
