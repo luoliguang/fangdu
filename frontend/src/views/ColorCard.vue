@@ -459,13 +459,29 @@
                   </div>
                 </div>
               </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label>导出格式</label>
+                  <div class="export-format-options">
+                    <label class="radio-label">
+                      <input type="radio" v-model="exportFormat" value="png" />
+                      <span>PNG 图片</span>
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" v-model="exportFormat" value="pdf" />
+                      <span>PDF 文档</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
             
             <button class="export-button" @click="exportColorCards">
               <svg viewBox="0 0 24 24" fill="none" class="btn-icon">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-              导出色卡图片
+              导出色卡
             </button>
           </div>
         </div>
@@ -673,6 +689,9 @@ const cardsPerRowExport = ref(10);
 const exportShowHex = ref(true);
 const exportShowRgb = ref(true);
 const exportShowLab = ref(false);
+
+// 导出格式选项
+const exportFormat = ref('png');
 
 // ========== 当前编辑颜色 ==========
 const currentColor = reactive({
@@ -1204,7 +1223,6 @@ const exportColorCards = () => {
     const cardInfo = document.createElement('div');
     cardInfo.className = 'export-card-info';
     
-    // 根据用户选择构建显示的色值
     let colorValuesHTML = '';
     if (exportShowHex.value) {
       colorValuesHTML += `<div class="export-hex">${card.hex}</div>`;
@@ -1254,30 +1272,85 @@ const exportColorCards = () => {
   exportContainer.style.position = 'absolute';
   exportContainer.style.left = '-9999px';
   
-  import('html2canvas').then(html2canvasModule => {
-    const html2canvas = html2canvasModule.default;
-    
-    html2canvas(exportContainer, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      logging: false
-    }).then(canvas => {
-      const link = document.createElement('a');
-      link.download = `色卡_${globalNote.value}_${new Date().toISOString().slice(0, 10)}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+  // 根据导出格式选择不同的处理方式
+  if (exportFormat.value === 'pdf') {
+    // PDF 导出
+    import('jspdf').then(jspdfModule => {
+      const { jsPDF } = jspdfModule;
       
-      document.body.removeChild(exportContainer);
-      showToast('导出成功', 'success');
-    }).catch(error => {
-      console.error('导出失败:', error);
-      showToast('导出失败，请重试', 'error');
+      // 先用html2canvas生成图片，再添加到PDF
+      import('html2canvas').then(html2canvasModule => {
+        const html2canvas = html2canvasModule.default;
+        
+        html2canvas(exportContainer, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          logging: false
+        }).then(canvas => {
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a4'
+          });
+          
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
+          
+          // 计算图片尺寸以适应A4
+          const imgWidth = canvas.width;
+          const imgHeight = canvas.height;
+          const ratio = Math.min((pdfWidth - 20) / imgWidth, (pdfHeight - 20) / imgHeight);
+          const printWidth = imgWidth * ratio;
+          const printHeight = imgHeight * ratio;
+          const x = (pdfWidth - printWidth) / 2;
+          const y = (pdfHeight - printHeight) / 2;
+          
+          pdf.addImage(imgData, 'PNG', x, y, printWidth, printHeight);
+          pdf.save(`色卡_${globalNote.value}_${new Date().toISOString().slice(0, 10)}.pdf`);
+          
+          document.body.removeChild(exportContainer);
+          showToast('PDF导出成功', 'success');
+        }).catch(error => {
+          console.error('PDF导出失败:', error);
+          showToast('PDF导出失败，请重试', 'error');
+          document.body.removeChild(exportContainer);
+        });
+      }).catch(() => {
+        showToast('导出功能加载失败', 'error');
+        document.body.removeChild(exportContainer);
+      });
+    }).catch(() => {
+      showToast('PDF功能加载失败', 'error');
       document.body.removeChild(exportContainer);
     });
-  }).catch(() => {
-    showToast('导出功能加载失败', 'error');
-    document.body.removeChild(exportContainer);
-  });
+  } else {
+    // PNG 导出（原有逻辑）
+    import('html2canvas').then(html2canvasModule => {
+      const html2canvas = html2canvasModule.default;
+      
+      html2canvas(exportContainer, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false
+      }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `色卡_${globalNote.value}_${new Date().toISOString().slice(0, 10)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        document.body.removeChild(exportContainer);
+        showToast('导出成功', 'success');
+      }).catch(error => {
+        console.error('导出失败:', error);
+        showToast('导出失败，请重试', 'error');
+        document.body.removeChild(exportContainer);
+      });
+    }).catch(() => {
+      showToast('导出功能加载失败', 'error');
+      document.body.removeChild(exportContainer);
+    });
+  }
 };
 
 // ========== 初始化 ==========
@@ -2284,5 +2357,24 @@ onMounted(() => {
   .cmyk-grid, .lab-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ========== 导出格式选项 ========== */
+.export-format-options {
+  display: flex;
+  gap: 16px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #2c3e50;
+}
+
+.radio-label input[type="radio"] {
+  cursor: pointer;
 }
 </style>
