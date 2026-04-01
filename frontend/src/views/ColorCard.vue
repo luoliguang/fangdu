@@ -330,14 +330,28 @@
               <div class="option-group">
                 <label>生成数量</label>
                 <div class="count-control">
-                  <el-select v-model.number="colorCount" class="count-select">
-                    <el-option
-                      v-for="n in 50"
-                      :key="n"
-                      :label="n + ' 个'"
-                      :value="n"
+                  <div class="count-input-wrapper">
+                    <input 
+                      type="number" 
+                      v-model.number="colorCount" 
+                      min="10" 
+                      max="100" 
+                      step="10"
+                      class="count-input"
+                      @change="handleCountChange"
                     />
-                  </el-select>
+                    <span class="count-unit">个</span>
+                  </div>
+                  <div class="count-presets">
+                    <button 
+                      v-for="n in [10, 20, 30, 50, 100]" 
+                      :key="n"
+                      :class="['preset-btn', { active: colorCount === n }]"
+                      @click="colorCount = n"
+                    >
+                      {{ n }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -639,7 +653,7 @@ const shadeOptions = [
 const materialOptions = [
   '速干', '莫代尔', '210克速干', '珠地', '仿棉', '260克莫代尔', 
   '260克珠地', '冰丝蝴蝶网', '小方格', '水蜜桃', '复合', 'T400', 
-  '斜纹', '健康布', '银狐绒', '罗马布', '空气层', '牛奶丝'
+  '斜纹', '健康布', '银狐绒', '牛奶丝'
 ];
 
 // ========== 状态定义 ==========
@@ -647,18 +661,18 @@ const inputMethod = ref('hex');
 const colorScheme = ref('shades');
 const shadeMode = ref('both');
 const hueOffset = ref(30);
-const colorCount = ref(5);
+const colorCount = ref(30);
 const colorCards = ref([]);
 const showColorValues = ref(true);
 const layoutMode = ref('grid');
 const globalNote = ref('');
 const selectedMaterial = ref('');
-const cardsPerRowExport = ref(5);
+const cardsPerRowExport = ref(10);
 
 // 导出时显示的色值选项
 const exportShowHex = ref(true);
 const exportShowRgb = ref(true);
-const exportShowLab = ref(true);
+const exportShowLab = ref(false);
 
 // ========== 当前编辑颜色 ==========
 const currentColor = reactive({
@@ -758,6 +772,16 @@ const updateAlphaFromPercentage = () => {
 
 const handleSchemeChange = () => {
   // 切换配色方案时触发
+};
+
+const handleCountChange = () => {
+  // 确保生成数量是10的倍数，在10-100之间
+  let val = colorCount.value;
+  val = Math.max(10, Math.min(100, val));
+  val = Math.round(val / 10) * 10; // 四舍五入到最近的10
+  if (val < 10) val = 10;
+  if (val > 100) val = 100;
+  colorCount.value = val;
 };
 
 // ========== 添加色卡 ==========
@@ -863,7 +887,7 @@ const generateColorScheme = () => {
         colors = generateTetradic(baseColor, count);
         break;
       case 'monochromatic':
-        colors = generateMonochromatic(baseColor, count);
+        colors = generateMonochromatic(baseColor, count, shadeMode.value);
         break;
       case 'customHue':
         colors = generateCustomHue(baseColor, count, hueOffset.value);
@@ -873,7 +897,9 @@ const generateColorScheme = () => {
     }
     
     // 清空现有色卡并添加新生成的
+    // 只添加生成的渐变色，当前颜色已经在模板中单独显示了
     colorCards.value = [];
+    
     colors.forEach((color, index) => {
       const rgb = updateRgbFromHex(color);
       colorCards.value.push({
@@ -895,22 +921,48 @@ const generateColorScheme = () => {
 };
 
 // ========== 配色方案生成函数 ==========
+// 注意：生成的渐变色不包含原始颜色本身
 const generateShades = (baseColor, count, mode) => {
   const colors = [];
+  const base = chroma(baseColor);
+  const baseLab = base.lab();
+  const baseL = baseLab[0]; // 原始颜色的亮度值
   
-  if (mode === 'light' || mode === 'both') {
-    const lighterCount = mode === 'light' ? count : Math.floor(count / 2);
-    for (let i = 1; i <= lighterCount; i++) {
-      const factor = i / (lighterCount + 1);
-      colors.push(chroma.mix(baseColor, '#FFFFFF', factor, 'rgb').hex());
+  // 进一步限制亮度范围，偏差更小
+  const maxL = Math.min(90, baseL + 20);
+  const minL = Math.max(10, baseL - 20);
+  
+  // 生成 count 个渐变色
+  if (mode === 'light') {
+    for (let i = 1; i <= count; i++) {
+      const factor = i / (count + 1);
+      const targetL = baseL + (maxL - baseL) * factor;
+      const newColor = chroma.lab(targetL, baseLab[1], baseLab[2]).hex();
+      colors.push(newColor);
     }
-  }
-  
-  if (mode === 'dark' || mode === 'both') {
-    const darkerCount = mode === 'dark' ? count : count - colors.length;
-    for (let i = 1; i <= darkerCount; i++) {
-      const factor = i / (darkerCount + 1);
-      colors.push(chroma.mix(baseColor, '#000000', factor, 'rgb').hex());
+  } else if (mode === 'dark') {
+    for (let i = 1; i <= count; i++) {
+      const factor = i / (count + 1);
+      const targetL = baseL + (minL - baseL) * factor;
+      const newColor = chroma.lab(targetL, baseLab[1], baseLab[2]).hex();
+      colors.push(newColor);
+    }
+  } else {
+    // 浅-深
+    const halfCount = Math.floor(count / 2);
+    // 浅色方向
+    for (let i = 1; i <= halfCount; i++) {
+      const factor = i / (halfCount + 1);
+      const targetL = baseL + (maxL - baseL) * factor;
+      const newColor = chroma.lab(targetL, baseLab[1], baseLab[2]).hex();
+      colors.push(newColor);
+    }
+    // 深色方向
+    for (let i = 1; i <= count - halfCount; i++) {
+      const factor = i / (count - halfCount + 1);
+      const targetL = baseL + (minL - baseL) * factor;
+      const newColor = chroma.lab(targetL, baseLab[1], baseLab[2]).hex();
+      colors.push(newColor);
     }
   }
   
@@ -918,120 +970,188 @@ const generateShades = (baseColor, count, mode) => {
 };
 
 const generateComplementary = (baseColor, count) => {
+  const colors = [];
   const base = chroma(baseColor);
-  const colors = [baseColor];
+  const baseLab = base.lab();
+  const baseL = baseLab[0];
   
-  const comp = base.set('hsl.h', (base.get('hsl.h') + 180) % 360);
-  colors.push(comp.hex());
+  // 计算互补色
+  const compColor = base.set('hsl.h', (base.get('hsl.h') + 180) % 360);
+  const compLab = compColor.lab();
   
-  // 添加中间过渡色
-  if (count > 2) {
-    const steps = count - 2;
-    for (let i = 1; i <= steps; i++) {
-      const factor = i / (steps + 1);
-      colors.splice(1, 0, chroma.mix(base, comp, factor, 'hsl').hex());
+  // 限制亮度范围
+  const maxL = Math.min(90, baseL + 20);
+  const minL = Math.max(10, baseL - 20);
+  
+  // 生成 count 个过渡色
+  if (count > 0) {
+    const step = 1 / (count || 1);
+    for (let i = 1; i <= count; i++) {
+      const factor = i * step;
+      
+      let newL = baseL + (compLab[0] - baseL) * factor;
+      newL = Math.max(minL, Math.min(maxL, newL));
+      
+      const newA = baseLab[1] + (compLab[1] - baseLab[1]) * factor;
+      const newB = baseLab[2] + (compLab[2] - baseLab[2]) * factor;
+      
+      colors.push(chroma.lab(newL, newA, newB).hex());
     }
   }
   
-  return colors.slice(0, count);
+  return colors;
 };
 
 const generateTriadic = (baseColor, count) => {
+  const colors = [];
   const base = chroma(baseColor);
   const h = base.get('hsl.h');
-  const colors = [
-    baseColor,
-    base.set('hsl.h', (h + 120) % 360).hex(),
-    base.set('hsl.h', (h + 240) % 360).hex()
-  ];
+  const s = base.get('hsl.s');
+  const l = base.get('hsl.l');
   
-  // 填充到指定数量
-  while (colors.length < count) {
-    colors.push(colors[colors.length % 3]);
+  const maxShift = 25;
+  const step = maxShift / (count || 1);
+  
+  // 生成 count 个
+  for (let i = 1; i <= count; i++) {
+    const newH = (h + 120 + i * step) % 360;
+    const newL = Math.max(0.2, Math.min(0.8, l + (i / count) * 0.1));
+    colors.push(chroma.hsl(newH, s, newL).hex());
   }
   
-  return colors.slice(0, count);
+  return colors;
 };
 
 const generateAnalogous = (baseColor, count) => {
+  const colors = [];
   const base = chroma(baseColor);
   const h = base.get('hsl.h');
-  const colors = [];
-  const step = 30;
+  const s = base.get('hsl.s');
+  const l = base.get('hsl.l');
   
-  const startIdx = Math.floor(-(count - 1) / 2);
-  for (let i = 0; i < count; i++) {
-    const newH = (h + (startIdx + i) * step + 360) % 360;
-    colors.push(base.set('hsl.h', newH).hex());
+  const maxHueShift = 15;
+  const hueStep = maxHueShift / (count || 1);
+  
+  // 生成 count 个
+  for (let i = 1; i <= count; i++) {
+    const newH = (h + i * hueStep) % 360;
+    const newL = Math.max(0.2, Math.min(0.8, l + (i / count) * 0.1));
+    colors.push(chroma.hsl(newH, s, newL).hex());
   }
   
   return colors;
 };
 
 const generateSplitComplementary = (baseColor, count) => {
+  const colors = [];
   const base = chroma(baseColor);
   const h = base.get('hsl.h');
-  const colors = [
-    baseColor,
-    base.set('hsl.h', (h + 150) % 360).hex(),
-    base.set('hsl.h', (h + 210) % 360).hex()
-  ];
+  const s = base.get('hsl.s');
+  const l = base.get('hsl.l');
   
-  while (colors.length < count) {
-    colors.push(colors[colors.length % 3]);
+  const maxShift = 20;
+  const step = maxShift / (count || 1);
+  
+  // 生成 count 个
+  for (let i = 1; i <= count; i++) {
+    const newH = (h + 150 + i * step) % 360;
+    const newL = Math.max(0.2, Math.min(0.8, l + (i / count) * 0.1));
+    colors.push(chroma.hsl(newH, s, newL).hex());
   }
   
-  return colors.slice(0, count);
+  return colors;
 };
 
 const generateTetradic = (baseColor, count) => {
+  const colors = [];
   const base = chroma(baseColor);
   const h = base.get('hsl.h');
-  const colors = [
-    baseColor,
-    base.set('hsl.h', (h + 90) % 360).hex(),
-    base.set('hsl.h', (h + 180) % 360).hex(),
-    base.set('hsl.h', (h + 270) % 360).hex()
-  ];
+  const s = base.get('hsl.s');
+  const l = base.get('hsl.l');
   
-  while (colors.length < count) {
-    colors.push(colors[colors.length % 4]);
+  const maxShift = 20;
+  const step = maxShift / (count || 1);
+  
+  // 生成 count 个
+  for (let i = 1; i <= count; i++) {
+    const newH = (h + 90 + i * step) % 360;
+    const newL = Math.max(0.2, Math.min(0.8, l + (i / count) * 0.1));
+    colors.push(chroma.hsl(newH, s, newL).hex());
   }
   
-  return colors.slice(0, count);
+  return colors;
 };
 
-const generateMonochromatic = (baseColor, count) => {
-  const base = chroma(baseColor);
+const generateMonochromatic = (baseColor, count, mode = 'both') => {
   const colors = [];
+  const base = chroma(baseColor);
+  const baseLab = base.lab();
+  const baseL = baseLab[0];
   
-  for (let i = 0; i < count; i++) {
-    const s = 1 - (i / (count - 1)) * 0.8;
-    const l = 0.2 + (i / (count - 1)) * 0.6;
-    colors.push(base.set('hsl.s', Math.max(0, s)).set('hsl.l', l).hex());
+  const maxL = Math.min(90, baseL + 20);
+  const minL = Math.max(10, baseL - 20);
+  
+  // 生成 count 个
+  if (mode === 'light') {
+    for (let i = 1; i <= count; i++) {
+      const factor = i / (count + 1);
+      const targetL = baseL + (maxL - baseL) * factor;
+      const newColor = chroma.lab(targetL, baseLab[1], baseLab[2]).hex();
+      colors.push(newColor);
+    }
+  } else if (mode === 'dark') {
+    for (let i = 1; i <= count; i++) {
+      const factor = i / (count + 1);
+      const targetL = baseL + (minL - baseL) * factor;
+      const newColor = chroma.lab(targetL, baseLab[1], baseLab[2]).hex();
+      colors.push(newColor);
+    }
+  } else {
+    const halfCount = Math.floor(count / 2);
+    for (let i = 1; i <= halfCount; i++) {
+      const factor = i / (halfCount + 1);
+      const targetL = baseL + (maxL - baseL) * factor;
+      const newColor = chroma.lab(targetL, baseLab[1], baseLab[2]).hex();
+      colors.push(newColor);
+    }
+    for (let i = 1; i <= count - halfCount; i++) {
+      const factor = i / (count - halfCount + 1);
+      const targetL = baseL + (minL - baseL) * factor;
+      const newColor = chroma.lab(targetL, baseLab[1], baseLab[2]).hex();
+      colors.push(newColor);
+    }
   }
   
   return colors;
 };
 
 const generateCustomHue = (baseColor, count, offset) => {
+  const colors = [];
   const base = chroma(baseColor);
-  const h = base.get('hsl.h');
-  const colors = [baseColor];
+  const baseLab = base.lab();
+  const baseL = baseLab[0];
   
-  const newH = (h + offset + 360) % 360;
-  colors.push(base.set('hsl.h', newH).hex());
+  const maxL = Math.min(90, baseL + 20);
+  const minL = Math.max(10, baseL - 20);
   
-  // 添加过渡色
-  if (count > 2) {
-    const steps = count - 2;
-    for (let i = 1; i <= steps; i++) {
-      const factor = i / (steps + 1);
-      colors.splice(1, 0, chroma.mix(chroma(baseColor), chroma(colors[1]), factor, 'hsl').hex());
-    }
+  const maxOffset = Math.abs(offset) * 0.5;
+  const step = maxOffset / (count || 1);
+  
+  const direction = offset > 0 ? 1 : -1;
+  for (let i = 1; i <= count; i++) {
+    const currentOffset = step * i * direction;
+    const h = base.get('hsl.h');
+    const s = base.get('hsl.s');
+    const l = base.get('hsl.l');
+    
+    const newH = (h + currentOffset + 360) % 360;
+    let newL = l * 100 + (maxL - baseL) * (i / count) * 0.5;
+    newL = Math.max(minL, Math.min(maxL, newL));
+    
+    colors.push(chroma.hsl(newH, s, newL / 100).hex());
   }
   
-  return colors.slice(0, count);
+  return colors;
 };
 
 // ========== 导出功能 ==========
@@ -1645,6 +1765,64 @@ onMounted(() => {
 .scheme-desc {
   font-size: 0.75rem;
   color: #7f8c8d;
+}
+
+/* ========== 生成数量输入 ========== */
+.count-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.count-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.count-input {
+  width: 80px;
+  padding: 8px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.count-input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.count-unit {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.count-presets {
+  display: flex;
+  gap: 6px;
+}
+
+.preset-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #e0e0e0;
+  background: #ffffff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.preset-btn:hover {
+  border-color: #3498db;
+}
+
+.preset-btn.active {
+  background: #3498db;
+  border-color: #3498db;
+  color: white;
 }
 
 .shade-options {
