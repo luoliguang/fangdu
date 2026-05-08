@@ -1,5 +1,6 @@
 <template>
-  <div class="drawer-config-container">
+  <div class="admin-page-shell">
+    <div class="drawer-config-container">
     <div class="page-header">
       <h1>抽屉配置管理</h1>
       <p class="page-description">管理左侧抽屉的公告、教程、快速筛选器等内容</p>
@@ -450,6 +451,7 @@
     <div v-if="loading" class="loading-overlay">
       <div class="loading-spinner">加载中...</div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -897,10 +899,17 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.admin-page-shell {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
 .drawer-config-container {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
+  min-width: 0;
 }
 
 .page-header {
@@ -925,6 +934,15 @@ onMounted(() => {
   gap: 8px;
   margin-bottom: 30px;
   border-bottom: 2px solid #f0f0f0;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.config-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-button {
@@ -1643,16 +1661,36 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .drawer-config-container {
-    padding: 16px;
+    padding: 14px 10px;
   }
-  
+
+  .page-header {
+    margin-bottom: 20px;
+  }
+
+  .page-header h1 {
+    font-size: 22px;
+  }
+
+  .page-description {
+    font-size: 14px;
+  }
+
   .config-tabs {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+    margin-bottom: 18px;
   }
-  
+
   .tab-button {
-    flex: 1;
-    min-width: 120px;
+    flex: 0 0 auto;
+    min-width: 104px;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .tab-label {
+    white-space: nowrap;
   }
   
   .section-header {
@@ -1662,26 +1700,29 @@ onMounted(() => {
   }
   
   .card-header {
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: space-between !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
     gap: 8px;
   }
-  
+
   .card-header h3 {
-    max-width: calc(100% - 150px) !important;
+    max-width: 100% !important;
     font-size: 13px !important;
   }
-  
+
   .tutorial-title-row,
   .filter-title-row,
   .contact-title-row {
-    max-width: calc(100% - 150px) !important;
+    max-width: 100% !important;
   }
-  
+
   .card-actions {
+    width: 100%;
     flex-direction: row !important;
-    gap: 4px !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start;
   }
   
   .edit-btn,
@@ -1701,8 +1742,27 @@ onMounted(() => {
   }
   
   .modal-content {
-    width: 95%;
-    margin: 20px;
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
+    max-height: 86vh;
+    margin: 10px;
+  }
+
+  .form-content {
+    padding: 14px;
+  }
+
+  .form-actions {
+    flex-wrap: wrap;
+  }
+
+  .save-btn,
+  .cancel-btn {
+    flex: 1 1 120px;
+  }
+
+  .markdown-editor-wrapper :deep(.md-editor) {
+    min-width: 0;
   }
 }
 </style>
