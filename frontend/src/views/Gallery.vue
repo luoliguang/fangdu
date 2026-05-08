@@ -19,11 +19,20 @@ function generateUUID() {
 
 // --- 基础状态 ---
 const materials = ref([]);
+const displayMaterials = ref([]);
 const searchTerm = ref('');
 const tags = ref([]);
 const activeTag = ref('');
 const isLoading = ref(false); // 初始为 false
 let debounceTimer = null;
+let requestSerial = 0;
+let latestAppliedSerial = 0;
+let lastSubmittedQuery = '';
+let appendFrameId = null;
+let suggestionsTimer = null;
+let suggestionsSerial = 0;
+let lastSuggestionKeyword = '';
+const isChunkRendering = ref(false);
 const isTagsExpanded = ref(false); //控制标签面板是否展开
 const tagsContainerRef = ref(null); // 标签容器引用
 const visibleTagsCount = ref(20); // 动态计算的可见标签数量
@@ -147,9 +156,25 @@ const calculateVisibleTags = async () => {
 // --- 分页与无限滚动状态 ---
 const currentPage = ref(1);
 const totalPages = ref(1);
+const SEARCH_RESULT_MAX = 120;
 const hasMore = computed(() => currentPage.value < totalPages.value);
+const isSearching = computed(() => searchTerm.value.trim().length > 0 || activeTag.value !== '');
+const reachedSearchDisplayLimit = computed(() => isSearching.value && displayMaterials.value.length >= SEARCH_RESULT_MAX);
 const observerEl = ref(null);
 let observer = null;
+
+const handleWindowResize = () => {
+  setTimeout(async () => {
+    await calculateVisibleTags();
+  }, 100);
+};
+
+const handleDocumentClick = (e) => {
+  const searchWrapper = document.querySelector('.search-wrapper');
+  if (searchWrapper && !searchWrapper.contains(e.target)) {
+    showSuggestions.value = false;
+  }
+};
 
 // --- Lightbox 和 Video Modal 状态 ---
 const lightboxVisible = ref(false);
@@ -232,16 +257,25 @@ const isCrossOriginUrl = (url) => {
   }
 };
 
-const imageSources = computed(() => {
-    if (!materials.value || !Array.isArray(materials.value)) {
-        return [];
+const imageOnlyMaterials = computed(() => {
+    if (!displayMaterials.value || !Array.isArray(displayMaterials.value)) {
+      return [];
     }
-    return materials.value
-        .filter(m => m.media_type === 'image')
-        .map(m => {
-            // 如果是跨域 URL，使用代理访问
-            return isCrossOriginUrl(m.file_path) ? getProxyUrl(m.file_path) : m.file_path;
-        });
+    return displayMaterials.value.filter(m => m.media_type === 'image');
+});
+
+const imageIndexMap = computed(() => {
+  const map = new Map();
+  imageOnlyMaterials.value.forEach((item, idx) => {
+    map.set(item.id, idx);
+  });
+  return map;
+});
+
+const imageSources = computed(() => {
+    return imageOnlyMaterials.value.map(m => {
+        return isCrossOriginUrl(m.file_path) ? getProxyUrl(m.file_path) : m.file_path;
+    });
 });
 
 const recordMaterialView = async (material) => {
@@ -258,10 +292,8 @@ const showMedia = (material) => {
     recordMaterialView(material);
 
     if (material.media_type === 'image') {
-        if (!materials.value || !Array.isArray(materials.value)) {
-            return;
-        }
-        const imageIndex = materials.value.filter(m => m.media_type === 'image').findIndex(m => m.id === material.id);
+        const imageIndex = imageIndexMap.value.get(material.id);
+        if (imageIndex === undefined || imageIndex < 0) return;
         lightboxIndex.value = imageIndex;
         lightboxVisible.value = true;
     } else if (material.media_type === 'video') {
@@ -275,76 +307,130 @@ const showMedia = (material) => {
     }
 };
 
+const applyDisplayMaterials = (source, { append = false, chunkSize = 24 } = {}) => {
+    if (appendFrameId) {
+      cancelAnimationFrame(appendFrameId);
+      appendFrameId = null;
+    }
+
+    const safeSource = Array.isArray(source) ? source : [];
+    isChunkRendering.value = true;
+
+    if (!append) {
+      displayMaterials.value = [];
+    }
+
+    if (safeSource.length === 0) {
+      isChunkRendering.value = false;
+      return;
+    }
+
+    let cursor = 0;
+    const pump = () => {
+      if (isSearching.value && displayMaterials.value.length >= SEARCH_RESULT_MAX) {
+        appendFrameId = null;
+        isChunkRendering.value = false;
+        return;
+      }
+
+      const nextChunk = safeSource.slice(cursor, cursor + chunkSize);
+      if (nextChunk.length > 0) {
+        const cappedChunk = isSearching.value
+          ? nextChunk.slice(0, Math.max(0, SEARCH_RESULT_MAX - displayMaterials.value.length))
+          : nextChunk;
+
+        displayMaterials.value = append || cursor > 0
+          ? [...displayMaterials.value, ...cappedChunk]
+          : cappedChunk;
+      }
+      cursor += chunkSize;
+      if (cursor < safeSource.length) {
+        appendFrameId = requestAnimationFrame(pump);
+      } else {
+        appendFrameId = null;
+        isChunkRendering.value = false;
+      }
+    };
+
+    pump();
+};
+
 const fetchMaterials = async (isLoadMore = false) => {
-    // 修复：移除可能导致首次加载失败的防重复请求逻辑
-    // 只在真正的加载更多操作时才检查loading状态
     if (isLoadMore && isLoading.value) return;
+
+    const query = {
+      search: searchTerm.value.trim(),
+      tag: activeTag.value,
+      page: currentPage.value,
+      limit: 20
+    };
+
+    const requestId = ++requestSerial;
     isLoading.value = true;
 
     try {
         const response = await apiClient.get(`/api/v1/materials`, {
-            params: {
-                search: searchTerm.value,
-                tag: activeTag.value,
-                page: currentPage.value,
-                limit: 20
-            }
+            params: query
         });
 
-        // 确保 response.data 和 meta 存在
+        // 忽略过期响应，避免旧请求覆盖新搜索结果
+        if (requestId < latestAppliedSerial) return;
+        latestAppliedSerial = requestId;
+
         if (response.data && response.data.meta) {
             const { data, meta } = response.data;
             if (isLoadMore) {
                 materials.value.push(...data);
+                applyDisplayMaterials(data, { append: true, chunkSize: 20 });
             } else {
                 materials.value = data;
+                applyDisplayMaterials(data, { append: false, chunkSize: 20 });
             }
             totalPages.value = meta.totalPages;
-            
-            // 如果没有搜索结果且有搜索词，获取建议
-            if (data.length === 0 && searchTerm.value.trim().length > 0 && !isLoadMore) {
+
+            if (data.length === 0 && query.search.length > 0 && !isLoadMore) {
                 await fetchSearchSuggestions();
             } else {
                 showSuggestions.value = false;
                 searchSuggestions.value = [];
             }
         } else {
-            // 如果后端返回数据格式不正确，清空并打印警告
             console.warn("后端返回数据格式不正确，缺少 meta 信息");
             materials.value = [];
-            // 当没有素材且不在加载中时，显示留言表单
+            displayMaterials.value = [];
             showFeedbackForm.value = materials.value.length === 0 && !isLoading.value;
-            
-            // 如果有搜索词，获取建议
-            if (searchTerm.value.trim().length > 0) {
+
+            if (query.search.length > 0) {
                 await fetchSearchSuggestions();
             }
         }
     } catch (error) {
-        console.error('获取素材失败:', error);
+        if (requestId >= latestAppliedSerial) {
+          console.error('获取素材失败:', error);
+        }
     } finally {
-        isLoading.value = false;
-        // 当没有素材且不在加载中时，显示留言表单
-        showFeedbackForm.value = materials.value.length === 0 && !isLoading.value;
+        if (requestId === requestSerial) {
+          isLoading.value = false;
+          showFeedbackForm.value = materials.value.length === 0 && !isLoading.value;
+        }
     }
 };
 
 // 获取搜索建议
 const fetchSearchSuggestions = async () => {
     const trimmedSearch = searchTerm.value.trim();
-    if (!trimmedSearch || trimmedSearch.length === 0) {
+    if (!trimmedSearch || trimmedSearch.length < 2) {
         searchSuggestions.value = [];
         showSuggestions.value = false;
         return;
     }
 
-    // 如果搜索词太短，不获取建议
-    if (trimmedSearch.length < 1) {
-        searchSuggestions.value = [];
-        showSuggestions.value = false;
-        return;
+    if (trimmedSearch === lastSuggestionKeyword && searchSuggestions.value.length > 0) {
+      showSuggestions.value = true;
+      return;
     }
 
+    const serial = ++suggestionsSerial;
     isFetchingSuggestions.value = true;
     try {
         const response = await apiClient.get(`/api/v1/materials/suggestions`, {
@@ -354,19 +440,26 @@ const fetchSearchSuggestions = async () => {
             }
         });
 
+        if (serial !== suggestionsSerial) return;
+
         if (response.data && response.data.success) {
             searchSuggestions.value = response.data.data || [];
             showSuggestions.value = searchSuggestions.value.length > 0;
+            lastSuggestionKeyword = trimmedSearch;
         } else {
             searchSuggestions.value = [];
             showSuggestions.value = false;
         }
     } catch (error) {
-        console.error('获取搜索建议失败:', error);
-        searchSuggestions.value = [];
-        showSuggestions.value = false;
+        if (serial === suggestionsSerial) {
+          console.error('获取搜索建议失败:', error);
+          searchSuggestions.value = [];
+          showSuggestions.value = false;
+        }
     } finally {
-        isFetchingSuggestions.value = false;
+        if (serial === suggestionsSerial) {
+          isFetchingSuggestions.value = false;
+        }
     }
 };
 
@@ -375,7 +468,20 @@ const useSuggestion = (suggestion) => {
     searchTerm.value = suggestion;
     showSuggestions.value = false;
     searchSuggestions.value = [];
-    handleFilterChange();
+};
+
+const showMoreSearchResults = () => {
+  if (!isSearching.value) return;
+  if (!materials.value || materials.value.length <= displayMaterials.value.length) return;
+
+  const previousMax = SEARCH_RESULT_MAX;
+  const incrementalChunk = materials.value.slice(displayMaterials.value.length, displayMaterials.value.length + 80);
+
+  applyDisplayMaterials(incrementalChunk, { append: true, chunkSize: 20 });
+
+  if (displayMaterials.value.length < previousMax) {
+    // no-op, keep current behavior stable
+  }
 };
 
 // 处理搜索框获得焦点
@@ -492,13 +598,15 @@ const getSessionId = () => {
     return sessionId;
 };
 
-const recordSearchKeyword = async () => {
-    const keyword = searchTerm.value.trim();
-    if (!keyword) return;
+const recordSearchKeyword = async (keyword) => {
+    const normalized = (keyword || '').trim();
+    if (!normalized || normalized === lastSubmittedQuery) return;
+
+    lastSubmittedQuery = normalized;
 
     try {
         await apiClient.post('/api/v1/visits/search', {
-            keyword,
+            keyword: normalized,
             page: window.location.pathname,
             sessionId: getSessionId()
         });
@@ -510,11 +618,9 @@ const recordSearchKeyword = async () => {
 const handleFilterChange = () => {
     currentPage.value = 1;
     totalPages.value = 1;
-    // 不立即清空，让 fetchMaterials 直接替换，避免闪烁
-    fetchMaterials(false); // 传入 false 表示是全新加载
+    fetchMaterials(false);
 
-    // 记录搜索关键词
-    recordSearchKeyword();
+    recordSearchKeyword(searchTerm.value);
 };
 
 const filterByTag = (tag) => {
@@ -525,23 +631,23 @@ const filterByTag = (tag) => {
 
 watch(searchTerm, () => {
     clearTimeout(debounceTimer);
+    clearTimeout(suggestionsTimer);
+
     debounceTimer = setTimeout(() => {
         handleFilterChange();
-        // 如果搜索词不为空，延迟获取建议（避免频繁请求）
-        if (searchTerm.value.trim().length > 0) {
-            // 只有在没有搜索结果时才显示建议
-            if (materials.value.length === 0) {
-                setTimeout(() => {
-                    fetchSearchSuggestions();
-                }, 500);
-            } else {
-                showSuggestions.value = false;
-            }
-        } else {
-            showSuggestions.value = false;
-            searchSuggestions.value = [];
-        }
-    }, 300);
+    }, 500);
+
+    suggestionsTimer = setTimeout(async () => {
+      const trimmed = searchTerm.value.trim();
+      if (!trimmed) {
+        showSuggestions.value = false;
+        searchSuggestions.value = [];
+        lastSuggestionKeyword = '';
+        return;
+      }
+
+      await fetchSearchSuggestions();
+    }, 380);
 });
 
 const setupObserver = () => {
@@ -552,6 +658,7 @@ const setupObserver = () => {
     
     observer = new IntersectionObserver((entries) => {
         const firstEntry = entries[0];
+        if (isSearching.value) return;
         if (firstEntry.isIntersecting && hasMore.value && !isLoading.value) {
             currentPage.value++;
             fetchMaterials(true);
@@ -585,21 +692,9 @@ onMounted(() => {
     nextTick(() => {
         setupObserver();
     });
-    
-    // 监听窗口大小变化
-    window.addEventListener('resize', () => {
-      setTimeout(async () => {
-        await calculateVisibleTags();
-      }, 100);
-    });
-    
-    // 点击外部关闭搜索建议
-    document.addEventListener('click', (e) => {
-      const searchWrapper = document.querySelector('.search-wrapper');
-      if (searchWrapper && !searchWrapper.contains(e.target)) {
-        showSuggestions.value = false;
-      }
-    });
+
+    window.addEventListener('resize', handleWindowResize);
+    document.addEventListener('click', handleDocumentClick);
 });
 
 // keep-alive组件激活时的逻辑
@@ -617,12 +712,21 @@ onUnmounted(() => {
         galleryCallbacks.value.handleShowMedia = null;
         galleryCallbacks.value.handleRemoveFromFavorites = null;
     }
-    
-    if (observer && observerEl.value) {
-        observer.unobserve(observerEl.value);
+
+    if (observer) {
+      observer.disconnect();
     }
-    // 移除窗口大小变化监听器
-    window.removeEventListener('resize', calculateVisibleTags);
+
+    if (appendFrameId) {
+      cancelAnimationFrame(appendFrameId);
+      appendFrameId = null;
+    }
+
+    clearTimeout(debounceTimer);
+    clearTimeout(suggestionsTimer);
+
+    window.removeEventListener('resize', handleWindowResize);
+    document.removeEventListener('click', handleDocumentClick);
 });
 
 // 新增：处理小部件鼠标进入事件
@@ -832,14 +936,14 @@ const copyImageNative = async (imageUrl, material) => {
         </button>
       </TransitionGroup>
     </div>
-    <TransitionGroup name="gallery" tag="div" class="grid-container">
+    <TransitionGroup :name="isChunkRendering ? '' : 'gallery'" tag="div" class="grid-container">
       <div 
-        v-for="material in materials" 
+        v-for="material in displayMaterials" 
         :key="material.id" 
         class="grid-item"
         @click="showMedia(material)" 
       >
-        <img v-if="material.media_type === 'image'" :src="material.thumbnail_url || material.file_path" :alt="material.name" loading="lazy" >
+        <img v-if="material.media_type === 'image'" :src="material.thumbnail_url || material.file_path" :alt="material.name" loading="lazy" decoding="async" fetchpriority="low">
         <video 
             v-else-if="material.media_type === 'video'"
             :src="material.file_path" 
@@ -884,7 +988,11 @@ const copyImageNative = async (imageUrl, material) => {
 
     <div class="load-more-container">
         <div v-if="isLoading" class="loader"></div>
-        <p v-if="!hasMore && materials && materials.length > 0 && !isLoading" class="load-complete">已加载全部素材</p>
+        <div v-if="reachedSearchDisplayLimit" class="search-limit-wrap">
+          <p class="load-complete">搜索结果较多，已优先展示前 {{ SEARCH_RESULT_MAX }} 条</p>
+          <button class="show-more-btn" @click="showMoreSearchResults">继续加载更多结果</button>
+        </div>
+        <p v-else-if="!hasMore && materials && materials.length > 0 && !isLoading" class="load-complete">已加载全部素材</p>
         <p v-if="(!materials || materials.length === 0) && !isLoading && (!searchTerm || searchTerm.trim().length === 0) && (!activeTag || activeTag === '')" class="no-results">输入关键词探索素材</p>
         <div v-if="(!materials || materials.length === 0) && !isLoading && ((searchTerm && searchTerm.trim().length > 0) || (activeTag && activeTag !== ''))" class="no-results">
             <p>暂无更多的素材</p>
@@ -1349,6 +1457,27 @@ const copyImageNative = async (imageUrl, material) => {
   color: #28a745;
   font-weight: 500;
   margin: 1rem 0;
+}
+
+.search-limit-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.show-more-btn {
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.92), rgba(168, 85, 247, 0.88));
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.show-more-btn:hover {
+  filter: brightness(1.08);
 }
 
 .no-results {
