@@ -156,10 +156,18 @@ const calculateVisibleTags = async () => {
 // --- 分页与无限滚动状态 ---
 const currentPage = ref(1);
 const totalPages = ref(1);
+const totalItems = ref(0);
 const SEARCH_RESULT_MAX = 120;
 const hasMore = computed(() => currentPage.value < totalPages.value);
 const isSearching = computed(() => searchTerm.value.trim().length > 0 || activeTag.value !== '');
 const reachedSearchDisplayLimit = computed(() => isSearching.value && displayMaterials.value.length >= SEARCH_RESULT_MAX);
+const hasHiddenSearchResults = computed(() => isSearching.value && materials.value.length > displayMaterials.value.length);
+const totalResultCount = computed(() => {
+  if (totalItems.value && totalItems.value > 0) return totalItems.value;
+  return Math.max(materials.value.length, displayMaterials.value.length);
+});
+const loadedCountText = computed(() => `${displayMaterials.value.length} / ${totalResultCount.value}`);
+const isLoadingMoreSearch = ref(false);
 const observerEl = ref(null);
 let observer = null;
 
@@ -386,7 +394,8 @@ const fetchMaterials = async (isLoadMore = false) => {
                 materials.value = data;
                 applyDisplayMaterials(data, { append: false, chunkSize: 20 });
             }
-            totalPages.value = meta.totalPages;
+            totalPages.value = meta.totalPages || 1;
+            totalItems.value = meta.totalItems || meta.total || meta.count || 0;
 
             if (data.length === 0 && query.search.length > 0 && !isLoadMore) {
                 await fetchSearchSuggestions();
@@ -470,17 +479,25 @@ const useSuggestion = (suggestion) => {
     searchSuggestions.value = [];
 };
 
-const showMoreSearchResults = () => {
-  if (!isSearching.value) return;
-  if (!materials.value || materials.value.length <= displayMaterials.value.length) return;
+const showMoreSearchResults = async () => {
+  if (!isSearching.value || isLoadingMoreSearch.value || isLoading.value) return;
 
-  const previousMax = SEARCH_RESULT_MAX;
-  const incrementalChunk = materials.value.slice(displayMaterials.value.length, displayMaterials.value.length + 80);
+  isLoadingMoreSearch.value = true;
+  try {
+    if (hasHiddenSearchResults.value) {
+      const incrementalChunk = materials.value.slice(displayMaterials.value.length, displayMaterials.value.length + 80);
+      applyDisplayMaterials(incrementalChunk, { append: true, chunkSize: 20 });
+      return;
+    }
 
-  applyDisplayMaterials(incrementalChunk, { append: true, chunkSize: 20 });
-
-  if (displayMaterials.value.length < previousMax) {
-    // no-op, keep current behavior stable
+    if (hasMore.value) {
+      currentPage.value += 1;
+      await fetchMaterials(true);
+    }
+  } finally {
+    setTimeout(() => {
+      isLoadingMoreSearch.value = false;
+    }, 300);
   }
 };
 
@@ -988,9 +1005,18 @@ const copyImageNative = async (imageUrl, material) => {
 
     <div class="load-more-container">
         <div v-if="isLoading" class="loader"></div>
-        <div v-if="reachedSearchDisplayLimit" class="search-limit-wrap">
-          <p class="load-complete">搜索结果较多，已优先展示前 {{ SEARCH_RESULT_MAX }} 条</p>
-          <button class="show-more-btn" @click="showMoreSearchResults">继续加载更多结果</button>
+        <div v-if="isSearching && (hasHiddenSearchResults || hasMore)" class="search-limit-wrap search-tip-card">
+          <p class="search-tip-title">当前结果较多，已优先显示部分内容</p>
+          <p class="search-tip-subtitle">为避免页面卡顿，结果会按批次继续加载。你也可以手动继续。</p>
+          <div class="search-progress">已显示 {{ loadedCountText }}</div>
+          <button class="show-more-btn" :disabled="isLoadingMoreSearch || isLoading" @click="showMoreSearchResults">
+            <span class="btn-icon">＋</span>
+            <span>{{ (isLoadingMoreSearch || isLoading) ? '加载中...' : '继续加载' }}</span>
+          </button>
+        </div>
+        <div v-else-if="reachedSearchDisplayLimit" class="search-limit-wrap search-tip-card">
+          <p class="search-tip-title">搜索结果已全部展示</p>
+          <p class="search-tip-subtitle">当前关键词结果较多，系统已完成分批加载。</p>
         </div>
         <p v-else-if="!hasMore && materials && materials.length > 0 && !isLoading" class="load-complete">已加载全部素材</p>
         <p v-if="(!materials || materials.length === 0) && !isLoading && (!searchTerm || searchTerm.trim().length === 0) && (!activeTag || activeTag === '')" class="no-results">输入关键词探索素材</p>
@@ -1466,18 +1492,73 @@ const copyImageNative = async (imageUrl, material) => {
   gap: 0.65rem;
 }
 
+.search-tip-card {
+  width: min(760px, calc(100% - 24px));
+  margin: 0 auto;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #dfe3e8;
+  background: #f8fafc;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.search-tip-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1f2937;
+  text-align: center;
+}
+
+.search-tip-subtitle {
+  margin: 0;
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: #4b5563;
+  text-align: center;
+}
+
+.search-progress {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
 .show-more-btn {
-  border: 1px solid rgba(124, 58, 237, 0.35);
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.92), rgba(168, 85, 247, 0.88));
-  color: #fff;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #111827;
   border-radius: 999px;
-  padding: 0.45rem 0.85rem;
-  font-size: 0.84rem;
+  padding: 0.5rem 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.btn-icon {
+  font-size: 0.76rem;
+  color: #374151;
 }
 
 .show-more-btn:hover {
-  filter: brightness(1.08);
+  background: #f3f4f6;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+}
+
+.show-more-btn:active {
+  transform: translateY(0);
+}
+
+.show-more-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .no-results {
