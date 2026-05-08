@@ -361,11 +361,12 @@ const goToFrontendHome = () => {
     left: 50%;
     transform: translateX(-50%);
     width: min(1360px, calc(100vw - 32px));
-    height: 52px;
+    min-height: 52px;
     border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.75rem;
     padding: 0 1rem;
     box-sizing: border-box;
     z-index: 1000;
@@ -384,6 +385,7 @@ const goToFrontendHome = () => {
     font-size: 0.92rem;
     font-weight: 600;
     letter-spacing: 0.02em;
+    white-space: nowrap;
   }
 
   .admin-topbar__dot {
@@ -392,12 +394,34 @@ const goToFrontendHome = () => {
     border-radius: 50%;
     background: linear-gradient(135deg, #7c3aed, #a855f7);
     box-shadow: 0 0 12px rgba(168, 85, 247, 0.7);
+    flex-shrink: 0;
   }
 
   .admin-topbar__meta {
     font-size: 0.8rem;
     color: #94a3b8;
+    white-space: nowrap;
   }
+
+  .admin-topbar__back {
+    flex-shrink: 0;
+    border: 1px solid rgba(168, 85, 247, 0.28);
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.95), rgba(168, 85, 247, 0.92));
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.55rem 0.95rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 10px 20px rgba(124, 58, 237, 0.25);
+  }
+
+  .admin-topbar__back:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+
   .main-nav {
     background: rgba(10, 12, 20, 0.72);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
@@ -418,6 +442,7 @@ const goToFrontendHome = () => {
     border-radius: 999px;
     z-index: 1000;
     box-sizing: border-box;
+    overflow: hidden;
     transition: top 0.3s ease, transform 0.35s ease, opacity 0.35s ease;
   }
 
@@ -503,38 +528,66 @@ const goToFrontendHome = () => {
   }
 
   /* --- 移动端适配样式 --- */
+  /* Keep in sync with BREAKPOINTS.tablet */
   @media (max-width: 768px) {
+    main {
+      margin-top: calc(72px + var(--announcement-height, 0px));
+    }
+
     .main-nav {
-      padding: 0.55rem 1.1rem;
-      min-height: 60px;
-      gap: 1rem;
-      flex-wrap: wrap;
-      justify-content: center;
-      width: min(100%, calc(100vw - 24px));
+      left: 12px;
+      right: 12px;
+      transform: none;
+      width: auto;
+      padding: 0.45rem 0.75rem;
+      min-height: 52px;
+      gap: 0.75rem;
+      justify-content: flex-start;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      border-radius: 14px;
+      scrollbar-width: none;
+    }
+
+    .main-nav::-webkit-scrollbar {
+      display: none;
+    }
+
+    .main-nav.is-hidden {
+      transform: translateY(-18px);
+    }
+
+    .main-nav a {
+      flex: 0 0 auto;
+      font-size: 0.9rem;
+      padding: 0.35rem 0.1rem;
+      white-space: nowrap;
     }
 
     .admin-topbar {
       width: calc(100vw - 20px);
-      height: 46px;
+      min-height: 46px;
       border-radius: 12px;
-      padding: 0 0.8rem;
+      padding: 0 0.75rem;
       top: calc(var(--announcement-height, 0px) + 8px);
+      gap: 0.6rem;
     }
 
     .admin-topbar__meta {
       display: none;
     }
-    
-    .main-nav a {
-      font-size: 0.95rem;
-      padding: 0.35rem 0.1rem;
-      white-space: nowrap;
+
+    .admin-topbar__back {
+      padding: 0.45rem 0.75rem;
+      font-size: 0.78rem;
     }
-    
+
     .nav-slider {
-      display: none; /* 在移动端隐藏滑块，避免布局复杂 */
+      display: none;
     }
-    
+
     .scroll-to-top-btn {
       bottom: 20px;
       right: 20px;
@@ -544,20 +597,47 @@ const goToFrontendHome = () => {
       line-height: 45px;
     }
   }
-  
+
   @media (max-width: 480px) {
+    main {
+      margin-top: calc(68px + var(--announcement-height, 0px));
+    }
+
     .main-nav {
-      padding: 0.5rem 0.8rem;
-      min-height: 56px;
-      gap: 0.75rem;
-      width: calc(100vw - 16px);
+      left: 8px;
+      right: 8px;
+      min-height: 48px;
+      padding: 0.4rem 0.6rem;
+      gap: 0.6rem;
+      border-radius: 12px;
     }
-    
+
     .main-nav a {
-      font-size: 0.86rem;
-      padding: 0.3rem 0.08rem;
+      font-size: 0.82rem;
+      padding: 0.24rem 0.08rem;
     }
-    
+
+    .admin-topbar {
+      width: calc(100vw - 14px);
+      padding: 0 0.58rem;
+      border-radius: 10px;
+    }
+
+    .admin-topbar__brand {
+      font-size: 0.82rem;
+      gap: 0.42rem;
+    }
+
+    .admin-topbar__dot {
+      width: 6px;
+      height: 6px;
+    }
+
+    .admin-topbar__back {
+      padding: 0.38rem 0.6rem;
+      font-size: 0.72rem;
+    }
+
     .scroll-to-top-btn {
       bottom: 15px;
       right: 15px;

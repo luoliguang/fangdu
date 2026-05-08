@@ -95,7 +95,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="card">
+  <div class="admin-page-shell">
+    <div class="card">
     <h2>
       用户留言管理
       <span v-if="pendingFeedbacksCount > 0" class="pending-badge">
@@ -164,10 +165,17 @@ onUnmounted(() => {
       type="danger"
       @confirm="deleteFeedback"
     />
+    </div>
   </div>
 </template>
 
 <style scoped>
+.admin-page-shell {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
 .card {
   background: white;
   border-radius: 12px;
@@ -317,7 +325,7 @@ h2 {
 @media (max-width: 480px) {
   .card {
     padding: 10px;
-    margin: 5px;
+    margin: 0;
   }
   
   h2 {

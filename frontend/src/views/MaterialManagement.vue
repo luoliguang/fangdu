@@ -133,7 +133,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="card">
+  <div class="admin-page-shell">
+    <div class="card">
     <h2>素材管理</h2>
     
     <DataTable 
@@ -218,10 +219,24 @@ onUnmounted(() => {
       type="danger"
       @confirm="deleteMaterial"
     />
+    </div>
   </div>
 </template>
 
 <style scoped>
+.admin-page-shell {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+:deep(.data-table-wrapper),
+:deep(.table-responsive) {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .card {
   background: white;
   border-radius: 8px;
@@ -399,7 +414,7 @@ h2 {
 @media (max-width: 480px) {
   .card {
     padding: 10px;
-    margin: 5px;
+    margin: 0;
   }
   
   h2 {

@@ -1,7 +1,8 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import apiClient from '../axiosConfig.js';
+import { BREAKPOINTS } from '../config/breakpoints.js';
 import {
   Upload,
   PictureRounded,
@@ -11,9 +12,27 @@ import {
   SwitchButton
 } from '@element-plus/icons-vue';
 
+const DESKTOP_BREAKPOINT = BREAKPOINTS.desktop;
+
 const router = useRouter();
+const route = useRoute();
 const pendingFeedbacksCount = ref(0);
 const showLogoutConfirm = ref(false);
+const showMobileMenu = ref(false);
+const isDesktop = ref(window.innerWidth > DESKTOP_BREAKPOINT);
+
+const navItems = [
+  { name: 'UploadMaterial', label: '上传素材', icon: Upload },
+  { name: 'MaterialManagement', label: '素材管理', icon: PictureRounded },
+  { name: 'FeedbackManagement', label: '留言管理', icon: ChatDotRound },
+  { name: 'Statistics', label: '访问统计', icon: DataAnalysis },
+  { name: 'DrawerConfig', label: '抽屉配置', icon: Setting }
+];
+
+const mobileMenuTitle = computed(() => {
+  const current = navItems.find((item) => item.name === route.name);
+  return current?.label || '管理菜单';
+});
 
 // --- 获取未处理留言数量 ---
 const fetchPendingFeedbacksCount = async () => {
@@ -33,6 +52,18 @@ const fetchPendingFeedbacksCount = async () => {
 // 导航到指定路由
 const navigateTo = (routeName) => {
   router.push({ name: routeName });
+  showMobileMenu.value = false;
+};
+
+const toggleMobileMenu = () => {
+  showMobileMenu.value = !showMobileMenu.value;
+};
+
+const handleResize = () => {
+  isDesktop.value = window.innerWidth > DESKTOP_BREAKPOINT;
+  if (isDesktop.value) {
+    showMobileMenu.value = false;
+  }
 };
 
 // 显示退出登录确认对话框
@@ -58,99 +89,86 @@ const cancelLogout = () => {
   showLogoutConfirm.value = false;
 };
 
+watch(() => route.name, () => {
+  showMobileMenu.value = false;
+});
+
+const showSidebar = computed(() => isDesktop.value || showMobileMenu.value);
+
 // 监听留言状态更新事件
 const handleFeedbackUpdate = () => {
   fetchPendingFeedbacksCount();
 };
 
+let interval = null;
+
 onMounted(() => {
   fetchPendingFeedbacksCount();
-  // 每60秒刷新一次未处理留言数量
-  const interval = setInterval(fetchPendingFeedbacksCount, 60000);
-  
-  // 监听留言状态更新事件
+  interval = setInterval(fetchPendingFeedbacksCount, 60000);
+
   window.addEventListener('feedbackStatusUpdated', handleFeedbackUpdate);
   window.addEventListener('feedbackDeleted', handleFeedbackUpdate);
-  
-  // 确保当前路径是/admin时，重定向到默认子路由
+  window.addEventListener('resize', handleResize);
+  handleResize();
+
   if (router.currentRoute.value.name === 'Admin' || router.currentRoute.value.name === 'AdminDefault') {
     router.push({ name: 'UploadMaterial' });
   }
-  
-  // 组件卸载时清除定时器和事件监听器
-  return () => {
-    clearInterval(interval);
-    window.removeEventListener('feedbackStatusUpdated', handleFeedbackUpdate);
-    window.removeEventListener('feedbackDeleted', handleFeedbackUpdate);
-  };
+});
+
+onUnmounted(() => {
+  if (interval) clearInterval(interval);
+  window.removeEventListener('feedbackStatusUpdated', handleFeedbackUpdate);
+  window.removeEventListener('feedbackDeleted', handleFeedbackUpdate);
+  window.removeEventListener('resize', handleResize);
 });
 </script>
 
 <template>
   <div class="admin-container">
-    <!-- 侧边栏 -->
-    <div class="sidebar">
-      <div class="sidebar-header">
-        <h2>管理后台</h2>
-      </div>
-      <div class="sidebar-nav">
-        <div 
-          class="nav-item" 
-          :class="{ active: $route.name === 'UploadMaterial' }"
-          @click="navigateTo('UploadMaterial')"
-        >
-          <span class="nav-hover-effect"></span>
-          <el-icon class="nav-icon"><Upload /></el-icon>
-          <span class="nav-text">上传素材</span>
-        </div>
-        <div 
-          class="nav-item" 
-          :class="{ active: $route.name === 'MaterialManagement' }"
-          @click="navigateTo('MaterialManagement')"
-        >
-          <span class="nav-hover-effect"></span>
-          <el-icon class="nav-icon"><PictureRounded /></el-icon>
-          <span class="nav-text">素材管理</span>
-        </div>
-        <div 
-          class="nav-item" 
-          :class="{ active: $route.name === 'FeedbackManagement' }"
-          @click="navigateTo('FeedbackManagement')"
-        >
-          <span class="nav-hover-effect"></span>
-          <el-icon class="nav-icon"><ChatDotRound /></el-icon>
-          <span class="nav-text">留言管理</span>
-          <span v-if="pendingFeedbacksCount > 0" class="badge">{{ pendingFeedbacksCount }}</span>
-        </div>
-        <div 
-          class="nav-item" 
-          :class="{ active: $route.name === 'Statistics' }"
-          @click="navigateTo('Statistics')"
-        >
-          <span class="nav-hover-effect"></span>
-          <el-icon class="nav-icon"><DataAnalysis /></el-icon>
-          <span class="nav-text">访问统计</span>
-        </div>
-        <div 
-          class="nav-item" 
-          :class="{ active: $route.name === 'DrawerConfig' }"
-          @click="navigateTo('DrawerConfig')"
-        >
-          <span class="nav-hover-effect"></span>
-          <el-icon class="nav-icon"><Setting /></el-icon>
-          <span class="nav-text">抽屉配置</span>
-        </div>
-      </div>
-      
-      <!-- 退出登录按钮 -->
-      <div class="sidebar-footer">
-        <div class="nav-item logout-item" @click="showLogoutDialog">
-          <span class="nav-hover-effect"></span>
-          <el-icon class="nav-icon"><SwitchButton /></el-icon>
-          <span class="nav-text">退出登录</span>
-        </div>
-      </div>
+    <div class="mobile-nav-toggle">
+      <button class="mobile-nav-toggle__btn" @click="toggleMobileMenu">
+        <span>{{ mobileMenuTitle }}</span>
+        <span class="mobile-nav-toggle__arrow" :class="{ open: showMobileMenu }">▾</span>
+      </button>
     </div>
+
+    <!-- 侧边栏 -->
+    <Transition name="mobile-menu">
+      <div v-show="showSidebar" class="sidebar" :class="{ 'is-open': showMobileMenu }">
+        <div class="sidebar-header">
+          <h2>管理后台</h2>
+        </div>
+        <div class="sidebar-nav">
+          <div
+            v-for="item in navItems"
+            :key="item.name"
+            class="nav-item"
+            :class="{ active: $route.name === item.name }"
+            @click="navigateTo(item.name)"
+          >
+            <span class="nav-hover-effect"></span>
+            <el-icon class="nav-icon"><component :is="item.icon" /></el-icon>
+            <span class="nav-text">{{ item.label }}</span>
+            <span
+              v-if="item.name === 'FeedbackManagement' && pendingFeedbacksCount > 0"
+              class="badge"
+            >
+              {{ pendingFeedbacksCount }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 退出登录按钮 -->
+        <div class="sidebar-footer">
+          <div class="nav-item logout-item" @click="showLogoutDialog">
+            <span class="nav-hover-effect"></span>
+            <el-icon class="nav-icon"><SwitchButton /></el-icon>
+            <span class="nav-text">退出登录</span>
+          </div>
+        </div>
+      </div>
+    </Transition>
     
     <!-- 内容区域 -->
     <div class="content-area">
@@ -177,17 +195,21 @@ onMounted(() => {
 
 <style scoped>
 .admin-container {
+  width: 100%;
   max-width: 1360px;
   margin: 1.25rem auto;
-  padding: 0 1rem;
+  padding: 0 0.75rem;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+  gap: 0.85rem;
   min-height: calc(100vh - 2.5rem);
   color: #f1f5f9;
+  overflow-x: clip;
 }
 
 .sidebar {
+  width: 100%;
+  min-width: 0;
   background:
     radial-gradient(120% 120% at 0% 0%, rgba(168, 85, 247, 0.18) 0%, rgba(168, 85, 247, 0) 55%),
     linear-gradient(180deg, #0f1117 0%, #0b0d12 100%);
@@ -197,6 +219,34 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.mobile-nav-toggle {
+  display: none;
+}
+
+.mobile-nav-toggle__btn {
+  width: 100%;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(168, 85, 247, 0.14));
+  color: #f8fafc;
+  padding: 0.7rem 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mobile-nav-toggle__arrow {
+  transition: transform 0.2s ease;
+}
+
+.mobile-nav-toggle__arrow.open {
+  transform: rotate(180deg);
 }
 
 .sidebar-header {
@@ -291,7 +341,10 @@ onMounted(() => {
 }
 
 .content-area {
+  width: 100%;
+  min-width: 0;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   border-radius: 16px;
   border: 1px solid #e5e7eb;
@@ -299,6 +352,16 @@ onMounted(() => {
   color: #1a1a1a;
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
   padding: 1rem;
+}
+
+.content-area :deep(*) {
+  max-width: 100%;
+}
+
+.content-area :deep(.el-table__inner-wrapper),
+.content-area :deep(.el-scrollbar),
+.content-area :deep(.el-form-item__content) {
+  min-width: 0;
 }
 
 .sidebar-footer {
@@ -396,25 +459,42 @@ onMounted(() => {
   filter: brightness(1.08);
 }
 
+/* Keep this in sync with DESKTOP_BREAKPOINT */
 @media (max-width: 1024px) {
   .admin-container {
+    margin: 0.95rem auto;
     grid-template-columns: 1fr;
     min-height: auto;
   }
 
+  .mobile-nav-toggle {
+    display: block;
+  }
+
   .sidebar {
     width: 100%;
+    transform-origin: top center;
+  }
+
+  .sidebar-header {
+    display: none;
   }
 
   .sidebar-nav {
-    flex-direction: row;
-    overflow-x: auto;
-    padding: 0.75rem;
+    flex-direction: column;
+    overflow: visible;
+    padding: 0.7rem;
+    gap: 0.45rem;
   }
 
   .nav-item {
-    flex-shrink: 0;
+    width: 100%;
     white-space: nowrap;
+  }
+
+  .sidebar-footer {
+    padding: 0.7rem;
+    margin-top: 0;
   }
 
   .content-area {
@@ -424,25 +504,95 @@ onMounted(() => {
 
 @media (max-width: 640px) {
   .admin-container {
-    margin: 0.75rem auto;
-    padding: 0 0.55rem;
-    gap: 0.75rem;
+    margin: 0.65rem auto;
+    padding: 0 0.45rem;
+    gap: 0.65rem;
+  }
+
+  .sidebar {
+    border-radius: 14px;
   }
 
   .sidebar-header h2 {
-    font-size: 0.92rem;
+    font-size: 0.9rem;
+  }
+
+  .sidebar-nav {
+    padding: 0.6rem;
+    gap: 0.4rem;
   }
 
   .nav-item {
-    padding: 0.65rem 0.75rem;
+    padding: 0.6rem 0.7rem;
+    gap: 0.52rem;
+    border-radius: 9px;
+  }
+
+  .nav-icon {
+    font-size: 0.92rem;
   }
 
   .nav-text {
-    font-size: 0.88rem;
+    font-size: 0.84rem;
+  }
+
+  .badge {
+    min-width: 1.2rem;
+    height: 1.2rem;
+    font-size: 0.66rem;
+    padding: 0 0.28rem;
   }
 
   .content-area {
-    padding: 0.7rem;
+    padding: 0.58rem;
+    border-radius: 12px;
   }
+
+  .logout-dialog {
+    min-width: 0;
+    width: calc(100vw - 26px);
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-container {
+    margin: 0.5rem auto;
+    padding: 0 0.35rem;
+    gap: 0.55rem;
+  }
+
+  .sidebar-header {
+    padding: 0.85rem 0.85rem 0.72rem;
+  }
+
+  .sidebar-nav,
+  .sidebar-footer {
+    padding: 0.5rem;
+  }
+
+  .nav-item {
+    padding: 0.52rem 0.58rem;
+  }
+
+  .content-area {
+    padding: 0.5rem;
+  }
+}
+
+.mobile-menu-enter-active,
+.mobile-menu-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.mobile-menu-enter-from,
+.mobile-menu-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.99);
+}
+
+.mobile-menu-enter-to,
+.mobile-menu-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 </style>

@@ -193,6 +193,11 @@ const applyTagsToAll = () => {
 };
 
 const uploadBatchMaterials = async () => {
+  if (!validateBatchForm()) {
+    toast.error('请选择文件并填写共享标签');
+    return;
+  }
+
   // 验证每个文件都有名称和标签
   let hasError = false;
   batchFiles.value.forEach((item, index) => {
@@ -290,7 +295,8 @@ const switchMode = (mode) => {
 </script>
 
 <template>
-  <div class="card">
+  <div class="admin-page-shell">
+    <div class="card">
     <h2>上传新素材</h2>
     
     <!-- 上传模式切换 -->
@@ -532,10 +538,24 @@ const switchMode = (mode) => {
         {{ message }}
       </p>
     </form>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.admin-page-shell {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.admin-page-shell :deep(.el-form-item__content),
+.admin-page-shell :deep(.el-upload),
+.admin-page-shell :deep(.el-upload-dragger) {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .card {
   background: linear-gradient(-45deg, #f8f8f8, #f0f0f0);
   background-size: 200% 200%;
