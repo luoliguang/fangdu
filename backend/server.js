@@ -120,18 +120,31 @@ class Server {
     this.visitController = new VisitController(this.db);
     this.app.use(this.visitController.visitTrackingMiddleware.bind(this.visitController));
     
-    // 请求日志中间件
+    // 请求日志中间件（避免高并发下日志导致CPU占用升高）
     if (this.config.logging.requests) {
       this.app.use((req, res, next) => {
         const start = Date.now();
-        const originalSend = res.send;
-        
-        res.send = function(data) {
-          const duration = Date.now() - start;
-          console.log(`${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
-          originalSend.call(this, data);
-        };
-        
+
+        // 避免记录高频静态资源和心跳类请求，减少I/O压力
+        const ignoredPrefixes = ['/uploads', '/favicon.ico'];
+        const ignoredExactPaths = ['/api/v1/visits/heartbeat'];
+        const shouldIgnore =
+          ignoredPrefixes.some(prefix => req.path.startsWith(prefix)) ||
+          ignoredExactPaths.includes(req.path);
+
+        if (!shouldIgnore) {
+          res.on('finish', () => {
+            const duration = Date.now() - start;
+
+            // 仅记录慢请求和错误请求，降低日志开销
+            const isSlow = duration >= 300;
+            const isError = res.statusCode >= 400;
+            if (isSlow || isError) {
+              console.log(`${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
+            }
+          });
+        }
+
         next();
       });
     }
