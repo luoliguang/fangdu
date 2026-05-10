@@ -4,6 +4,7 @@ import { useRoute, useRouter  } from 'vue-router';
 import apiClient from './axiosConfig.js';
 import SideDrawer from './components/SideDrawer.vue';
 import TopAnnouncement from './components/TopAnnouncement.vue';
+import FabricGoQRModal from './components/FabricGoQRModal.vue';
 
 
 // --- 新增：导航栏滑动效果的逻辑 ---
@@ -19,6 +20,8 @@ const isLoggedIn = computed(() => loginState.value);
 
 // 未处理留言数量
 const pendingFeedbacksCount = ref(0);
+const showQRModal = ref(false);
+const fabricGoBtn = ref(null);
 
 // --- SideDrawer 全局状态 ---
 // 收藏夹（只在Gallery页面使用）
@@ -275,6 +278,12 @@ const handleNavClick = () => {
   });
 };
 
+const openFabricGoModal = async () => {
+  fabricGoBtn.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  showQRModal.value = true;
+};
+
 const goToFrontendHome = () => {
   router.push('/');
 };
@@ -304,7 +313,7 @@ const goToFrontendHome = () => {
     <nav v-if="!isAdminRoute" class="main-nav" :class="{ 'is-hidden': !showNavBar }" ref="mainNav">
       <div class="nav-slider" ref="navSlider"></div>
       <router-link to="/" @click="handleNavClick">实拍</router-link>
-      <a href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank">面料细节</a>
+      <a ref="fabricGoBtn" href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank" @click.prevent="openFabricGoModal">面料细节</a>
       <a href="https://fangdutex.cn/welcome" target="_blank">知识库「所有知识」</a>
       <router-link to="/color-card" @click="handleNavClick">设计专用</router-link>
       <router-link to="/size-converter" @click="handleNavClick">尺码转换</router-link>
@@ -338,6 +347,8 @@ const goToFrontendHome = () => {
         ↑
       </button>
     </Transition>
+
+    <FabricGoQRModal v-model="showQRModal" />
   </div>
 </template>
 
