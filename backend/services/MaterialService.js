@@ -284,16 +284,11 @@ class MaterialService {
    */
   generateThumbnailUrl(url, width = 300) {
     if (!url) return url;
-    // 如果URL已经是缩略图（已包含x-oss-process），直接返回
     if (url.includes('x-oss-process')) return url;
-    // 添加OSS图片处理参数：固定宽高自动裁剪
-    const separator = url.includes('?') ? '&' : '?';
-    const ossThumbnailUrl = `${url}${separator}x-oss-process=image/resize,m_fill,w_${width},quality,q_80`;
-    // 返回通过后端代理的URL，解决跨域问题
-    // 自动检测当前服务器的主机和端口
-    const port = process.env.PORT || 3002;
-    // 直接返回代理URL，URL参数需要编码
-    return `/api/proxy/media?url=${encodeURIComponent(ossThumbnailUrl)}`;
+    const cdnBase = process.env.CDN_BASE_URL || 'https://assets.fangdutex.cn';
+    const cdnUrl = url.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, cdnBase);
+    const separator = cdnUrl.includes('?') ? '&' : '?';
+    return `${cdnUrl}${separator}x-oss-process=image/resize,m_fill,w_${width},quality,q_80`;
   }
 
   /**

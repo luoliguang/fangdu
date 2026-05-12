@@ -108,36 +108,27 @@ const isCrossOrigin = (url) => {
   }
 };
 
-// 辅助函数：转换为代理URL
+// 辅助函数：解析 API base（仅供下载代理使用）
 const resolveApiBase = () => {
-  // 生产环境一律同源 /api，避免跨域与路径层级问题
   if (import.meta.env && import.meta.env.PROD) return '/api';
-  // 开发环境：尊重 VITE_API_BASE_URL，否则回退 /api
   let base = (import.meta.env && import.meta.env.VITE_API_BASE_URL) ? String(import.meta.env.VITE_API_BASE_URL) : '/api';
-  // 去掉末尾斜杠
   base = base.replace(/\/$/, '');
-  // 如果结尾为 /api/v1 统一改为 /api
   base = base.replace(/\/api\/v1$/,'/api');
-  // http(s) 情况：若末尾不是 /api 则补上 /api
   if (/^https?:\/\//i.test(base)) {
     if (!/\/api$/i.test(base)) base = base + '/api';
     return base;
   }
-  // 非 http(s)：若不以 /api 结尾，则补上 /api
   if (!base.endsWith('/api')) base = base + '/api';
   return base;
 };
 
+// 将OSS URL转换为CDN URL
+const CDN_BASE_URL = (import.meta.env && import.meta.env.VITE_CDN_BASE_URL) || 'https://assets.fangdutex.cn';
 const toProxyUrl = (rawUrl) => {
   try {
     if (!rawUrl) return rawUrl;
     const full = normalizePath(rawUrl);
-    if (!isCrossOrigin(full)) return full;
-    const base = resolveApiBase();
-    const proxyPath = `${base}/proxy/media`;
-    const proxied = new URL(proxyPath, window.location.origin);
-    proxied.searchParams.set('url', full);
-    return proxied.toString();
+    return full.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, CDN_BASE_URL);
   } catch (_) {
     return rawUrl;
   }

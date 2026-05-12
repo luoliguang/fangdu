@@ -242,17 +242,11 @@ const showTutorial = ref(false); // 控制教程显示
 const tutorialTarget = ref('.search-input-cool'); // 教程聚焦目标
 const tutorialGuideRef = ref(null); // 教程组件引用
 
-// 获取代理URL
-const getProxyUrl = (url) => {
-  try {
-    const proxyPath = '/api/proxy/media';
-    const proxied = new URL(proxyPath, window.location.origin);
-    proxied.searchParams.set('url', url);
-    return proxied.toString();
-  } catch (error) {
-    console.error('构建代理URL失败:', error);
-    return url;
-  }
+// 将OSS URL转换为CDN URL
+const CDN_BASE_URL = import.meta.env.VITE_CDN_BASE_URL || 'https://assets.fangdutex.cn';
+const toCdnUrl = (url) => {
+  if (!url) return url;
+  return url.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, CDN_BASE_URL);
 };
 
 // 检查URL是否跨域
@@ -282,7 +276,7 @@ const imageIndexMap = computed(() => {
 
 const imageSources = computed(() => {
     return imageOnlyMaterials.value.map(m => {
-        return isCrossOriginUrl(m.file_path) ? getProxyUrl(m.file_path) : m.file_path;
+        return toCdnUrl(m.file_path);
     });
 });
 
@@ -838,8 +832,7 @@ const quickCopyImage = async (material) => {
     
     showCustomToast(`正在复制"${imageName}"...`, 'success');
 
-    const isCrossOrigin = isCrossOriginUrl(imageUrl);
-    let imageUrlToUse = isCrossOrigin ? getProxyUrl(imageUrl) : imageUrl;
+    let imageUrlToUse = toCdnUrl(imageUrl);
 
     try {
       await copyImageToClipboard(imageUrlToUse);
