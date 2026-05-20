@@ -90,7 +90,7 @@ class Visit {
     // 这确保与 getOverallStats() 的逻辑一致
     const sql = `
       SELECT 
-        DATE(visit_time) as date,
+        DATE(datetime(visit_time, '+8 hours')) as date,
         COUNT(*) as visits,
         COUNT(DISTINCT CASE 
           WHEN ip_address IS NOT NULL 
@@ -101,7 +101,7 @@ class Visit {
       FROM visits 
       WHERE visit_time >= datetime('now', '-${days} days')
       AND visit_time IS NOT NULL
-      GROUP BY DATE(visit_time)
+      GROUP BY DATE(datetime(visit_time, '+8 hours'))
       ORDER BY date ASC
     `;
     
@@ -170,16 +170,16 @@ class Visit {
       const todayVisitsSql = `
         SELECT COUNT(*) as today 
         FROM visits 
-        WHERE visit_time >= datetime('now', 'start of day')
+        WHERE visit_time >= datetime('now', '+8 hours', 'start of day', '-8 hours')
         AND visit_time IS NOT NULL
       `;
       const todayVisits = await this.queryOne(todayVisitsSql);
 
       // 今日唯一访客 - 使用当天的00:00作为起始时间
       const todayUniqueVisitorsSql = `
-        SELECT COUNT(DISTINCT ip_address) as today_unique 
-        FROM visits 
-        WHERE visit_time >= datetime('now', 'start of day')
+        SELECT COUNT(DISTINCT ip_address) as today_unique
+        FROM visits
+        WHERE visit_time >= datetime('now', '+8 hours', 'start of day', '-8 hours')
         AND ip_address IS NOT NULL AND ip_address != '' AND ip_address != 'unknown'
       `;
       const todayUniqueVisitors = await this.queryOne(todayUniqueVisitorsSql);
@@ -197,7 +197,7 @@ class Visit {
       const monthVisitsSql = `
         SELECT COUNT(*) as month 
         FROM visits 
-        WHERE visit_time >= datetime('now', 'start of month')
+        WHERE visit_time >= datetime('now', '+8 hours', 'start of month', '-8 hours')
         AND visit_time IS NOT NULL
       `;
       const monthVisits = await this.queryOne(monthVisitsSql);
@@ -322,7 +322,7 @@ class Visit {
     // 修复：添加时间有效性检查，确保只统计有效访问
     const sql = `
       SELECT 
-        CAST(strftime('%H', visit_time) AS INTEGER) as hour,
+        CAST(strftime('%H', datetime(visit_time, '+8 hours')) AS INTEGER) as hour,
         COUNT(*) as visits
       FROM visits 
       WHERE visit_time >= datetime('now', '-7 days')
