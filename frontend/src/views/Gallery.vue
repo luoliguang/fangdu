@@ -953,11 +953,11 @@ const copyImageNative = async (imageUrl, material) => {
         class="grid-item"
         @click="showMedia(material)" 
       >
-        <img v-if="material.media_type === 'image'" :src="material.thumbnail_url || material.file_path" :alt="material.name" loading="lazy" decoding="async" fetchpriority="low">
-        <video 
+        <img v-if="material.media_type === 'image'" :src="toCdnUrl(material.thumbnail_url || material.file_path)" :alt="material.name" loading="lazy" decoding="async" fetchpriority="low">
+        <video
             v-else-if="material.media_type === 'video'"
-            :src="material.file_path" 
-            :poster="material.cover_image_path || material.thumbnail_url"
+            :src="toCdnUrl(material.file_path)"
+            :poster="toCdnUrl(material.cover_image_path || material.thumbnail_url)"
             preload="metadata"
             muted
             playsinline
