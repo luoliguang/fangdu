@@ -11,7 +11,22 @@ const materialStore = useMaterialStore();
 const editingMaterial = ref(null); // 正在编辑的素材对象
 
 // 从store中获取状态 - 使用storeToRefs保持响应性
-const { materials, isLoading, currentPage, totalPages, totalCount, pageSize, isPrevDisabled, isNextDisabled } = storeToRefs(materialStore);
+const { materials, isLoading, currentPage, totalPages, totalCount, pageSize, isPrevDisabled, isNextDisabled, searchKeyword, typeFilter } = storeToRefs(materialStore);
+
+// --- 搜索与筛选 ---
+const searchInput = ref('');
+let searchTimer = null;
+
+const onSearchInput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    materialStore.applySearch(searchInput.value, undefined);
+  }, 400);
+};
+
+const setTypeFilter = (type) => {
+  materialStore.applySearch(undefined, type);
+};
 
 // --- 分页跳转 ---
 const goToPage = (page) => {
@@ -136,7 +151,23 @@ onUnmounted(() => {
   <div class="admin-page-shell">
     <div class="card">
     <h2>素材管理</h2>
-    
+
+    <!-- 搜索与筛选栏 -->
+    <div class="search-bar">
+      <input
+        v-model="searchInput"
+        @input="onSearchInput"
+        type="text"
+        placeholder="搜索名称..."
+        class="search-input"
+      />
+      <div class="type-filters">
+        <button :class="['filter-btn', typeFilter === '' ? 'active' : '']" @click="setTypeFilter('')">全部</button>
+        <button :class="['filter-btn', typeFilter === 'image' ? 'active' : '']" @click="setTypeFilter('image')">图片</button>
+        <button :class="['filter-btn', typeFilter === 'video' ? 'active' : '']" @click="setTypeFilter('video')">视频</button>
+      </div>
+    </div>
+
     <DataTable 
       :data="materials"
       :columns="columns"
@@ -247,7 +278,53 @@ onUnmounted(() => {
 
 h2 {
   color: #333;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-input:focus {
+  border-color: #667eea;
+}
+
+.type-filters {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-btn {
+  padding: 7px 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.filter-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+.filter-btn.active {
+  background: #667eea;
+  border-color: #667eea;
+  color: white;
 }
 
 .preview-container {

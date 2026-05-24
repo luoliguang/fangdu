@@ -13,6 +13,8 @@ export const useMaterialStore = defineStore('material', () => {
   const totalPages = ref(1)
   const pageSize = ref(10)
   const totalCount = ref(0)
+  const searchKeyword = ref('')
+  const typeFilter = ref('')  // '' | 'image' | 'video'
   
   // 计算属性
   const hasMaterials = computed(() => materials.value.length > 0)
@@ -24,8 +26,11 @@ export const useMaterialStore = defineStore('material', () => {
     isLoading.value = true
     try {
       const token = localStorage.getItem('authToken')
+      const params = { page, limit: pageSize.value }
+      if (searchKeyword.value) params.search = searchKeyword.value
+      if (typeFilter.value) params.media_type = typeFilter.value
       const response = await apiClient.get(`/api/v1/materials`, {
-        params: { page, limit: pageSize.value },
+        params,
         headers: { Authorization: `Bearer ${token}` }
       })
       
@@ -104,7 +109,14 @@ export const useMaterialStore = defineStore('material', () => {
     if (page < 1 || page > totalPages.value) return
     await fetchMaterials(page)
   }
-  
+
+  // 搜索（重置到第1页）
+  const applySearch = async (keyword, type) => {
+    searchKeyword.value = keyword ?? searchKeyword.value
+    typeFilter.value = type ?? typeFilter.value
+    await fetchMaterials(1)
+  }
+
   // 刷新当前页
   const refresh = async () => {
     await fetchMaterials(currentPage.value)
@@ -178,6 +190,8 @@ export const useMaterialStore = defineStore('material', () => {
     totalPages,
     pageSize,
     totalCount,
+    searchKeyword,
+    typeFilter,
     
     // 计算属性
     hasMaterials,
@@ -191,6 +205,7 @@ export const useMaterialStore = defineStore('material', () => {
     uploadMaterial,
     uploadMaterialsBatch,
     goToPage,
+    applySearch,
     refresh,
     reset
   }

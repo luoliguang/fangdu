@@ -14,21 +14,28 @@ class Material {
     const {
       search = '',
       tag = '',
+      media_type = '',
       page = 1,
       limit = 20
     } = options;
 
     const offset = (page - 1) * limit;
     const keywords = search.split(' ').filter(k => k);
-    
+
     let whereClause = ` WHERE 1=1`;
     const params = [];
-    
+
     // 添加搜索条件
     keywords.forEach(keyword => {
       whereClause += ` AND name LIKE ?`;
       params.push(`%${keyword}%`);
     });
+
+    // 添加媒体类型过滤
+    if (media_type && ['image', 'video'].includes(media_type)) {
+      whereClause += ` AND media_type = ?`;
+      params.push(media_type);
+    }
     
     // 添加标签过滤
     if (tag) {

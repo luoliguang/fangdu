@@ -444,11 +444,12 @@ class VisitService {
    */
   fillMissingDates(trends, days) {
     const result = [];
-    const today = new Date();
-    
+    // 使用 CST (UTC+8) 当前日期，与 SQL 中 datetime(visit_time, '+8 hours') 保持一致
+    const nowCst = new Date(Date.now() + 8 * 60 * 60 * 1000);
+
     for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
+      const date = new Date(nowCst);
+      date.setUTCDate(date.getUTCDate() - i);
       const dateStr = date.toISOString().split('T')[0];
       
       const existingData = trends.find(t => t.date === dateStr);

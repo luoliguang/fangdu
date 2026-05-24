@@ -19,11 +19,12 @@ class MaterialService {
    */
   async getMaterials(query) {
     try {
-      const { search, tag, page, limit } = query;
+      const { search, tag, media_type, page, limit } = query;
       
       const options = {
         search: search || '',
         tag: tag || '',
+        media_type: media_type || '',
         page: parseInt(page) || 1,
         limit: Math.min(parseInt(limit) || 20, 100) // 限制最大每页数量
       };
