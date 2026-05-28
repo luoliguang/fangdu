@@ -1377,7 +1377,7 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 24px;
   padding: 20px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1c1917 0%, #3c3330 100%);
   border-radius: 14px;
   color: white;
 }
@@ -1783,12 +1783,12 @@ onMounted(() => {
 }
 
 .generate-btn {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #c2410c, #9a3412);
 }
 
 .generate-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(194, 65, 12, 0.4);
 }
 
 .export-button {

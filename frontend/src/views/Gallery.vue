@@ -1197,7 +1197,7 @@ const copyImageNative = async (imageUrl, material) => {
 }
 .search-input-cool:focus {
   outline: none;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.25), 0 0 0 4px rgba(29, 184, 112, 0.35);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.25), 0 0 0 4px rgba(90, 143, 115, 0.35);
   transform: translateY(-2px);
 }
 
@@ -1272,7 +1272,7 @@ const copyImageNative = async (imageUrl, material) => {
 } 
 
 .suggestion-item:hover {
-  background: linear-gradient(135deg, #0a3d22 0%, #1db870 100%);
+  background: linear-gradient(135deg, #0a3d22 0%, #5a8f73 100%);
   color: white;
   transform: translateX(4px);
 }
@@ -1308,22 +1308,22 @@ const copyImageNative = async (imageUrl, material) => {
 .suggestion-btn {
   padding: 0.7rem 1.4rem;
   background: white;
-  border: 2px solid #1db870;
+  border: 2px solid #5a8f73;
   border-radius: 25px;
-  color: #0d6b47;
+  color: #3d6b52;
   font-size: 0.95em;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(29, 184, 112, 0.2);
+  box-shadow: 0 2px 8px rgba(90, 143, 115, 0.2);
 }
 
 .suggestion-btn:hover {
-  background: linear-gradient(135deg, #0a3d22, #1db870);
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
   color: white;
   border-color: transparent;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(29, 184, 112, 0.35);
+  box-shadow: 0 4px 12px rgba(90, 143, 115, 0.35);
 }
   
 .tags-container {
@@ -1395,10 +1395,10 @@ const copyImageNative = async (imageUrl, material) => {
   box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 .tags-container button.active {
-  background: linear-gradient(135deg, #0a3d22, #1db870);
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
   color: white;
   border-color: transparent;
-  box-shadow: 0 4px 12px rgba(29, 184, 112, 0.35);
+  box-shadow: 0 4px 12px rgba(90, 143, 115, 0.35);
   transform: translateY(-1px);
 }
 
@@ -1498,7 +1498,7 @@ const copyImageNative = async (imageUrl, material) => {
 }
 
 .browse-load-count strong {
-  color: #0d6b47;
+  color: #3d6b52;
   font-weight: 600;
 }
 
@@ -1590,7 +1590,7 @@ const copyImageNative = async (imageUrl, material) => {
 }
 
 .feedback-btn {
-  background: linear-gradient(135deg, #0a3d22, #1db870);
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
   color: white;
   border: none;
   border-radius: 25px;
@@ -1600,16 +1600,16 @@ const copyImageNative = async (imageUrl, material) => {
   cursor: pointer;
   transition: all 0.3s ease;
   margin-top: 1rem;
-  box-shadow: 0 4px 15px rgba(29, 184, 112, 0.3);
+  box-shadow: 0 4px 15px rgba(90, 143, 115, 0.3);
 }
 
 .feedback-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(29, 184, 112, 0.4);
+  box-shadow: 0 6px 20px rgba(90, 143, 115, 0.4);
 }
 .loader {
   border: 4px solid #e8f7f0;
-  border-top: 4px solid #1db870;
+  border-top: 4px solid #5a8f73;
   border-radius: 50%;
   width: 40px;
   height: 40px;
@@ -1714,15 +1714,15 @@ const copyImageNative = async (imageUrl, material) => {
 
 .feedback-form textarea:focus {
   outline: none;
-  border-color: #1db870;
-  box-shadow: 0 0 0 4px rgba(29, 184, 112, 0.15);
+  border-color: #5a8f73;
+  box-shadow: 0 0 0 4px rgba(90, 143, 115, 0.15);
 }
 
 .feedback-form button {
   display: block;
   width: 100%;
   padding: 1rem 1.8rem;
-  background: linear-gradient(135deg, #0a3d22, #1db870);
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
   color: white;
   border: none;
   border-radius: 8px;
@@ -1730,18 +1730,18 @@ const copyImageNative = async (imageUrl, material) => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(29, 184, 112, 0.25);
+  box-shadow: 0 4px 15px rgba(90, 143, 115, 0.25);
 }
 
 .feedback-form button:hover {
-  background: linear-gradient(135deg, #0d6b47, #25d47f);
+  background: linear-gradient(135deg, #3d6b52, #6aab88);
   transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(29, 184, 112, 0.4);
+  box-shadow: 0 6px 20px rgba(90, 143, 115, 0.4);
 }
 
 .feedback-form button:active {
   transform: translateY(0);
-  box-shadow: 0 2px 10px rgba(29, 184, 112, 0.2);
+  box-shadow: 0 2px 10px rgba(90, 143, 115, 0.2);
 }
 
 /* 新增：留言时间线小部件样式 */
@@ -1774,7 +1774,7 @@ const copyImageNative = async (imageUrl, material) => {
   display: flex;
   align-items: center;
   padding: 12px 12px;
-  background: linear-gradient(135deg, #0a3d22, #1db870);
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
   color: white;
   cursor: pointer;
   font-weight: 600; /* 更粗字重 */
@@ -2098,7 +2098,7 @@ const copyImageNative = async (imageUrl, material) => {
 /* 标签切换按钮 */
 .tags-toggle-btn {
   background-color: transparent !important;
-  color: #0d6b47 !important;
+  color: #3d6b52 !important;
   font-weight: 600 !important;
   font-size: 0.85rem !important;
   box-shadow: none !important;
@@ -2108,7 +2108,7 @@ const copyImageNative = async (imageUrl, material) => {
 }
 
 .tags-toggle-btn:hover {
-  background-color: rgba(29, 184, 112, 0.08) !important;
+  background-color: rgba(90, 143, 115, 0.08) !important;
   transform: none !important;
   box-shadow: none !important;
 }
@@ -2321,13 +2321,13 @@ a.router-link-active.router-link-exact-active{
 
 /* 复制按钮特定样式 */
 .copy-btn {
-  color: #0d6b47;
+  color: #3d6b52;
 }
 
 .copy-btn:hover {
-  background: linear-gradient(135deg, #0a3d22, #1db870);
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
   color: white;
-  box-shadow: 0 4px 12px rgba(29, 184, 112, 0.4);
+  box-shadow: 0 4px 12px rgba(90, 143, 115, 0.4);
 }
 
 .copy-btn svg {
