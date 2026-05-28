@@ -923,30 +923,31 @@ const copyImageNative = async (imageUrl, material) => {
     </div>
   </header>
   
-    <div class="tags-container" :class="{ 'tags-expanded': isTagsExpanded }" ref="tagsContainerRef">
-      <TransitionGroup name="tag-list">
-        <button @click="filterByTag('')" :class="{ active: activeTag === '' }" key="all-btn">
-          全部
-        </button>
-        
-        <button
-          v-for="tag in visibleTags" 
-          :key="tag"
-          @click="filterByTag(tag)"
-          :class="{ active: tag === activeTag }"
-        >
-          {{ tag }}
-        </button>
+    <div class="tags-container" :class="{ 'tags-expanded': isTagsExpanded }">
+      <div class="tags-inner" ref="tagsContainerRef">
+        <TransitionGroup name="tag-list">
+          <button @click="filterByTag('')" :class="{ active: activeTag === '' }" key="all-btn">
+            全部
+          </button>
 
-        <button 
-          v-if="tags && tags.length > visibleTagsCount" 
-          @click="isTagsExpanded = !isTagsExpanded" 
+          <button
+            v-for="tag in visibleTags"
+            :key="tag"
+            @click="filterByTag(tag)"
+            :class="{ active: tag === activeTag }"
+          >
+            {{ tag }}
+          </button>
+        </TransitionGroup>
+      </div>
+      <div class="tags-footer" v-if="tags && tags.length > visibleTagsCount">
+        <button
+          @click="isTagsExpanded = !isTagsExpanded"
           class="tags-toggle-btn"
-          key="toggle-btn"
         >
-          {{ isTagsExpanded ? '收起' : '展开更多' }}
+          {{ isTagsExpanded ? '↑ 收起' : '展开更多 ↓' }}
         </button>
-      </TransitionGroup>
+      </div>
     </div>
     <TransitionGroup :name="isChunkRendering ? '' : 'gallery'" tag="div" class="grid-container">
       <div 
@@ -1000,6 +1001,10 @@ const copyImageNative = async (imageUrl, material) => {
 
     <div class="load-more-container">
         <div v-if="isLoading" class="loader"></div>
+        <!-- 浏览模式：显示加载进度 -->
+        <div v-if="!isSearching && totalItems > 0 && displayMaterials.length > 0" class="browse-load-count">
+          已加载 <strong>{{ displayMaterials.length }}</strong> / {{ totalItems }} 条
+        </div>
         <div v-if="isSearching && (hasHiddenSearchResults || hasMore)" class="search-limit-wrap search-tip-card">
           <p class="search-tip-title">当前结果较多，已优先显示部分内容</p>
           <p class="search-tip-subtitle">为避免页面卡顿，结果会按批次继续加载。你也可以手动继续。</p>
@@ -1190,10 +1195,10 @@ const copyImageNative = async (imageUrl, material) => {
   color: #999; /* 占位符颜色 */
   opacity: 0.8;
 }
-.search-input-cool:focus { 
-  outline: none; 
-  box-shadow: 0 8px 30px rgba(0,0,0,0.25), 0 0 0 4px rgba(138, 43, 226, 0.4); /* 调整焦点效果颜色 */
-  transform: translateY(-2px); /* 略微上浮效果 */
+.search-input-cool:focus {
+  outline: none;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.25), 0 0 0 4px rgba(29, 184, 112, 0.35);
+  transform: translateY(-2px);
 }
 
 /* 搜索框包装器 */
@@ -1267,7 +1272,7 @@ const copyImageNative = async (imageUrl, material) => {
 } 
 
 .suggestion-item:hover {
-  background: linear-gradient(135deg, #1c7863 0%, #0eeeba 100%);
+  background: linear-gradient(135deg, #0a3d22 0%, #1db870 100%);
   color: white;
   transform: translateX(4px);
 }
@@ -1303,42 +1308,47 @@ const copyImageNative = async (imageUrl, material) => {
 .suggestion-btn {
   padding: 0.7rem 1.4rem;
   background: white;
-  border: 2px solid #23d5ab;
+  border: 2px solid #1db870;
   border-radius: 25px;
-  color: #5be3c4;
+  color: #0d6b47;
   font-size: 0.95em;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(138, 43, 226, 0.2);
+  box-shadow: 0 2px 8px rgba(29, 184, 112, 0.2);
 }
 
 .suggestion-btn:hover {
-  background: linear-gradient(135deg, rgb(151, 165, 228) 0%, #5be3c4 100%);
+  background: linear-gradient(135deg, #0a3d22, #1db870);
   color: white;
   border-color: transparent;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(138, 43, 226, 0.4);
+  box-shadow: 0 4px 12px rgba(29, 184, 112, 0.35);
 }
   
-.tags-container { 
-  margin-bottom: 2rem; 
-  text-align: center; padding: 1rem 0; 
-  background-color: #f5f5f5; 
-  border-radius: 12px; 
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
-      /* 关键：允许标签按钮自动换行 */
+.tags-container {
+  margin-bottom: 2rem;
+  background-color: #f5f5f5;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+.tags-inner {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center; /* 让换行后的标签也保持居中 */
-  /* 默认最多显示两行的高度，可以根据按钮大小微调 */
-  max-height: 110px; 
+  justify-content: center;
+  padding: 1rem 0 0.4rem;
+  max-height: 110px;
   overflow: hidden;
   transition: max-height 0.4s ease-in-out;
 }
-.tags-container.tags-expanded {
-  /* 一个足够大的值，确保能容纳所有标签 */
-  max-height: 1000px; 
+.tags-container.tags-expanded .tags-inner {
+  max-height: 1000px;
+}
+.tags-footer {
+  display: flex;
+  justify-content: center;
+  padding: 0.15rem 0 0.55rem;
 }
 
 /* --- 新增：为 TransitionGroup 内的标签按钮添加过渡动画 --- */
@@ -1362,8 +1372,8 @@ const copyImageNative = async (imageUrl, material) => {
   position: absolute;
 }
 
-/* 4. TransitionGroup 需要一个容器来计算动画，我们让它继承父级样式 */
-.tags-container > div {
+/* TransitionGroup 渲染的 div 继承 flex 布局 */
+.tags-inner > div {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -1384,11 +1394,11 @@ const copyImageNative = async (imageUrl, material) => {
   transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
-.tags-container button.active { 
-  background: linear-gradient(45deg, #8a2be2, #4b0082); /* 渐变色高亮 */
-  color: white; 
-  border-color: #8a2be2; 
-  box-shadow: 0 4px 12px rgba(138, 43, 226, 0.3);
+.tags-container button.active {
+  background: linear-gradient(135deg, #0a3d22, #1db870);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(29, 184, 112, 0.35);
   transform: translateY(-1px);
 }
 
@@ -1480,6 +1490,18 @@ const copyImageNative = async (imageUrl, material) => {
   margin: 1rem 0;
 }
 
+.browse-load-count {
+  color: #9ca3af;
+  font-size: 0.82rem;
+  margin: 0.6rem 0 0.2rem;
+  letter-spacing: 0.01em;
+}
+
+.browse-load-count strong {
+  color: #0d6b47;
+  font-weight: 600;
+}
+
 .search-limit-wrap {
   display: flex;
   flex-direction: column;
@@ -1568,7 +1590,7 @@ const copyImageNative = async (imageUrl, material) => {
 }
 
 .feedback-btn {
-  background: linear-gradient(45deg, #8a2be2, #4b0082);
+  background: linear-gradient(135deg, #0a3d22, #1db870);
   color: white;
   border: none;
   border-radius: 25px;
@@ -1578,20 +1600,20 @@ const copyImageNative = async (imageUrl, material) => {
   cursor: pointer;
   transition: all 0.3s ease;
   margin-top: 1rem;
-  box-shadow: 0 4px 15px rgba(138, 43, 226, 0.3);
+  box-shadow: 0 4px 15px rgba(29, 184, 112, 0.3);
 }
 
 .feedback-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(138, 43, 226, 0.4);
+  box-shadow: 0 6px 20px rgba(29, 184, 112, 0.4);
 }
-.loader { 
-  border: 4px solid #f3f3f3; 
-  border-top: 4px solid #8a2be2; /* 调整加载动画颜色 */
-  border-radius: 50%; 
-  width: 40px; 
-  height: 40px; 
-  animation: spin 1s linear infinite; 
+.loader {
+  border: 4px solid #e8f7f0;
+  border-top: 4px solid #1db870;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
 }
   @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   .observer { height: 20px; }
@@ -1603,11 +1625,10 @@ const copyImageNative = async (imageUrl, material) => {
     padding-left: 1rem;
     padding-right: 1rem; 
   }
-  /* --- 新增：为移动端调整标签容器的高度 --- */
-  .tags-container {
-  /* 在移动端，由于每行能显示的标签更少，我们需要一个更大的默认高度来容纳大约3-4行 */
-     max-height: 100px; 
-}
+  /* 移动端标签内容区高度调整 */
+  .tags-inner {
+    max-height: 100px;
+  }
   
   .hero-title {
     font-size: 2rem; /* 在小屏幕上适当缩小标题字号 */
@@ -1693,17 +1714,15 @@ const copyImageNative = async (imageUrl, material) => {
 
 .feedback-form textarea:focus {
   outline: none;
-  border-color: #8a2be2; /* 调整焦点边框颜色 */
-  box-shadow: 0 0 0 4px rgba(138, 43, 226, 0.2); /* 调整焦点阴影颜色 */
+  border-color: #1db870;
+  box-shadow: 0 0 0 4px rgba(29, 184, 112, 0.15);
 }
 
 .feedback-form button {
   display: block;
   width: 100%;
   padding: 1rem 1.8rem;
-  background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); /* 新的动感渐变色 */
-  background-size: 400% 400%; /* 扩大背景尺寸，为动画做准备 */
-  animation: gradient-animation 15s ease infinite; /* 渐变动画 */
+  background: linear-gradient(135deg, #0a3d22, #1db870);
   color: white;
   border: none;
   border-radius: 8px;
@@ -1711,20 +1730,18 @@ const copyImageNative = async (imageUrl, material) => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(138, 43, 226, 0.2);
+  box-shadow: 0 4px 15px rgba(29, 184, 112, 0.25);
 }
 
 .feedback-form button:hover {
-  background: linear-gradient(-45deg, #e73c7e, #ee7752, #23a6d5, #23d5ab); /* 悬停时渐变方向或颜色微调 */
-  background-size: 400% 400%;
-  animation: gradient-animation 10s ease infinite; /* 悬停时动画速度变化 */
+  background: linear-gradient(135deg, #0d6b47, #25d47f);
   transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(138, 43, 226, 0.3);
+  box-shadow: 0 6px 20px rgba(29, 184, 112, 0.4);
 }
 
 .feedback-form button:active {
   transform: translateY(0);
-  box-shadow: 0 2px 10px rgba(138, 43, 226, 0.2);
+  box-shadow: 0 2px 10px rgba(29, 184, 112, 0.2);
 }
 
 /* 新增：留言时间线小部件样式 */
@@ -1756,10 +1773,8 @@ const copyImageNative = async (imageUrl, material) => {
 .widget-header {
   display: flex;
   align-items: center;
-  padding: 12px 12px; /* 调整内边距 */
-  background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); /* 新的动感渐变背景 */
-  background-size: 400% 400%; /* 扩大背景尺寸 */
-  animation: gradient-animation 15s ease infinite; /* 渐变动画 */
+  padding: 12px 12px;
+  background: linear-gradient(135deg, #0a3d22, #1db870);
   color: white;
   cursor: pointer;
   font-weight: 600; /* 更粗字重 */
@@ -1953,8 +1968,10 @@ const copyImageNative = async (imageUrl, material) => {
   
   /* 标签容器移动端适配 */
   .tags-container {
-    padding: 0.8rem 0;
     margin-bottom: 1.5rem;
+  }
+  .tags-inner {
+    padding: 0.8rem 0 0.3rem;
   }
   
   .tags-container button {
@@ -2003,8 +2020,6 @@ const copyImageNative = async (imageUrl, material) => {
   .widget-header {
     padding: 10px 12px;
     font-size: 1em;
-    background-size: 400% 400%; /* 确保移动端也应用背景尺寸 */
-    animation: gradient-animation 15s ease infinite; /* 确保移动端也应用动画 */
   }
   .widget-header .icon {
     font-size: 1.2em;
@@ -2043,13 +2058,6 @@ const copyImageNative = async (imageUrl, material) => {
   .feedback-message {
     font-size: 0.85em;
   }
-  .feedback-form button {
-    background-size: 400% 400%; /* 确保移动端按钮也应用背景尺寸 */
-    animation: gradient-animation 15s ease infinite; /* 确保移动端按钮也应用动画 */
-  }
-  .feedback-form button:hover {
-    animation: gradient-animation 10s ease infinite; /* 确保移动端按钮 hover 动画 */
-  }
 }
 
 /* 小屏幕设备进一步优化 */
@@ -2087,20 +2095,22 @@ const copyImageNative = async (imageUrl, material) => {
   }
 }
 
-/* 新增标签切换按钮的样式 */
+/* 标签切换按钮 */
 .tags-toggle-btn {
-  background-color: transparent !important; /* !important 覆盖原有样式 */
-  color: #8a2be2 !important; /* 紫色主题色 */
-  font-weight: bold !important;
+  background-color: transparent !important;
+  color: #0d6b47 !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
   box-shadow: none !important;
-  flex-shrink: 0 !important; /* 防止按钮被压缩 */
-  white-space: nowrap !important; /* 防止文字换行 */
-  order: 999 !important; /* 确保按钮排在最后 */
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  letter-spacing: 0.02em;
 }
 
 .tags-toggle-btn:hover {
-  background-color: #f0e6fa !important; /* 悬浮时淡紫色背景 */
-  transform: none !important; /* 移除悬浮时的上移效果 */
+  background-color: rgba(29, 184, 112, 0.08) !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* 高端提示框样式 */
@@ -2311,13 +2321,13 @@ a.router-link-active.router-link-exact-active{
 
 /* 复制按钮特定样式 */
 .copy-btn {
-  color: #8a2be2;
+  color: #0d6b47;
 }
 
 .copy-btn:hover {
-  background: linear-gradient(135deg, #8a2be2, #4b0082);
+  background: linear-gradient(135deg, #0a3d22, #1db870);
   color: white;
-  box-shadow: 0 4px 12px rgba(138, 43, 226, 0.4);
+  box-shadow: 0 4px 12px rgba(29, 184, 112, 0.4);
 }
 
 .copy-btn svg {
