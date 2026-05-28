@@ -1365,7 +1365,7 @@ const copyImageNative = async (imageUrl, material) => {
 }
   
 .tags-container {
-  margin-bottom: 2rem;
+  margin-bottom: 0rem;
   background-color: #f5f5f5;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.05);
