@@ -467,7 +467,7 @@ const goToFrontendHome = () => {
     top: 0.5rem; /* 直接设置顶部距离，避免transform冲突 */
     left: 0;
     height: calc(100% - 1rem); /* 高度留出上下边距 */
-    background: linear-gradient(135deg, #ec4899, #a855f7);
+    background: linear-gradient(135deg, #0a3d22, #1db870);
     border-radius: 4px;
     transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease; /* 添加opacity过渡动画 */
     z-index: 1; /* 置于底层 */

@@ -1142,20 +1142,20 @@ const copyImageNative = async (imageUrl, material) => {
   }
 
   .hero-header {
-    background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); /* 新的动感渐变色 */
-    background-size: 400% 400%; /* 扩大背景尺寸，为动画做准备 */
-    animation: gradient-animation 15s ease infinite; /* 渐变动画 */
+    background: linear-gradient(-45deg, #020d07, #062818, #0a3d22, #051f10, #0d4a2a, #021208);
+    background-size: 400% 400%;
+    animation: gradient-animation 18s ease infinite;
     color: white;
     text-align: center;
-    padding: 3rem 1rem; /* 增加上下内边距 */
-    border-bottom-left-radius: 25px; /* 增加圆角 */
+    padding: 3rem 1rem;
+    border-bottom-left-radius: 25px;
     border-bottom-right-radius: 25px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2); /* 柔和阴影 */
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   @keyframes gradient-animation {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
   }
 
