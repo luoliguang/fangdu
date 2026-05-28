@@ -894,14 +894,18 @@ const copyImageNative = async (imageUrl, material) => {
       <h1 class="hero-title">方度实拍图</h1>
       <p class="hero-subtitle">您可以在这里获取到各种面料、款式、等实拍图素材</p>
       <div class="search-wrapper">
-        <input 
-          type="text" 
-          v-model="searchTerm" 
-          placeholder="请以关键词的形式搜索 如：圆领短袖 插肩" 
-          class="search-input-cool"
-          @focus="handleSearchFocus"
-          @blur="handleSearchBlur"
-        >
+        <div class="search-bar-row">
+          <input
+            type="text"
+            v-model="searchTerm"
+            placeholder="请以关键词的形式搜索 如：圆领短袖 插肩"
+            class="search-input-cool"
+            @focus="handleSearchFocus"
+            @blur="handleSearchBlur"
+            @keydown.enter="handleFilterChange"
+          >
+          <button class="search-btn" @click="handleFilterChange">搜索</button>
+        </div>
         <!-- 搜索建议下拉列表 -->
         <div v-if="showSuggestions && searchSuggestions.length > 0" class="search-suggestions">
           <div class="suggestions-header">
@@ -1180,25 +1184,59 @@ const copyImageNative = async (imageUrl, material) => {
   opacity: 0.95; 
   margin: 1rem 0 2.5rem 0; /* 调整间距 */
 }
+/* 搜索栏行：输入框 + 按钮组合 */
+.search-bar-row {
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 30px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  transition: box-shadow 0.4s ease, transform 0.4s ease;
+  overflow: hidden;
+}
+
+.search-bar-row:focus-within {
+  box-shadow: 0 8px 30px rgba(0,0,0,0.25), 0 0 0 4px rgba(90, 143, 115, 0.35);
+  transform: translateY(-2px);
+}
+
 .search-input-cool {
-  width: 100%; 
-  padding: 1.2rem 2rem; /* 增加内边距 */
-  font-size: 1.1rem; 
-  border-radius: 30px; /* 更圆的边框 */
-  border: none; 
-  background-color: rgba(255, 255, 255, 0.95); /* 半透明背景 */
-  box-shadow: 0 6px 20px rgba(0,0,0,0.15); /* 柔和阴影 */
-  transition: all 0.4s ease; 
-  color: #333; /* 字体颜色 */
+  flex: 1;
+  min-width: 0;
+  padding: 1.2rem 1.5rem 1.2rem 2rem;
+  font-size: 1.1rem;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: #333;
+}
+
+.search-btn {
+  flex-shrink: 0;
+  margin: 0.4rem 0.4rem 0.4rem 0;
+  padding: 0.75rem 1.6rem;
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.search-btn:hover {
+  opacity: 0.88;
+  transform: scale(1.03);
+}
+
+.search-btn:active {
+  transform: scale(0.98);
 }
 .search-input-cool::placeholder { 
   color: #999; /* 占位符颜色 */
   opacity: 0.8;
-}
-.search-input-cool:focus {
-  outline: none;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.25), 0 0 0 4px rgba(90, 143, 115, 0.35);
-  transform: translateY(-2px);
 }
 
 /* 搜索框包装器 */
@@ -1644,9 +1682,13 @@ const copyImageNative = async (imageUrl, material) => {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
   /* 移动端搜索框 */
-  .search-input-cool{
-    width: 90%;
-    padding: 1rem 1.5rem;
+  .search-input-cool {
+    padding: 0.9rem 1rem 0.9rem 1.4rem;
+    font-size: 1rem;
+  }
+  .search-btn {
+    padding: 0.65rem 1.1rem;
+    font-size: 0.9rem;
   }
   
   /* 移动端搜索建议 */
@@ -1962,8 +2004,8 @@ const copyImageNative = async (imageUrl, material) => {
   }
   
   .search-input-cool {
-    padding: 1rem 1.5rem;
-    font-size: 1rem;
+    padding: 0.85rem 0.8rem 0.85rem 1.2rem;
+    font-size: 0.95rem;
   }
   
   /* 标签容器移动端适配 */

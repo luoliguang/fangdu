@@ -218,13 +218,12 @@ const updateSlider = async () => {
   }
 
   if (activeLink) {
-    // 获取激活链接的位置和尺寸
+    // 获取激活链接的位置和尺寸，两侧各扩展 12px 让滑块有足够呼吸感
     const { offsetLeft, offsetWidth } = activeLink;
-    
-    // 更新滑块的样式
-    navSlider.value.style.width = `${offsetWidth}px`;
-    navSlider.value.style.transform = `translateX(${offsetLeft}px)`;
-    navSlider.value.style.opacity = '1'; // 显示滑块
+    const PADDING = 12;
+    navSlider.value.style.width = `${offsetWidth + PADDING * 2}px`;
+    navSlider.value.style.transform = `translateX(${offsetLeft - PADDING}px)`;
+    navSlider.value.style.opacity = '1';
   } else {
     // 如果没有找到激活链接（比如在/login页面），隐藏滑块
     navSlider.value.style.opacity = '0';
