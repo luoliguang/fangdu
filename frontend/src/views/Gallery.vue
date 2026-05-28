@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, onActivated, inject, nextTick } from 'vue';
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch, onActivated, inject, nextTick } from 'vue';
 import apiClient from '../axiosConfig.js';
 import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
@@ -18,8 +18,8 @@ function generateUUID() {
 }
 
 // --- 基础状态 ---
-const materials = ref([]);
-const displayMaterials = ref([]);
+const materials = shallowRef([]);
+const displayMaterials = shallowRef([]);
 const searchTerm = ref('');
 const tags = ref([]);
 const activeTag = ref('');
@@ -382,7 +382,7 @@ const fetchMaterials = async (isLoadMore = false) => {
         if (response.data && response.data.meta) {
             const { data, meta } = response.data;
             if (isLoadMore) {
-                materials.value.push(...data);
+                materials.value = [...materials.value, ...data];
                 applyDisplayMaterials(data, { append: true, chunkSize: 20 });
             } else {
                 materials.value = data;
@@ -629,8 +629,10 @@ const recordSearchKeyword = async (keyword) => {
 const handleFilterChange = () => {
     currentPage.value = 1;
     totalPages.value = 1;
+    // 立即清空，让 DOM 移除发生在 API 等待期间，避免"清除+插入"同帧卡顿
+    isChunkRendering.value = true;
+    displayMaterials.value = [];
     fetchMaterials(false);
-
     recordSearchKeyword(searchTerm.value);
 };
 
