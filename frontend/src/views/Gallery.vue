@@ -823,7 +823,23 @@ if (typeof window !== 'undefined') {
 // 留言表单始终显示
 showFeedbackForm.value = true;
 
-// 快捷复制图片（通过后端代理绕过 CORS，直接写入真实图片）
+// 将任意图片 blob 转为 PNG（ClipboardItem 只支持 image/png）
+const blobToPngBlob = (blob) => new Promise((resolve, reject) => {
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(png => png ? resolve(png) : reject(new Error('toBlob failed')), 'image/png');
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image load failed')); };
+  img.src = url;
+});
+
+// 快捷复制图片（通过后端代理绕过 CORS，转 PNG 后写入剪贴板）
 const quickCopyImage = async (material) => {
   if (material.media_type !== 'image') return;
 
@@ -833,7 +849,6 @@ const quickCopyImage = async (material) => {
   showCustomToast(`正在复制"${imageName}"...`, 'success');
 
   try {
-    // 通过后端代理拉取图片，避免 CDN 跨域限制
     const apiBase = import.meta.env.VITE_API_BASE_URL;
     const origin = apiBase?.startsWith('http') ? apiBase : window.location.origin;
     const proxyUrl = `${origin}/api/v1/proxy/media?url=${encodeURIComponent(imageUrl)}`;
@@ -842,15 +857,12 @@ const quickCopyImage = async (material) => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const blob = await response.blob();
-    const imageBlob = blob.type.startsWith('image/')
-      ? blob
-      : new Blob([blob], { type: 'image/png' });
+    const pngBlob = await blobToPngBlob(blob);
 
-    await navigator.clipboard.write([new ClipboardItem({ [imageBlob.type]: imageBlob })]);
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
     showCustomToast(`"${imageName}" 已复制！`, 'success');
   } catch (error) {
     console.error('复制图片失败:', error);
-    // 降级：复制链接
     try {
       await navigator.clipboard.writeText(imageUrl);
       showCustomToast('已复制图片链接', 'info');
