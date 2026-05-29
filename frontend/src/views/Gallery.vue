@@ -6,7 +6,6 @@ import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
 import TutorialGuide from '../components/TutorialGuide.vue';
 import tutorialManager from '../utils/tutorialManager.js';
-import { copyImageToClipboard } from 'copy-image-clipboard';
 
 // 简单的 UUID 生成函数
 function generateUUID() {
@@ -824,66 +823,40 @@ if (typeof window !== 'undefined') {
 // 留言表单始终显示
 showFeedbackForm.value = true;
 
-// 快捷复制图片（从卡片直接复制，不打开大图）
+// 快捷复制图片（通过后端代理绕过 CORS，直接写入真实图片）
 const quickCopyImage = async (material) => {
+  if (material.media_type !== 'image') return;
+
+  const imageName = material.name || '图片';
+  const imageUrl = toCdnUrl(material.file_path);
+
+  showCustomToast(`正在复制"${imageName}"...`, 'success');
+
   try {
-    if (material.media_type !== 'image') return;
-    
-    const imageUrl = material.file_path;
-    const imageName = material.name || '图片';
-    
-    showCustomToast(`正在复制"${imageName}"...`, 'success');
+    // 通过后端代理拉取图片，避免 CDN 跨域限制
+    const apiBase = import.meta.env.VITE_API_BASE_URL;
+    const origin = apiBase?.startsWith('http') ? apiBase : window.location.origin;
+    const proxyUrl = `${origin}/api/v1/proxy/media?url=${encodeURIComponent(imageUrl)}`;
 
-    let imageUrlToUse = toCdnUrl(imageUrl);
+    const response = await fetch(proxyUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    try {
-      await copyImageToClipboard(imageUrlToUse);
-      showCustomToast(`"${imageName}" 已复制！`, 'success');
-    } catch (error) {
-      console.error('快捷复制失败:', error);
-      await copyImageNative(imageUrlToUse, material);
-    }
-  } catch (error) {
-    console.error('快捷复制图片失败:', error);
-    showCustomToast('复制失败，请重试', 'error');
-  }
-};
-
-// 原生复制方法（作为降级方案）
-const copyImageNative = async (imageUrl, material) => {
-  try {
-    if (!navigator.clipboard || !navigator.clipboard.write) {
-      throw new Error('浏览器不支持剪贴板API');
-    }
-
-    const response = await fetch(imageUrl);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
     const blob = await response.blob();
-    
-    // 确保blob类型正确
-    let finalBlob = blob;
-    if (!blob.type || !blob.type.startsWith('image/')) {
-      finalBlob = new Blob([blob], { type: 'image/png' });
-    }
-    
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        [finalBlob.type]: finalBlob
-      })
-    ]);
+    const imageBlob = blob.type.startsWith('image/')
+      ? blob
+      : new Blob([blob], { type: 'image/png' });
 
-    const successMsg = material?.name ? `"${material.name}" 已复制！` : '图片已复制到剪贴板！';
-    showCustomToast(successMsg, 'success');
+    await navigator.clipboard.write([new ClipboardItem({ [imageBlob.type]: imageBlob })]);
+    showCustomToast(`"${imageName}" 已复制！`, 'success');
   } catch (error) {
-    console.error('原生复制方法失败:', error);
-    
-    // 最终降级：复制图片链接
-    await navigator.clipboard.writeText(imageUrl);
-    showCustomToast('已复制图片链接（图片无法直接复制）', 'success');
+    console.error('复制图片失败:', error);
+    // 降级：复制链接
+    try {
+      await navigator.clipboard.writeText(imageUrl);
+      showCustomToast('已复制图片链接', 'info');
+    } catch {
+      showCustomToast('复制失败，请重试', 'error');
+    }
   }
 };
 </script>
