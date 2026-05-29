@@ -3,8 +3,8 @@
     <header class="page-header">
       <div class="header-content">
         <span class="eyebrow">SIZE TOOLS</span>
-        <h1>尺码工具</h1>
-        <p>换码标生成与尺码推荐，让制单更高效</p>
+        <h1>跟单专属尺码工具</h1>
+        <p>客户总是喜欢换码标，也是没招了...</p>
       </div>
     </header>
 

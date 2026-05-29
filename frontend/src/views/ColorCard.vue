@@ -10,7 +10,7 @@
         </div>
         <div class="header-text">
           <h1>打色卡工具</h1>
-          <p class="header-description">专业的色彩管理工具，支持多种色彩空间转换和配色方案生成</p>
+          <p class="header-description">为小伙伴们准备的小工具，客户太喜欢打色块了...</p>
         </div>
       </div>
       <div class="header-actions">
