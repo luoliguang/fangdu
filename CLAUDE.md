@@ -40,12 +40,17 @@ The production frontend is built and served as static files by the Express backe
 - `src/router/index.js` — routes, JWT guard for `/admin/*`, visit tracking in `afterEach`, 30s heartbeat
 - `src/stores/` — Pinia stores (material, feedback, user)
 - `src/axiosConfig.js` — axios instance with base URL from `VITE_API_BASE_URL`
+- `src/composables/useApi.js` — wraps API calls with loading/error state; prefer this over raw axios in components
 
 ## Important Patterns
+
+**OSS vs local storage**: `MaterialService` uploads to Aliyun OSS when `ALI_OSS_*` env vars are set; falls back to local `backend/uploads/` otherwise. Both modes return the same API shape.
 
 **CDN URL transformation**: OSS URLs (`*.aliyuncs.com`) are rewritten to the CDN domain `assets.fangdutex.cn`. Backend: `MaterialService.generateThumbnailUrl()` uses `CDN_BASE_URL` env var. Frontend: `toCdnUrl()` in Gallery.vue does the same regex replace. Thumbnail OSS processing params: `?x-oss-process=image/resize,m_fill,w_300,quality,q_80`.
 
 **Auth**: JWT stored in `localStorage` as `authToken`. Admin routes have a `beforeEnter` guard. Backend uses Bearer token middleware.
+
+**Visit deduplication**: Same session within 5 minutes counts as one visit. When debugging stats appearing too low, check `VisitService` dedup logic before suspecting tracking bugs.
 
 **Timezone**: SQLite always stores UTC. CST (UTC+8) range queries use:
 ```sql
