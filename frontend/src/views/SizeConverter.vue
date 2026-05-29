@@ -1,9 +1,11 @@
 <template>
   <div class="size-converter-container">
     <header class="page-header">
-      <span class="eyebrow">SIZE TOOLS</span>
-      <h1>尺码工具</h1>
-      <p>换码标生成与尺码推荐，让制单更高效</p>
+      <div class="header-content">
+        <span class="eyebrow">SIZE TOOLS</span>
+        <h1>尺码工具</h1>
+        <p>换码标生成与尺码推荐，让制单更高效</p>
+      </div>
     </header>
 
     <div class="card">
@@ -206,32 +208,87 @@ export default {
   color: #2c3a32;
 }
 
-/* 页面头部 */
+/* 页面头部 —— 深绿渐变 hero 横幅 */
 .page-header {
+  position: relative;
+  overflow: hidden;
   text-align: center;
-  margin: 50px 0 32px;
+  margin: 40px 0 28px;
+  padding: 52px 24px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #072e19 0%, #0a3d22 45%, #316b49 100%);
+  box-shadow: 0 16px 44px rgba(10, 61, 34, 0.28);
+}
+
+/* 柔和光晕装饰 */
+.page-header::before {
+  content: '';
+  position: absolute;
+  top: -70px;
+  right: -50px;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(158, 212, 181, 0.35), transparent 70%);
+  border-radius: 50%;
+}
+
+.page-header::after {
+  content: '';
+  position: absolute;
+  bottom: -90px;
+  left: -60px;
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(90, 143, 115, 0.32), transparent 70%);
+  border-radius: 50%;
+}
+
+/* 细腻点阵纹理 */
+.header-content {
+  position: relative;
+  z-index: 1;
+}
+
+.header-content::before {
+  content: '';
+  position: absolute;
+  inset: -52px -24px;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 18px 18px;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .eyebrow {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-size: 12px;
   letter-spacing: 3px;
   font-weight: 600;
-  color: #5a8f73;
-  margin-bottom: 10px;
+  color: #9ed4b5;
+  margin-bottom: 14px;
+}
+
+.eyebrow::before,
+.eyebrow::after {
+  content: '';
+  width: 22px;
+  height: 1px;
+  background: rgba(158, 212, 181, 0.5);
 }
 
 .page-header h1 {
-  font-size: 32px;
+  font-size: 34px;
   font-weight: 700;
-  margin: 0 0 10px;
-  color: #0a3d22;
-  letter-spacing: 1px;
+  margin: 0 0 12px;
+  color: #fff;
+  letter-spacing: 2px;
 }
 
 .page-header p {
   margin: 0;
-  color: #8a8f8c;
+  color: rgba(255, 255, 255, 0.72);
   font-size: 15px;
 }
 
