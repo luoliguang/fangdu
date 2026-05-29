@@ -503,32 +503,32 @@ onMounted(() => {
   left: 0;
   transform: translateY(-50%);
   z-index: 1000;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
+  color: #fff;
   border: none;
-  border-radius: 0 25px 25px 0;
-  padding: 15px 12px;
+  border-radius: 0 14px 14px 0;
+  padding: 18px 11px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  box-shadow: 2px 0 15px rgba(102, 126, 234, 0.4);
-  transition: all 0.3s ease;
-  font-size: 12px;
+  gap: 6px;
+  box-shadow: 3px 2px 12px rgba(10, 61, 34, 0.22);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  font-size: 13px;
   font-weight: 500;
+  letter-spacing: 2px;
   writing-mode: vertical-rl;
   text-orientation: mixed;
 }
 
 .drawer-trigger:hover {
-  transform: translateY(-50%) translateX(5px);
-  box-shadow: 2px 0 20px rgba(102, 126, 234, 0.6);
+  transform: translateY(-50%) translateX(3px);
+  box-shadow: 5px 2px 18px rgba(10, 61, 34, 0.3);
 }
 
 .drawer-trigger.active {
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-  transform: translateY(-50%) translateX(5px);
+  transform: translateY(-50%) translateX(3px);
 }
 
 .trigger-icon {
@@ -590,12 +590,12 @@ onMounted(() => {
   left: -400px;
   width: 400px;
   height: 100vh;
-  background: white;
+  background: #fff;
   z-index: 1002;
-  transition: left 0.3s ease;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 4px 0 24px rgba(10, 61, 34, 0.12);
 }
 
 .side-drawer.open {
@@ -604,19 +604,19 @@ onMounted(() => {
 
 /* 抽屉头部 */
 .drawer-header {
-  padding: 20px;
-  border-bottom: 1px solid #eee;
+  padding: 22px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
 }
 
 .drawer-header h3 {
   margin: 0;
-  color: #333;
-  font-size: 18px;
+  color: #fff;
+  font-size: 17px;
   font-weight: 600;
+  letter-spacing: 1px;
 }
 
 .drawer-close {
@@ -634,44 +634,63 @@ onMounted(() => {
 }
 
 .drawer-close:hover {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(255, 255, 255, 0.18);
 }
 
 .drawer-close svg {
   width: 20px;
   height: 20px;
-  color: #666;
+  color: #fff;
 }
 
 /* 抽屉标签栏 */
 .drawer-tabs {
   display: flex;
-  border-bottom: 1px solid #eee;
-  background: #fafafa;
+  border-bottom: 1px solid #ececec;
+  background: #fff;
   overflow-x: auto;
 }
 
 .drawer-tab {
+  position: relative;
   flex: 1;
-  padding: 12px 8px;
+  padding: 14px 8px;
   border: none;
   background: none;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  transition: all 0.2s;
+  gap: 5px;
+  color: #8a8f8c;
+  transition: color 0.2s ease, background-color 0.2s ease;
   min-width: 60px;
 }
 
+.drawer-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) scaleX(0);
+  width: 60%;
+  height: 2.5px;
+  background: #5a8f73;
+  border-radius: 2px;
+  transition: transform 0.22s ease;
+}
+
 .drawer-tab:hover {
-  background-color: rgba(102, 126, 234, 0.1);
+  background-color: rgba(90, 143, 115, 0.07);
+  color: #3d6b52;
 }
 
 .drawer-tab.active {
-  background-color: #667eea;
-  color: white;
+  color: #0a3d22;
+}
+
+.drawer-tab.active::after {
+  transform: translateX(-50%) scaleX(1);
 }
 
 .tab-icon {
@@ -687,12 +706,17 @@ onMounted(() => {
   height: 18px;
 }
 
-.drawer-tab:not(.active) .tab-icon svg {
-  stroke: #666;
+.drawer-tab .tab-icon svg {
+  stroke: #8a8f8c;
+  transition: stroke 0.2s ease;
+}
+
+.drawer-tab:hover .tab-icon svg {
+  stroke: #3d6b52;
 }
 
 .drawer-tab.active .tab-icon svg {
-  stroke: white;
+  stroke: #0a3d22;
 }
 
 .tab-label {
@@ -738,10 +762,10 @@ onMounted(() => {
 
 .announcement-item {
   padding: 16px;
-  border-radius: 12px;
-  border-left: 4px solid #667eea;
-  background: #f8f9ff;
-  transition: all 0.2s;
+  border-radius: 10px;
+  border-left: 3px solid #5a8f73;
+  background: #f4f7f5;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
   position: relative;
 }
@@ -894,8 +918,8 @@ onMounted(() => {
 
 /* 行内代码 */
 .markdown-preview :deep(code) {
-  background: rgba(102, 126, 234, 0.1) !important;
-  color: #667eea !important;
+  background: rgba(90, 143, 115, 0.12) !important;
+  color: #3d6b52 !important;
   padding: 2px 5px !important;
   border-radius: 3px !important;
   font-size: 12px !important;
@@ -921,12 +945,12 @@ onMounted(() => {
 
 /* 引用 */
 .markdown-preview :deep(blockquote) {
-  border-left: 3px solid #667eea !important;
+  border-left: 3px solid #5a8f73 !important;
   padding-left: 12px !important;
   margin: 8px 0 !important;
   color: #666 !important;
   font-style: italic !important;
-  background: rgba(102, 126, 234, 0.05) !important;
+  background: rgba(90, 143, 115, 0.06) !important;
   padding: 8px 12px !important;
   border-radius: 4px !important;
 }
@@ -945,13 +969,13 @@ onMounted(() => {
 
 /* 链接 */
 .markdown-preview :deep(a) {
-  color: #667eea !important;
+  color: #3d6b52 !important;
   text-decoration: none !important;
-  border-bottom: 1px solid rgba(102, 126, 234, 0.3) !important;
+  border-bottom: 1px solid rgba(90, 143, 115, 0.35) !important;
 }
 
 .markdown-preview :deep(a:hover) {
-  border-bottom-color: #667eea !important;
+  border-bottom-color: #5a8f73 !important;
 }
 
 /* 表格 */
@@ -1079,7 +1103,7 @@ onMounted(() => {
 .tutorial-icon svg {
   width: 24px;
   height: 24px;
-  stroke: #667eea;
+  stroke: #5a8f73;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1136,8 +1160,8 @@ onMounted(() => {
 }
 
 .filter-button:hover {
-  border-color: #667eea;
-  background: #f8f9ff;
+  border-color: #5a8f73;
+  background: #f4f7f5;
   transform: translateY(-2px);
 }
 
@@ -1152,7 +1176,7 @@ onMounted(() => {
 .filter-icon svg {
   width: 20px;
   height: 20px;
-  stroke: #667eea;
+  stroke: #5a8f73;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1288,23 +1312,25 @@ onMounted(() => {
 
 .feedback-form textarea:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #5a8f73;
+  box-shadow: 0 0 0 3px rgba(90, 143, 115, 0.12);
 }
 
 .feedback-submit-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
   color: white;
   border: none;
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: transform 0.2s;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .feedback-submit-btn:hover {
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(10, 61, 34, 0.22);
 }
 
 .contact-info {
