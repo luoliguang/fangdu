@@ -54,17 +54,17 @@ const handleLogin = async () => {
           <span class="brand-logo-text">方度</span>
         </div>
         <h2 class="brand-title">素材管理平台</h2>
-        <p class="brand-desc">专为服饰行业打造的私有化<br>多媒体资产管理系统</p>
+        <p class="brand-desc">专为方度服饰打造的实拍图管理平台</p>
 
         <div class="brand-tags">
-          <span class="brand-tag">面料实拍</span>
-          <span class="brand-tag">款式归档</span>
+          <span class="brand-tag">实拍图管理</span>
+          <span class="brand-tag">面料归档</span>
           <span class="brand-tag">设计素材</span>
         </div>
       </div>
 
       <div class="brand-footer">
-        <span>fangdutex.cn</span>
+        <span>material.fangdutex.cn</span>
       </div>
     </aside>
 
