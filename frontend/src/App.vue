@@ -338,12 +338,15 @@ const goToFrontendHome = () => {
     </main>
 
     <Transition name="fade">
-      <button 
-        v-if="showScrollTopButton" 
-        @click="scrollToTop" 
+      <button
+        v-if="showScrollTopButton"
+        @click="scrollToTop"
         class="scroll-to-top-btn"
+        aria-label="回到顶部"
       >
-        ↑
+        <svg class="scroll-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="18 15 12 9 6 15"/>
+        </svg>
       </button>
     </Transition>
 
@@ -498,43 +501,103 @@ const goToFrontendHome = () => {
 
 
 
-  /* --- 新增：“返回顶部”按钮的样式 --- */
+  /* --- 返回顶部按钮 --- */
   .scroll-to-top-btn {
-    position: fixed; /* 固定在视口位置 */
-    bottom: 30px;
-    right: 30px;
-    z-index: 1000; /* 确保在最上层 */
-    
-    width: 50px;
-    height: 50px;
-    border-radius: 50%; /* 圆形 */
-    background-color: #42b983;
-    color: white;
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    z-index: 1000;
+
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
     border: none;
-    
-    font-size: 24px;
-    line-height: 50px;
-    text-align: center;
-    
     cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    transition: all 0.3s ease; /* 平滑过渡效果 */
+    isolation: isolate;
+
+    background: linear-gradient(145deg, #0c4427, #1d6b43);
+    color: #fff;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    box-shadow:
+      0 6px 24px rgba(10, 61, 34, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  /* 旋转光环 */
+  .scroll-to-top-btn::before {
+    content: '';
+    position: absolute;
+    inset: -2.5px;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 0deg,
+      #5a8f73 0deg,
+      #9ed4b5 90deg,
+      transparent 160deg,
+      transparent 280deg,
+      #5a8f73 360deg
+    );
+    animation: ring-spin 3.5s linear infinite;
+    z-index: -1;
+  }
+
+  /* 光环内填充层（遮住渐变中心） */
+  .scroll-to-top-btn::after {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #0c4427, #1d6b43);
+    z-index: -1;
+  }
+
+  @keyframes ring-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .scroll-arrow {
+    width: 19px;
+    height: 19px;
+    position: relative;
+    z-index: 1;
+    transition: transform 0.25s ease;
   }
 
   .scroll-to-top-btn:hover {
-    background-color: #3aa875;
-    transform: scale(1.1); /* 鼠标悬浮时放大一点 */
-  }
-  
-  /* --- 新增：按钮的淡入淡出动画 --- */
-  .fade-enter-active,
-  .fade-leave-active {
-    transition: opacity 0.3s ease;
+    transform: translateY(-3px);
+    box-shadow:
+      0 12px 32px rgba(10, 61, 34, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
 
-  .fade-enter-from,
+  .scroll-to-top-btn:hover .scroll-arrow {
+    transform: translateY(-2px);
+  }
+
+  .scroll-to-top-btn:active {
+    transform: translateY(0);
+  }
+
+  /* 淡入淡出 + 上浮出现 */
+  .fade-enter-active {
+    transition: opacity 0.35s ease, transform 0.35s ease;
+  }
+  .fade-leave-active {
+    transition: opacity 0.22s ease, transform 0.22s ease;
+  }
+  .fade-enter-from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
   .fade-leave-to {
     opacity: 0;
+    transform: translateY(8px);
   }
 
   /* --- 移动端适配样式 --- */
@@ -601,10 +664,8 @@ const goToFrontendHome = () => {
     .scroll-to-top-btn {
       bottom: 20px;
       right: 20px;
-      width: 45px;
-      height: 45px;
-      font-size: 20px;
-      line-height: 45px;
+      width: 44px;
+      height: 44px;
     }
   }
 
@@ -649,12 +710,10 @@ const goToFrontendHome = () => {
     }
 
     .scroll-to-top-btn {
-      bottom: 15px;
-      right: 15px;
+      bottom: 16px;
+      right: 16px;
       width: 40px;
       height: 40px;
-      font-size: 18px;
-      line-height: 40px;
     }
   }
 </style>
