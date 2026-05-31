@@ -71,37 +71,6 @@
             </el-select>
           </div>
 
-          <!-- 数字码：起始数字 + 间距 -->
-          <template v-if="conversionMode === 'numeric'">
-            <div class="form-group">
-              <label class="group-label">起始数字</label>
-              <div class="number-input-wrap">
-                <input
-                  type="number"
-                  v-model.number="numericStartValue"
-                  @input="calculateNumericConversion"
-                  class="number-input"
-                  min="0"
-                  step="5"
-                />
-                <span class="number-input-hint">默认 90</span>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="group-label">每档间距</label>
-              <div class="number-input-wrap">
-                <input
-                  type="number"
-                  v-model.number="numericStep"
-                  @input="calculateNumericConversion"
-                  class="number-input"
-                  min="1"
-                  step="5"
-                />
-                <span class="number-input-hint">默认 10</span>
-              </div>
-            </div>
-          </template>
 
           <!-- 摘要 -->
           <div class="conversion-summary">
@@ -114,7 +83,7 @@
               降 {{ decrementCount }} 码 · 共 {{ conversionResult.length }} 项
             </div>
             <div class="summary-meta" v-else>
-              {{ numericStartValue }} 起 · 每档 +{{ numericStep }} · 共 {{ numericResult.length }} 项
+              标准儿童码 · 共 {{ numericResult.length }} 项
             </div>
           </div>
         </aside>
@@ -213,9 +182,14 @@ export default {
       decrementCount: 3,
       conversionResult: [],
       copySuccess: false,
-      // 数字码
-      numericStartValue: 90,
-      numericStep: 10,
+      // 数字码（标准儿童尺码固定对照表）
+      numericSizeMap: {
+        'XXXS': 60, 'XXS': 70, 'XS': 80,
+        'S': 90, 'M': 100, 'L': 110, 'XL': 120,
+        '2XL': 130, '3XL': 140, '4XL': 150, '5XL': 160,
+        '6XL': 170, '7XL': 180, '8XL': 190, '9XL': 200,
+        '10XL': 210, '11XL': 220, '12XL': 230, '13XL': 240, '14XL': 250
+      },
       numericResult: [],
       numericCopySuccess: false,
       sizeOrder: ['XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL', '11XL','12XL','13XL','14XL'],
@@ -282,14 +256,14 @@ export default {
 
     // ── 数字码 ──
     calculateNumericConversion() {
-      const result = [];
+      this.numericResult = [];
       for (let i = this.startSize; i <= this.endSize; i++) {
-        result.push({
-          letter: this.sizeOrder[i],
-          numeric: this.numericStartValue + (i - this.startSize) * this.numericStep
-        });
+        const letter = this.sizeOrder[i];
+        const numeric = this.numericSizeMap[letter];
+        if (numeric !== undefined) {
+          this.numericResult.push({ letter, numeric });
+        }
       }
-      this.numericResult = result;
     },
     copySingleNumericResult(item) {
       navigator.clipboard.writeText(`${item.letter}->${item.numeric}`)
@@ -535,37 +509,6 @@ export default {
   box-shadow: 0 1px 4px rgba(10, 61, 34, 0.12);
 }
 
-/* 数字输入框 */
-.number-input-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.number-input {
-  flex: 1;
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid #e3e9e5;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #0a3d22;
-  background: #fff;
-  outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.number-input:focus {
-  border-color: #5a8f73;
-  box-shadow: 0 0 0 3px rgba(90, 143, 115, 0.15);
-}
-
-.number-input-hint {
-  font-size: 12px;
-  color: #b6c0ba;
-  white-space: nowrap;
-}
 
 /* 数字码提示标签 */
 .numeric-hint {
