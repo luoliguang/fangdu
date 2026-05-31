@@ -177,8 +177,8 @@ export default {
     return {
       activeTab: 'sizeConversion',
       conversionMode: 'letter', // 'letter' | 'numeric'
-      startSize: 3,
-      endSize: 6,
+      startSize: 4,
+      endSize: 8,
       decrementCount: 3,
       conversionResult: [],
       copySuccess: false,
