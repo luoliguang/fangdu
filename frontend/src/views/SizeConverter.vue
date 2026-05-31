@@ -29,6 +29,22 @@
       <div v-if="activeTab === 'sizeConversion'" class="conversion-layout">
         <!-- 左侧控制面板 -->
         <aside class="control-panel">
+
+          <!-- 模式切换 -->
+          <div class="mode-switcher">
+            <button
+              class="mode-btn"
+              :class="{ active: conversionMode === 'letter' }"
+              @click="setMode('letter')"
+            >字母码</button>
+            <button
+              class="mode-btn"
+              :class="{ active: conversionMode === 'numeric' }"
+              @click="setMode('numeric')"
+            >数字码</button>
+          </div>
+
+          <!-- 尺码范围（两种模式共用） -->
           <div class="form-group">
             <label class="group-label">尺码范围</label>
             <div class="size-selection">
@@ -47,54 +63,118 @@
             </div>
           </div>
 
-          <div class="form-group">
+          <!-- 字母码：降码数量 -->
+          <div v-if="conversionMode === 'letter'" class="form-group">
             <label class="group-label">降码数量</label>
             <el-select v-model="decrementCount" @change="calculateConversion" class="select-control" size="large" popper-class="custom-select-dropdown">
               <el-option v-for="n in 5" :key="n" :label="`降 ${n} 码`" :value="n" />
             </el-select>
           </div>
 
+          <!-- 数字码：起始数字 + 间距 -->
+          <template v-if="conversionMode === 'numeric'">
+            <div class="form-group">
+              <label class="group-label">起始数字</label>
+              <div class="number-input-wrap">
+                <input
+                  type="number"
+                  v-model.number="numericStartValue"
+                  @input="calculateNumericConversion"
+                  class="number-input"
+                  min="0"
+                  step="5"
+                />
+                <span class="number-input-hint">默认 90</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="group-label">每档间距</label>
+              <div class="number-input-wrap">
+                <input
+                  type="number"
+                  v-model.number="numericStep"
+                  @input="calculateNumericConversion"
+                  class="number-input"
+                  min="1"
+                  step="5"
+                />
+                <span class="number-input-hint">默认 10</span>
+              </div>
+            </div>
+          </template>
+
+          <!-- 摘要 -->
           <div class="conversion-summary">
             <div class="summary-row">
               <span class="summary-pill">{{ sizeOrder[startSize] }}</span>
               <span class="summary-sep">→</span>
               <span class="summary-pill">{{ sizeOrder[endSize] }}</span>
             </div>
-            <div class="summary-meta">
+            <div class="summary-meta" v-if="conversionMode === 'letter'">
               降 {{ decrementCount }} 码 · 共 {{ conversionResult.length }} 项
+            </div>
+            <div class="summary-meta" v-else>
+              {{ numericStartValue }} 起 · 每档 +{{ numericStep }} · 共 {{ numericResult.length }} 项
             </div>
           </div>
         </aside>
 
         <!-- 右侧结果区 -->
         <section class="result-panel">
-          <div class="result-panel-header">
-            <h3>转换结果</h3>
-            <el-button v-if="conversionResult.length > 0" type="primary" @click="copyResult" class="copy-button" :icon="CopyDocument">
-              复制全部
-            </el-button>
-          </div>
 
-          <div v-if="conversionResult.length > 0" class="result-list">
-            <div v-for="(item, index) in conversionResult" :key="index" class="result-row">
-              <span class="size-badge original">{{ item.original }}</span>
-              <span class="result-arrow">→</span>
-              <span class="size-badge converted">{{ item.converted }}</span>
-              <button class="copy-single-button" @click="copySingleResult(item)" title="复制此项">
-                <el-icon><CopyDocument /></el-icon>
-              </button>
+          <!-- 字母码结果 -->
+          <template v-if="conversionMode === 'letter'">
+            <div class="result-panel-header">
+              <h3>转换结果</h3>
+              <el-button v-if="conversionResult.length > 0" type="primary" @click="copyResult" class="copy-button" :icon="CopyDocument">
+                复制全部
+              </el-button>
             </div>
-          </div>
-
-          <div v-else class="result-empty">
-            <p>请在左侧选择尺码范围</p>
-          </div>
-
-          <transition name="toast-fade">
-            <div v-if="copySuccess" class="copy-success">
-              <i class="success-icon">✓</i> 已复制到剪贴板
+            <div v-if="conversionResult.length > 0" class="result-list">
+              <div v-for="(item, index) in conversionResult" :key="index" class="result-row">
+                <span class="size-badge original">{{ item.original }}</span>
+                <span class="result-arrow">→</span>
+                <span class="size-badge converted">{{ item.converted }}</span>
+                <button class="copy-single-button" @click="copySingleResult(item)" title="复制此项">
+                  <el-icon><CopyDocument /></el-icon>
+                </button>
+              </div>
             </div>
-          </transition>
+            <div v-else class="result-empty"><p>请在左侧选择尺码范围</p></div>
+            <transition name="toast-fade">
+              <div v-if="copySuccess" class="copy-success">
+                <i class="success-icon">✓</i> 已复制到剪贴板
+              </div>
+            </transition>
+          </template>
+
+          <!-- 数字码结果 -->
+          <template v-else>
+            <div class="result-panel-header">
+              <h3>数字码对照表</h3>
+              <el-button v-if="numericResult.length > 0" type="primary" @click="copyNumericResult" class="copy-button" :icon="CopyDocument">
+                复制全部
+              </el-button>
+            </div>
+            <div class="numeric-hint">儿童尺码 · 字母 → 数字码</div>
+            <div v-if="numericResult.length > 0" class="result-list">
+              <div v-for="(item, index) in numericResult" :key="index" class="result-row">
+                <span class="size-badge original">{{ item.letter }}</span>
+                <span class="result-arrow">→</span>
+                <span class="size-badge converted numeric-value">{{ item.numeric }}</span>
+                <button class="copy-single-button" @click="copySingleNumericResult(item)" title="复制此项">
+                  <el-icon><CopyDocument /></el-icon>
+                </button>
+              </div>
+            </div>
+            <div v-else class="result-empty"><p>请在左侧选择尺码范围</p></div>
+            <transition name="toast-fade">
+              <div v-if="numericCopySuccess" class="copy-success">
+                <i class="success-icon">✓</i> 已复制到剪贴板
+              </div>
+            </transition>
+          </template>
+
         </section>
       </div>
 
@@ -127,26 +207,35 @@ export default {
   data() {
     return {
       activeTab: 'sizeConversion',
-      startSize: 3, // 默认从XL开始
-      endSize: 6, // 默认到4XL结束
+      conversionMode: 'letter', // 'letter' | 'numeric'
+      startSize: 3,
+      endSize: 6,
       decrementCount: 3,
       conversionResult: [],
       copySuccess: false,
+      // 数字码
+      numericStartValue: 90,
+      numericStep: 10,
+      numericResult: [],
+      numericCopySuccess: false,
       sizeOrder: ['XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL', '11XL','12XL','13XL','14XL'],
-      CopyDocument: markRaw(CopyDocument) // 使用 markRaw 包裹图标组件，避免变成响应式对象
+      CopyDocument: markRaw(CopyDocument)
     }
   },
   mounted() {
-    // 初始化时计算一次转换结果
     this.calculateConversion();
+    this.calculateNumericConversion();
   },
   methods: {
+    setMode(mode) {
+      this.conversionMode = mode;
+    },
     updateSizeRange() {
-      // 确保结束尺码不小于开始尺码
       if (this.endSize < this.startSize) {
         this.endSize = this.startSize;
       }
       this.calculateConversion();
+      this.calculateNumericConversion();
     },
     calculateConversion() {
       const result = [];
@@ -183,16 +272,40 @@ export default {
       const textToCopy = this.conversionResult
         .map(item => `${item.original}->${item.converted}`)
         .join('\n');
-
       navigator.clipboard.writeText(textToCopy)
         .then(() => {
           this.copySuccess = true;
-          setTimeout(() => {
-            this.copySuccess = false;
-          }, 2000);
+          setTimeout(() => { this.copySuccess = false; }, 2000);
         })
-        .catch(err => {
-          console.error('无法复制到剪贴板:', err);
+        .catch(err => { console.error('无法复制到剪贴板:', err); });
+    },
+
+    // ── 数字码 ──
+    calculateNumericConversion() {
+      const result = [];
+      for (let i = this.startSize; i <= this.endSize; i++) {
+        result.push({
+          letter: this.sizeOrder[i],
+          numeric: this.numericStartValue + (i - this.startSize) * this.numericStep
+        });
+      }
+      this.numericResult = result;
+    },
+    copySingleNumericResult(item) {
+      navigator.clipboard.writeText(`${item.letter}->${item.numeric}`)
+        .then(() => {
+          this.numericCopySuccess = true;
+          setTimeout(() => { this.numericCopySuccess = false; }, 2000);
+        });
+    },
+    copyNumericResult() {
+      const text = this.numericResult
+        .map(item => `${item.letter}->${item.numeric}`)
+        .join('\n');
+      navigator.clipboard.writeText(text)
+        .then(() => {
+          this.numericCopySuccess = true;
+          setTimeout(() => { this.numericCopySuccess = false; }, 2000);
         });
     }
   }
@@ -391,6 +504,91 @@ export default {
 
 .select-control {
   width: 100%;
+}
+
+/* 模式切换 */
+.mode-switcher {
+  display: flex;
+  background: #eef1ef;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #8a8f8c;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mode-btn.active {
+  background: #fff;
+  color: #0a3d22;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(10, 61, 34, 0.12);
+}
+
+/* 数字输入框 */
+.number-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.number-input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e3e9e5;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0a3d22;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.number-input:focus {
+  border-color: #5a8f73;
+  box-shadow: 0 0 0 3px rgba(90, 143, 115, 0.15);
+}
+
+.number-input-hint {
+  font-size: 12px;
+  color: #b6c0ba;
+  white-space: nowrap;
+}
+
+/* 数字码提示标签 */
+.numeric-hint {
+  font-size: 12px;
+  color: #8a8f8c;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.numeric-hint::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: #5a8f73;
+  border-radius: 50%;
+}
+
+/* 数字码数值徽章样式 */
+.size-badge.numeric-value {
+  font-size: 16px;
+  letter-spacing: 0.5px;
 }
 
 /* 转换摘要 */
