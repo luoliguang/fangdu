@@ -22,7 +22,7 @@ const getSteps = () => [
     element: '.search-wrapper',
     popover: {
       title: '关键词搜索',
-      description: '在这里输入关键词，如「圆领短袖」「棉麻」「连衣裙」，点击搜索即可获得精准结果。搜索词越具体，结果越好。',
+      description: '在这里输入关键词，如「圆领短袖」「翻领」「速干 圆领」，点击搜索即可获得精准结果。搜索词越具体，结果越好。',
       side: 'bottom',
       align: 'center'
     }
