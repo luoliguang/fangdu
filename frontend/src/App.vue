@@ -303,6 +303,29 @@ const goToFrontendHome = () => {
   router.push('/');
 };
 
+// ── 移动端折叠导航 ──────────────────────────────────────
+const mobileNavOpen = ref(false);
+
+const currentPageTitle = computed(() => {
+  const path = route.path;
+  if (path === '/') return '实拍';
+  if (path === '/color-card') return '设计专用';
+  if (path === '/size-converter') return '尺码转换';
+  if (path === '/login') return '登录';
+  if (path.startsWith('/admin')) return '后台管理';
+  if (path.startsWith('/category/')) {
+    const slug = path.replace('/category/', '');
+    const cat = pageCategories.value.find(c => c.slug === slug);
+    return cat?.name ?? '分类';
+  }
+  return '方度素材库';
+});
+
+// 路由变化时关闭移动菜单
+watch(() => route.path, () => { mobileNavOpen.value = false; });
+
+const closeMobileNav = () => { mobileNavOpen.value = false; };
+
 </script>
 
 <template>
@@ -325,6 +348,7 @@ const goToFrontendHome = () => {
       <button class="admin-topbar__back" @click="goToFrontendHome">返回前台</button>
     </div>
 
+    <!-- 桌面端导航（>768px） -->
     <nav v-if="!isAdminRoute" class="main-nav" :class="{ 'is-hidden': !showNavBar }" ref="mainNav">
       <div class="nav-slider" ref="navSlider"></div>
       <router-link to="/" @click="handleNavClick">实拍</router-link>
@@ -338,15 +362,49 @@ const goToFrontendHome = () => {
       <a href="https://fangdutex.cn/welcome" target="_blank">知识库「所有知识」</a>
       <router-link to="/color-card" @click="handleNavClick">设计专用</router-link>
       <router-link to="/size-converter" @click="handleNavClick">尺码转换</router-link>
-      <!-- 未登录时显示登录链接 -->
       <router-link v-if="!isLoggedIn" to="/login" @click="handleNavClick">登录</router-link>
-      <!-- 已登录时显示后台管理 -->
       <template v-else>
-        <router-link to="/admin" @click="handleNavClick">
-          后台管理
-        </router-link>
+        <router-link to="/admin" @click="handleNavClick">后台管理</router-link>
       </template>
     </nav>
+
+    <!-- 移动端折叠导航（≤768px） -->
+    <div v-if="!isAdminRoute" class="mobile-nav" :class="{ 'is-hidden': !showNavBar }">
+      <!-- 顶部胶囊：当前页名 + 汉堡按钮 -->
+      <div class="mobile-nav-bar" @click.stop>
+        <span class="mobile-nav-current">{{ currentPageTitle }}</span>
+        <button class="mobile-nav-toggle" @click="mobileNavOpen = !mobileNavOpen" :aria-label="mobileNavOpen ? '关闭菜单' : '打开菜单'">
+          <svg v-if="!mobileNavOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+            <line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/>
+          </svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- 展开后的菜单下拉 -->
+      <Transition name="mobile-menu-drop">
+        <div v-if="mobileNavOpen" class="mobile-nav-dropdown" @click.stop>
+          <router-link to="/" @click="closeMobileNav">实拍</router-link>
+          <router-link
+            v-for="cat in pageCategories"
+            :key="cat.slug"
+            :to="`/category/${cat.slug}`"
+            @click="closeMobileNav"
+          >{{ cat.name }}</router-link>
+          <a href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank" @click="closeMobileNav">面料细节</a>
+          <a href="https://fangdutex.cn/welcome" target="_blank" @click="closeMobileNav">知识库</a>
+          <router-link to="/color-card" @click="closeMobileNav">设计专用</router-link>
+          <router-link to="/size-converter" @click="closeMobileNav">尺码转换</router-link>
+          <router-link v-if="!isLoggedIn" to="/login" @click="closeMobileNav">登录</router-link>
+          <router-link v-else to="/admin" @click="closeMobileNav">后台管理</router-link>
+        </div>
+      </Transition>
+
+      <!-- 点击遮罩关闭 -->
+      <div v-if="mobileNavOpen" class="mobile-nav-backdrop" @click="mobileNavOpen = false" />
+    </div>
     
     <!-- 顶部公告通知 -->
     <TopAnnouncement />
@@ -646,42 +704,142 @@ const goToFrontendHome = () => {
     }
   }
 
+  /* ── 移动端折叠导航（默认隐藏，≤768px 显示） ── */
+  .mobile-nav {
+    display: none;
+  }
+
   /* --- 移动端适配样式 --- */
   @media (max-width: 768px) {
     main {
-      margin-top: calc(72px + var(--announcement-height, 0px));
+      margin-top: calc(64px + var(--announcement-height, 0px));
     }
 
+    /* 桌面 nav 在移动端完全隐藏 */
     .main-nav {
+      display: none !important;
+    }
+
+    /* 移动端折叠导航 */
+    .mobile-nav {
+      display: block;
+      position: fixed;
+      top: calc(var(--announcement-height, 0px) + 10px);
       left: 12px;
       right: 12px;
-      transform: none;
-      width: auto;
-      padding: 0.45rem 0.75rem;
-      min-height: 52px;
-      gap: 0.75rem;
-      justify-content: flex-start;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      overflow-y: hidden;
-      white-space: nowrap;
-      border-radius: 14px;
-      scrollbar-width: none;
+      z-index: 1000;
+      transition: opacity 0.3s ease, transform 0.3s ease;
     }
 
-    .main-nav::-webkit-scrollbar {
-      display: none;
+    .mobile-nav.is-hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-12px);
     }
 
-    .main-nav.is-hidden {
-      transform: translateY(-18px);
+    /* 顶部胶囊栏 */
+    .mobile-nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1rem 0 1.3rem;
+      height: 48px;
+      background: rgba(10, 12, 20, 0.82);
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
     }
 
-    .main-nav a {
-      flex: 0 0 auto;
+    .mobile-nav-current {
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .mobile-nav-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.9);
+      cursor: pointer;
+      transition: background 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .mobile-nav-toggle:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    /* 展开的下拉面板 */
+    .mobile-nav-dropdown {
+      margin-top: 8px;
+      background: rgba(10, 12, 20, 0.92);
+      backdrop-filter: blur(24px) saturate(140%);
+      -webkit-backdrop-filter: blur(24px) saturate(140%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 18px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+      padding: 0.6rem 0.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+    }
+
+    .mobile-nav-dropdown a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem 1rem;
+      color: rgba(244, 248, 255, 0.82);
+      text-decoration: none;
       font-size: 0.9rem;
-      padding: 0.35rem 0.1rem;
-      white-space: nowrap;
+      font-weight: 500;
+      border-radius: 12px;
+      text-align: center;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .mobile-nav-dropdown a:hover,
+    .mobile-nav-dropdown a:active {
+      background: rgba(90, 143, 115, 0.22);
+      color: #fff;
+    }
+
+    .mobile-nav-dropdown a.router-link-exact-active {
+      background: linear-gradient(135deg, rgba(10, 61, 34, 0.8), rgba(90, 143, 115, 0.6));
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* 遮罩层 */
+    .mobile-nav-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+    }
+
+    /* 展开动画 */
+    .mobile-menu-drop-enter-active {
+      transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
+    .mobile-menu-drop-leave-active {
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .mobile-menu-drop-enter-from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.97);
+    }
+    .mobile-menu-drop-leave-to {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
     }
 
     .admin-topbar {
@@ -716,21 +874,7 @@ const goToFrontendHome = () => {
 
   @media (max-width: 480px) {
     main {
-      margin-top: calc(68px + var(--announcement-height, 0px));
-    }
-
-    .main-nav {
-      left: 8px;
-      right: 8px;
-      min-height: 48px;
-      padding: 0.4rem 0.6rem;
-      gap: 0.6rem;
-      border-radius: 12px;
-    }
-
-    .main-nav a {
-      font-size: 0.82rem;
-      padding: 0.24rem 0.08rem;
+      margin-top: calc(62px + var(--announcement-height, 0px));
     }
 
     .admin-topbar {
