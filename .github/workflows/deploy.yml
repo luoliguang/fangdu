@@ -1,47 +1,73 @@
-# .github/workflows/deploy.yml
-name: Deploy to Cloud Server
+name: Build and Deploy
 
-# 触发条件：当有代码推送到 main 分支时
+# 触发条件：推送到 main 分支，或手动触发
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
-# 任务
 jobs:
-  deploy:
-    # 运行环境
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # 第一步：检出代码
-    - name: Checkout code
-      uses: actions/checkout@v4
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    # 第二步：执行SSH命令，部署应用
-    - name: Deploy to Server
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          # 进入项目目录
-          cd /www/fangdu
+      # 2. 准备 Node 环境（带 npm 缓存，加速构建）
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-          # 拉取最新的代码
-          echo ">>> Pulling latest code from GitHub..."
-          git pull origin main
+      # 3. 在 GitHub 上安装依赖并打包前端（关键：打包在这里完成，不在服务器）
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
 
-          # 部署后端
-          echo ">>> Deploying backend..."
-          cd backend
-          npm install
-          pm2 restart material-hub-api
+      # 4. 把打包产物 dist 传到服务器的临时目录
+      - name: Upload dist to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "frontend/dist"
+          target: "/www/fangdu/deploy-tmp"
+          overwrite: true
 
-          # 部署前端
-          echo ">>> Deploying frontend..."
-          cd ../frontend
-          npm install
+      # 5. 在服务器上部署：拉后端代码、装后端依赖、换上新 dist、重启服务
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /www/fangdu
 
-          echo ">>> Deployment finished!"
+            echo ">>> 拉取最新代码（后端 + 源码）..."
+            git pull origin main
+
+            echo ">>> 安装后端依赖..."
+            cd backend
+            npm install --production
+            cd ..
+
+            echo ">>> 替换前端打包产物..."
+            rm -rf frontend/dist
+            mv deploy-tmp/frontend/dist frontend/dist
+            rm -rf deploy-tmp
+
+            echo ">>> 重启后端服务..."
+            pm2 restart fangdu-backend || pm2 start backend/server.js --name fangdu-backend --env production
+            pm2 save
+
+            echo ">>> 部署完成！"
