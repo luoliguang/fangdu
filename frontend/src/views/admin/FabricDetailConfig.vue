@@ -73,6 +73,11 @@ import { ElMessage } from 'element-plus';
 import apiClient from '../../axiosConfig.js';
 import defaultImg from '../../assets/fabricgo-qr.jpg';
 
+const toCdnUrl = (url) => {
+  if (!url) return url;
+  return url.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, 'https://assets.fangdutex.cn');
+};
+
 const currentUrl = ref(defaultImg);
 const selectedFile = ref(null);
 const previewFile = ref('');
@@ -88,7 +93,7 @@ const authHeaders = () => {
 const fetchCurrentImage = async () => {
   try {
     const { data } = await apiClient.get('/api/v1/drawer-config/site-config/fabric_detail_image_url');
-    if (data?.data) currentUrl.value = data.data;
+    if (data?.data) currentUrl.value = toCdnUrl(data.data);
   } catch {}
 };
 
@@ -119,7 +124,7 @@ const handleUpload = async () => {
       formData,
       { headers: { ...authHeaders(), 'Content-Type': 'multipart/form-data' } }
     );
-    currentUrl.value = data.data.url;
+    currentUrl.value = toCdnUrl(data.data.url);
     selectedFile.value = null;
     previewFile.value = '';
     ElMessage.success('图片已替换，弹窗将即时生效');

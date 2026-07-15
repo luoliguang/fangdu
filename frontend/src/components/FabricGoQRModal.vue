@@ -13,10 +13,15 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 const imageUrl = ref(fallbackImg)
 
+const toCdnUrl = (url) => {
+  if (!url) return url
+  return url.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, 'https://assets.fangdutex.cn')
+}
+
 onMounted(async () => {
   try {
     const { data } = await apiClient.get('/api/v1/drawer-config/site-config/fabric_detail_image_url')
-    if (data?.data) imageUrl.value = data.data
+    if (data?.data) imageUrl.value = toCdnUrl(data.data)
   } catch {}
 })
 
