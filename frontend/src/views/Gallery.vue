@@ -1981,19 +1981,22 @@ const quickCopyImage = async (material) => {
     transition: margin-top 0.3s ease; /* 平滑过渡 */
   }
   
-  /* 英雄区域移动端适配 */
-  /* .hero-header 样式在桌面端已定义，移动端无需额外调整 */
-  
+  .hero-header {
+    padding: 2rem 1rem;
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+  }
+
   .hero-title {
-    font-size: 2.5rem;
+    font-size: 2.2rem;
     letter-spacing: 1px;
   }
-  
+
   .hero-subtitle {
-    font-size: 1.1rem;
-    margin: 0.8rem 0 2rem 0;
+    font-size: 1rem;
+    margin: 0.7rem 0 1.6rem;
   }
-  
+
   .search-input-cool {
     padding: 0.85rem 0.8rem 0.85rem 1.2rem;
     font-size: 0.95rem;
@@ -2004,32 +2007,44 @@ const quickCopyImage = async (material) => {
     margin-bottom: 1.5rem;
   }
   .tags-inner {
-    padding: 0.8rem 0 0.3rem;
+    padding: 0.8rem 0.5rem 0.3rem 52px; /* 左侧留白避开侧边菜单按钮 */
+    justify-content: flex-start;
   }
-  
+  .tags-inner > div {
+    justify-content: flex-start;
+  }
+  .tags-footer {
+    padding-left: 52px;
+    justify-content: flex-start;
+  }
+
   .tags-container button {
-    padding: 0.5rem 1rem;
-    margin: 0.3rem;
-    font-size: 0.9rem;
+    padding: 0.4rem 0.9rem;
+    margin: 0.25rem;
+    font-size: 0.85rem;
   }
-  
+
   /* 网格布局移动端适配 */
   .grid-container {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
     padding: 0.5rem 0;
   }
-  
+
   .grid-item {
-    padding: 1rem;
+    padding: 0.75rem;
   }
-  
+
   .grid-item img, .grid-item video {
-    height: 120px;
+    height: 130px;
   }
-  
+
   .grid-item p {
-    font-size: 1rem;
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 0.4rem;
   }
   
   .media-icon {
@@ -2096,35 +2111,59 @@ const quickCopyImage = async (material) => {
 /* 小屏幕设备进一步优化 */
 @media (max-width: 480px) {
   main {
-    margin-top: calc(60px + var(--announcement-height, 0px)); /* 小屏幕导航栏高度 + 公告栏高度 */
-    transition: margin-top 0.3s ease; /* 平滑过渡 */
+    margin-top: calc(60px + var(--announcement-height, 0px));
+    transition: margin-top 0.3s ease;
   }
-  
+
+  .hero-header {
+    padding: 1.6rem 1rem;
+  }
+
   .hero-title {
-    font-size: 2rem;
+    font-size: 1.8rem;
+    letter-spacing: 1px;
   }
-  
+
   .hero-subtitle {
-    font-size: 1rem;
+    font-size: 0.9rem;
+    margin: 0.6rem 0 1.4rem;
   }
-  
-  .grid-container {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.8rem;
+
+  .search-input-cool {
+    padding: 0.7rem 0.8rem 0.7rem 1rem;
+    font-size: 0.9rem;
   }
-  
-  .grid-item {
-    padding: 0.8rem;
-  }
-  
-  .grid-item img, .grid-item video {
-    height: 100px;
-  }
-  
-  .tags-container button {
-    padding: 0.4rem 0.8rem;
-    margin: 0.2rem;
+
+  .search-btn {
+    padding: 0.55rem 1rem;
     font-size: 0.85rem;
+  }
+
+  .grid-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+
+  .grid-item {
+    padding: 0.6rem;
+    border-radius: 10px;
+  }
+
+  .grid-item img, .grid-item video {
+    height: 110px;
+    margin-bottom: 0.5rem;
+    border-radius: 6px;
+  }
+
+  .grid-item p {
+    font-size: 0.82rem;
+    margin-top: 0.3rem;
+  }
+
+  .tags-container button {
+    padding: 0.35rem 0.7rem;
+    margin: 0.2rem;
+    font-size: 0.8rem;
   }
 }
 
@@ -2292,11 +2331,25 @@ a.router-link-active.router-link-exact-active{
   transform: translateY(0);
 }
 
-/* 移动端始终显示按钮 */
+/* 移动端始终显示按钮，并缩小尺寸 */
 @media (max-width: 768px) {
   .card-actions {
     opacity: 1;
     transform: translateY(0);
+    gap: 4px;
+    top: 5px;
+    right: 5px;
+  }
+
+  .action-btn {
+    width: 28px;
+    height: 28px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  }
+
+  .action-btn svg {
+    width: 13px;
+    height: 13px;
   }
 }
 
