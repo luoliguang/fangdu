@@ -789,12 +789,17 @@ class DrawerConfigController {
 
   // ── SiteConfig ────────────────────────────────────────────────────
 
-  // 获取单个站点配置（公开）
+  // 获取单个站点配置（公开），返回时统一转为 CDN URL
   static async getSiteConfig(req, res) {
     try {
       const { key } = req.params;
       const config = await SiteConfig.findOne({ where: { key } });
-      res.json({ success: true, data: config ? config.value : null });
+      let value = config ? config.value : null;
+      if (value && value.includes('aliyuncs.com')) {
+        const cdnBase = process.env.CDN_BASE_URL || 'https://assets.fangdutex.cn';
+        value = value.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, cdnBase);
+      }
+      res.json({ success: true, data: value });
     } catch (error) {
       res.status(500).json({ success: false, message: '获取配置失败', error: error.message });
     }
@@ -814,9 +819,9 @@ class DrawerConfigController {
 
       const { originalname, buffer, mimetype } = req.file;
       const ext = originalname.split('.').pop().toLowerCase();
-      const fileName = `site-config/fabric-detail-${Date.now()}.${ext}`;
+      const fileName = `fabric-detail-${Date.now()}.${ext}`;
 
-      await ossClient.put(fileName, buffer, {
+      const uploadResult = await ossClient.put(fileName, buffer, {
         headers: {
           'Content-Type': mimetype,
           'Content-Disposition': 'inline',
@@ -824,10 +829,10 @@ class DrawerConfigController {
         }
       });
 
-      // 构造 CDN URL（与 MaterialService 保持一致）
-      const ossBase = `https://${process.env.ALI_OSS_BUCKET}.${process.env.ALI_OSS_REGION}.aliyuncs.com`;
-      const cdnBase = process.env.CDN_BASE_URL || ossBase;
-      const cdnUrl = `${cdnBase}/${fileName}`;
+      // 与 MaterialService 保持相同的 CDN 转换逻辑
+      const ossUrl = (uploadResult.url || '').replace(/^http:/, 'https:');
+      const cdnBase = process.env.CDN_BASE_URL || 'https://assets.fangdutex.cn';
+      const cdnUrl = ossUrl.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, cdnBase);
 
       // 写入或更新 SiteConfig
       await SiteConfig.upsert({ key: 'fabric_detail_image_url', value: cdnUrl });
