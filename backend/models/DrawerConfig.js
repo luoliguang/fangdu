@@ -263,11 +263,57 @@ const ContactInfo = sequelize.define('ContactInfo', {
   updatedAt: 'updated_at'
 });
 
+// 独立页面分类配置表
+// 每条记录代表一个从主画廊独立出来的子页面（如"杂款领口"）
+const PageCategory = sequelize.define('PageCategory', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  name: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    comment: '页面显示名称，如"杂款领口"'
+  },
+  slug: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    unique: true,
+    comment: 'URL 路径标识，如 special-necklines'
+  },
+  description: {
+    type: DataTypes.STRING(200),
+    comment: '页面副标题'
+  },
+  tags: {
+    type: DataTypes.JSON,
+    defaultValue: [],
+    comment: '属于该页面的标签数组，主页会自动排除这些标签的素材'
+  },
+  is_active: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    comment: '是否在导航栏显示'
+  },
+  sort_order: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    comment: '导航栏排列顺序'
+  }
+}, {
+  tableName: 'page_categories',
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
+});
+
 module.exports = {
   DrawerConfig,
   Announcement,
   TutorialStep,
   QuickFilter,
   DrawerTab,
-  ContactInfo
+  ContactInfo,
+  PageCategory
 };

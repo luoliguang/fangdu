@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted,watch,nextTick, computed, provide  } from 'vue';
+import { ref, onMounted, onUnmounted, watch, nextTick, computed, provide } from 'vue';
 import { useRoute, useRouter  } from 'vue-router';
 import apiClient from './axiosConfig.js';
 import SideDrawer from './components/SideDrawer.vue';
@@ -17,6 +17,22 @@ const isAdminRoute = computed(() => route.path.startsWith('/admin'));
 // 登录状态管理
 const loginState = ref(!!localStorage.getItem('authToken'));
 const isLoggedIn = computed(() => loginState.value);
+
+// 动态页面分类（从后台配置中加载）
+const pageCategories = ref([]);
+const excludeTagsParam = computed(() => {
+  const allTags = pageCategories.value.flatMap(c => c.tags ?? []);
+  return [...new Set(allTags)].join(',');
+});
+
+const fetchPageCategories = async () => {
+  try {
+    const { data: res } = await apiClient.get('/api/v1/drawer-config/page-categories');
+    pageCategories.value = (res?.data ?? []).filter(c => c.is_active);
+  } catch (err) {
+    console.error('加载分类配置失败:', err);
+  }
+};
 
 // 未处理留言数量
 const pendingFeedbacksCount = ref(0);
@@ -173,12 +189,9 @@ const scrollToTop = () => {
 };
 
 // Provide favorites state and callbacks to child components
-provide('appFavorites', {
-  favorites,
-  addToFavorites
-});
-
+provide('appFavorites', { favorites, addToFavorites });
 provide('galleryCallbacks', galleryCallbacks);
+provide('excludeTagsParam', excludeTagsParam);
 
 // 4. 在组件挂载时，监听整个窗口的滚动事件
 onMounted(() => {
@@ -238,7 +251,10 @@ onMounted(async () => { // 将 onMounted 变为 async 函数
   
   // 初始化登录状态
   updateLoginState();
-  
+
+  // 加载动态页面分类配置（用于主页排除标签和动态导航）
+  fetchPageCategories();
+
   // 如果已登录，开始定期获取未处理留言数量
   if (loginState.value) {
     fetchPendingFeedbacksCount();
@@ -312,7 +328,12 @@ const goToFrontendHome = () => {
     <nav v-if="!isAdminRoute" class="main-nav" :class="{ 'is-hidden': !showNavBar }" ref="mainNav">
       <div class="nav-slider" ref="navSlider"></div>
       <router-link to="/" @click="handleNavClick">实拍</router-link>
-      <router-link to="/special-necklines" @click="handleNavClick">杂款领口</router-link>
+      <router-link
+        v-for="cat in pageCategories"
+        :key="cat.slug"
+        :to="`/category/${cat.slug}`"
+        @click="handleNavClick"
+      >{{ cat.name }}</router-link>
       <a ref="fabricGoBtn" href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank" @click.prevent="openFabricGoModal">面料细节</a>
       <a href="https://fangdutex.cn/welcome" target="_blank">知识库「所有知识」</a>
       <router-link to="/color-card" @click="handleNavClick">设计专用</router-link>

@@ -36,4 +36,10 @@ router.delete('/contacts/:id', DrawerConfigController.deleteContactInfo);
 // 批量更新排序
 router.put('/sort-order', DrawerConfigController.updateSortOrder);
 
+// 页面分类配置（独立子页面管理）
+router.get('/page-categories', DrawerConfigController.getPageCategories);
+router.post('/page-categories', DrawerConfigController.createPageCategory);
+router.put('/page-categories/:id', DrawerConfigController.updatePageCategory);
+router.delete('/page-categories/:id', DrawerConfigController.deletePageCategory);
+
 module.exports = router;

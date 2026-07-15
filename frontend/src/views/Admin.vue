@@ -26,7 +26,8 @@ const navItems = [
   { name: 'MaterialManagement', label: '素材管理', icon: PictureRounded },
   { name: 'FeedbackManagement', label: '留言管理', icon: ChatDotRound },
   { name: 'Statistics', label: '访问统计', icon: DataAnalysis },
-  { name: 'DrawerConfig', label: '抽屉配置', icon: Setting }
+  { name: 'DrawerConfig', label: '抽屉配置', icon: Setting },
+  { name: 'PageCategoryConfig', label: '页面分类', icon: Setting }
 ];
 
 const mobileMenuTitle = computed(() => {

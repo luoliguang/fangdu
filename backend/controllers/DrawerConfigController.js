@@ -1,10 +1,11 @@
-const { 
-  DrawerConfig, 
-  Announcement, 
-  TutorialStep, 
-  QuickFilter, 
-  DrawerTab, 
-  ContactInfo 
+const {
+  DrawerConfig,
+  Announcement,
+  TutorialStep,
+  QuickFilter,
+  DrawerTab,
+  ContactInfo,
+  PageCategory
 } = require('../models/DrawerConfig');
 const { Op } = require('sequelize');
 
@@ -705,6 +706,82 @@ class DrawerConfigController {
         message: '更新排序失败',
         error: error.message
       });
+    }
+  }
+  // ── PageCategory CRUD ────────────────────────────────────────────
+
+  // 获取所有页面分类（公开，前台导航和主页排除都需要）
+  static async getPageCategories(req, res) {
+    try {
+      const categories = await PageCategory.findAll({
+        order: [['sort_order', 'ASC'], ['id', 'ASC']]
+      });
+      res.json({ success: true, data: categories });
+    } catch (error) {
+      res.status(500).json({ success: false, message: '获取页面分类失败', error: error.message });
+    }
+  }
+
+  // 创建页面分类
+  static async createPageCategory(req, res) {
+    try {
+      const { name, slug, description, tags, is_active, sort_order } = req.body;
+      if (!name || !slug) {
+        return res.status(400).json({ success: false, message: '名称和路径标识不能为空' });
+      }
+      const exists = await PageCategory.findOne({ where: { slug } });
+      if (exists) {
+        return res.status(400).json({ success: false, message: '路径标识已存在' });
+      }
+      const category = await PageCategory.create({
+        name, slug, description: description || '',
+        tags: tags || [],
+        is_active: is_active !== false,
+        sort_order: sort_order || 0
+      });
+      res.json({ success: true, data: category });
+    } catch (error) {
+      res.status(500).json({ success: false, message: '创建失败', error: error.message });
+    }
+  }
+
+  // 更新页面分类
+  static async updatePageCategory(req, res) {
+    try {
+      const { id } = req.params;
+      const { name, slug, description, tags, is_active, sort_order } = req.body;
+      const category = await PageCategory.findByPk(id);
+      if (!category) return res.status(404).json({ success: false, message: '分类不存在' });
+
+      if (slug && slug !== category.slug) {
+        const exists = await PageCategory.findOne({ where: { slug } });
+        if (exists) return res.status(400).json({ success: false, message: '路径标识已存在' });
+      }
+
+      await category.update({
+        name: name ?? category.name,
+        slug: slug ?? category.slug,
+        description: description ?? category.description,
+        tags: tags ?? category.tags,
+        is_active: is_active ?? category.is_active,
+        sort_order: sort_order ?? category.sort_order
+      });
+      res.json({ success: true, data: category });
+    } catch (error) {
+      res.status(500).json({ success: false, message: '更新失败', error: error.message });
+    }
+  }
+
+  // 删除页面分类
+  static async deletePageCategory(req, res) {
+    try {
+      const { id } = req.params;
+      const category = await PageCategory.findByPk(id);
+      if (!category) return res.status(404).json({ success: false, message: '分类不存在' });
+      await category.destroy();
+      res.json({ success: true, message: '删除成功' });
+    } catch (error) {
+      res.status(500).json({ success: false, message: '删除失败', error: error.message });
     }
   }
 }

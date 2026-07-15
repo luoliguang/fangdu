@@ -7,16 +7,17 @@ import MaterialManagement from '../views/MaterialManagement.vue';
 import FeedbackManagement from '../views/FeedbackManagement.vue';
 import Statistics from '../views/Statistics.vue';
 import DrawerConfig from '../views/admin/DrawerConfig.vue';
-import ColorCard from '../views/ColorCard.vue'; // 引入打色卡组件
-import SizeConverter from '../views/SizeConverter.vue'; // 引入尺码工具组件
-import SpecialNecklines from '../views/SpecialNecklines.vue'; // 引入杂款领口组件
+import PageCategoryConfig from '../views/admin/PageCategoryConfig.vue';
+import ColorCard from '../views/ColorCard.vue';
+import SizeConverter from '../views/SizeConverter.vue';
+import CategoryPage from '../views/CategoryPage.vue';
 
 const routes = [
     { path: '/', name: 'Gallery', component: Gallery },
     { path: '/login', name: 'Login', component: Login }, // 添加登录路由
     { path: '/color-card', name: 'ColorCard', component: ColorCard }, // 添加打色卡路由
     { path: '/size-converter', name: 'SizeConverter', component: SizeConverter }, // 添加尺码工具路由
-    { path: '/special-necklines', name: 'SpecialNecklines', component: SpecialNecklines }, // 添加杂款领口路由
+    { path: '/category/:slug', name: 'CategoryPage', component: CategoryPage },
     {
         path: '/admin',
         name: 'Admin',
@@ -56,10 +57,15 @@ const routes = [
                 name: 'Statistics', 
                 component: Statistics 
             },
-            { 
-                path: 'drawer-config', 
-                name: 'DrawerConfig', 
-                component: DrawerConfig 
+            {
+                path: 'drawer-config',
+                name: 'DrawerConfig',
+                component: DrawerConfig
+            },
+            {
+                path: 'page-categories',
+                name: 'PageCategoryConfig',
+                component: PageCategoryConfig
             }
         ]
     }
