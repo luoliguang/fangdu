@@ -90,69 +90,51 @@ const removeFromFavorites = (materialId) => {
   }
 };
 
-const visibleTags = computed(() => {
-  //如果tags.value不存在或不是数组，返回空数组
-  if (!tags.value || !Array.isArray(tags.value)) {
-    return [];
-  }
-  //如果是展开状态，或者标签总数小于等于可见数量，则全部显示
-  if (isTagsExpanded.value || tags.value.length <= visibleTagsCount.value){
-    return tags.value;
-  }
-  //否则只显示计算出的可见数量
-  return tags.value.slice(0, visibleTagsCount.value)
-})
+// 移动端检测（≤768px 用横向滚动标签，不走折行逻辑）
+const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768);
+const onResize = () => { isMobile.value = window.innerWidth <= 768; };
 
-// 计算实际可见的标签数量
+const visibleTags = computed(() => {
+  if (!tags.value || !Array.isArray(tags.value)) return [];
+  // 移动端直接显示全部，由 CSS overflow-x:auto 实现横向滚动
+  if (isMobile.value) return tags.value;
+  if (isTagsExpanded.value || tags.value.length <= visibleTagsCount.value) return tags.value;
+  return tags.value.slice(0, visibleTagsCount.value);
+});
+
+// 计算实际可见的标签数量（仅桌面端执行）
 const calculateVisibleTags = async () => {
-  if (!tagsContainerRef.value || !tags.value || tags.value.length === 0) {
-    return;
-  }
-  
+  if (isMobile.value) return; // 移动端不需要折行计算
+  if (!tagsContainerRef.value || !tags.value || tags.value.length === 0) return;
+
   const container = tagsContainerRef.value;
-  const maxHeight = 110; // 对应CSS中的max-height
-  
-  // 先显示所有标签来测试是否溢出
+  const maxHeight = 110;
+
   const originalExpanded = isTagsExpanded.value;
   isTagsExpanded.value = true;
-  
-  await new Promise(resolve => setTimeout(resolve, 0)); // 等待DOM更新
-  
+  await new Promise(resolve => setTimeout(resolve, 0));
   const fullHeight = container.scrollHeight;
-  
-  // 如果没有溢出，显示所有标签
+
   if (fullHeight <= maxHeight) {
     visibleTagsCount.value = tags.value.length;
     isTagsExpanded.value = originalExpanded;
     return;
   }
-  
-  // 恢复原始状态
+
   isTagsExpanded.value = originalExpanded;
-  
-  // 逐个减少标签数量直到不溢出
   let testCount = tags.value.length - 1;
-  
+
   while (testCount > 0) {
     visibleTagsCount.value = testCount;
-    
-    await new Promise(resolve => setTimeout(resolve, 0)); // 等待DOM更新
-    
-    const currentHeight = container.scrollHeight;
-    
-    if (currentHeight <= maxHeight) {
-      // 找到合适的数量，但需要为"展开更多"按钮留出空间
-      // 所以再减少1-2个标签
+    await new Promise(resolve => setTimeout(resolve, 0));
+    if (container.scrollHeight <= maxHeight) {
       visibleTagsCount.value = Math.max(1, testCount - 1);
       break;
     }
-    
     testCount--;
   }
-  
-  if (testCount === 0) {
-    visibleTagsCount.value = 1; // 至少显示1个标签
-  }
+
+  if (testCount === 0) visibleTagsCount.value = 1;
 }
 
 // --- 分页与无限滚动状态 ---
@@ -174,6 +156,7 @@ const observerEl = ref(null);
 let observer = null;
 
 const handleWindowResize = () => {
+  isMobile.value = window.innerWidth <= 768;
   setTimeout(async () => {
     await calculateVisibleTags();
   }, 100);
@@ -935,7 +918,7 @@ const quickCopyImage = async (material) => {
           </button>
         </TransitionGroup>
       </div>
-      <div class="tags-footer" v-if="tags && tags.length > visibleTagsCount">
+      <div class="tags-footer" v-if="!isMobile && tags && tags.length > visibleTagsCount">
         <button
           @click="isTagsExpanded = !isTagsExpanded"
           class="tags-toggle-btn"
@@ -1973,197 +1956,156 @@ const quickCopyImage = async (material) => {
   line-height: 1.5;
 }
 
+/* ═══════════════════════════════════════════════════
+   移动端响应式设计（≤ 768px）
+   设计原则：
+   - Hero 用 clamp() 流式字号，不靠断点硬缩
+   - 标签改为单行横向滚动，节省竖向空间
+   - 图片用 aspect-ratio 自适应列宽，不固定高度
+   - 卡片去除外 padding，图片撑满，标题内嵌其下
+   ═══════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* 主要内容区域适配 */
   main {
-    padding: 0.5rem;
-    margin-top: calc(60px + var(--announcement-height, 0px)); /* 移动端导航栏高度 + 公告栏高度 */
-    transition: margin-top 0.3s ease; /* 平滑过渡 */
-  }
-  
-  .hero-header {
-    padding: 2rem 1rem;
-    border-bottom-left-radius: 18px;
-    border-bottom-right-radius: 18px;
-  }
-
-  .hero-title {
-    font-size: 2.2rem;
-    letter-spacing: 1px;
-  }
-
-  .hero-subtitle {
-    font-size: 1rem;
-    margin: 0.7rem 0 1.6rem;
-  }
-
-  .search-input-cool {
-    padding: 0.85rem 0.8rem 0.85rem 1.2rem;
-    font-size: 0.95rem;
-  }
-  
-  /* 标签容器移动端适配 */
-  .tags-container {
-    margin-bottom: 1.5rem;
-  }
-  .tags-inner {
-    padding: 0.8rem 0.5rem 0.3rem 52px; /* 左侧留白避开侧边菜单按钮 */
-    justify-content: flex-start;
-  }
-  .tags-inner > div {
-    justify-content: flex-start;
-  }
-  .tags-footer {
-    padding-left: 52px;
-    justify-content: flex-start;
-  }
-
-  .tags-container button {
-    padding: 0.4rem 0.9rem;
-    margin: 0.25rem;
-    font-size: 0.85rem;
-  }
-
-  /* 网格布局移动端适配 */
-  .grid-container {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-  }
-
-  .grid-item {
-    padding: 0.75rem;
-  }
-
-  .grid-item img, .grid-item video {
-    height: 130px;
-  }
-
-  .grid-item p {
-    font-size: 0.88rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 0.4rem;
-  }
-  
-  .media-icon {
-    width: 30px;
-    height: 30px;
-    top: 35%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
-  
-  .feedback-timeline-widget {
-    bottom: 15px;
-    left: 8px; /* 移动端更靠近左侧 */
-    width: 60px; /* 移动端默认收起宽度 */
-    max-height: 50px;
-  }
-  .feedback-timeline-widget.expanded {
-    width: calc(100% - 16px); /* 调整宽度 */
-    max-height: 350px;
-  }
-  .widget-header {
-    padding: 10px 12px;
-    font-size: 1em;
-  }
-  .widget-header .icon {
-    font-size: 1.2em;
-    margin-right: 0;
-    position: relative; /* 为红点定位提供上下文 */
-  }
-  .feedback-timeline-widget.expanded .widget-header .icon {
-    margin-right: 8px;
-  }
-  .widget-header .pending-badge {
-    padding: 0.15em 0.4em; /* 移动端调整默认内边距 */
-    font-size: 0.6em; /* 移动端调整默认字体大小 */
-    min-width: 18px; /* 移动端调整默认最小宽度 */
-    margin-left: 4px; /* 移动端默认左边距 */
-  }
-  .feedback-timeline-widget:not(.expanded) .widget-header .pending-badge {
-    top: 4px; /* 移动端距离顶部 */
-    right: 4px; /* 移动端距离右侧 */
-    width: 8px; /* 移动端红点尺寸 */
-    height: 8px; /* 移动端红点尺寸 */
     padding: 0;
-    margin: 0;
-  }
-  .feedback-timeline-widget.expanded .widget-header .pending-badge {
-    margin-left: 8px;
-  }
-  .widget-header .toggle-icon {
-    margin-left: 8px;
-  }
-  .widget-content {
-    padding: 10px;
-  }
-  .feedback-item {
-    padding: 10px;
-  }
-  .feedback-message {
-    font-size: 0.85em;
-  }
-}
-
-/* 小屏幕设备进一步优化 */
-@media (max-width: 480px) {
-  main {
-    margin-top: calc(60px + var(--announcement-height, 0px));
+    margin-top: calc(56px + var(--announcement-height, 0px));
     transition: margin-top 0.3s ease;
   }
 
+  /* ── Hero ── */
   .hero-header {
-    padding: 1.6rem 1rem;
+    padding: clamp(1.2rem, 4vw, 2rem) 1rem clamp(1.4rem, 4vw, 2rem);
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
   }
-
   .hero-title {
-    font-size: 1.8rem;
-    letter-spacing: 1px;
+    font-size: clamp(1.6rem, 6.5vw, 2.4rem);
+    letter-spacing: 0.5px;
+    margin-bottom: 0.4rem;
   }
-
   .hero-subtitle {
-    font-size: 0.9rem;
-    margin: 0.6rem 0 1.4rem;
+    font-size: clamp(0.8rem, 2.8vw, 1rem);
+    margin: 0.4rem 0 clamp(1rem, 3vw, 1.6rem);
+    opacity: 0.88;
   }
-
   .search-input-cool {
-    padding: 0.7rem 0.8rem 0.7rem 1rem;
+    padding: 0.75rem 0.75rem 0.75rem 1rem;
     font-size: 0.9rem;
   }
-
   .search-btn {
-    padding: 0.55rem 1rem;
+    padding: 0.6rem 1rem;
     font-size: 0.85rem;
   }
 
+  /* ── 标签：单行横向滚动 ── */
+  .tags-container {
+    margin-bottom: 0.75rem;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  .tags-inner {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: none;
+    padding: 0.6rem 1rem 0.6rem 56px; /* 左侧56px避开侧边菜单按钮 */
+    justify-content: flex-start;
+    gap: 0.4rem;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tags-inner::-webkit-scrollbar { display: none; }
+  .tags-inner > div {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    min-width: max-content;
+    justify-content: flex-start;
+  }
+  .tags-container button {
+    padding: 0.4rem 0.85rem;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin: 0;
+    border-radius: 999px;
+  }
+
+  /* ── 网格：2列，aspect-ratio 自适应 ── */
   .grid-container {
     grid-template-columns: repeat(2, 1fr);
-    gap: 0.6rem;
+    gap: 0.5rem;
+    padding: 0 0.5rem 0.5rem;
   }
-
   .grid-item {
-    padding: 0.6rem;
+    padding: 0;
     border-radius: 10px;
+    overflow: hidden;
   }
-
-  .grid-item img, .grid-item video {
-    height: 110px;
-    margin-bottom: 0.5rem;
-    border-radius: 6px;
+  .grid-item img,
+  .grid-item video {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: 0;
+    margin-bottom: 0;
+    display: block;
   }
-
   .grid-item p {
     font-size: 0.82rem;
-    margin-top: 0.3rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+    padding: 0.45rem 0.6rem 0.55rem;
+    text-align: left;
+  }
+  .media-icon {
+    width: 30px;
+    height: 30px;
   }
 
-  .tags-container button {
-    padding: 0.35rem 0.7rem;
-    margin: 0.2rem;
-    font-size: 0.8rem;
+  /* ── feedback 小部件 ── */
+  .feedback-timeline-widget {
+    bottom: 15px;
+    left: 8px;
+    width: 60px;
+    max-height: 50px;
+  }
+  .feedback-timeline-widget.expanded {
+    width: calc(100% - 16px);
+    max-height: 350px;
+  }
+  .widget-header { padding: 10px 12px; font-size: 1em; }
+  .widget-header .icon { font-size: 1.2em; margin-right: 0; position: relative; }
+  .feedback-timeline-widget.expanded .widget-header .icon { margin-right: 8px; }
+  .widget-header .pending-badge { padding: 0.15em 0.4em; font-size: 0.6em; min-width: 18px; margin-left: 4px; }
+  .feedback-timeline-widget:not(.expanded) .widget-header .pending-badge { top: 4px; right: 4px; width: 8px; height: 8px; padding: 0; margin: 0; }
+  .feedback-timeline-widget.expanded .widget-header .pending-badge { margin-left: 8px; }
+  .widget-header .toggle-icon { margin-left: 8px; }
+  .widget-content { padding: 10px; }
+  .feedback-item { padding: 10px; }
+  .feedback-message { font-size: 0.85em; }
+}
+
+/* ── 窄屏微调（≤ 480px） ── */
+@media (max-width: 480px) {
+  main {
+    margin-top: calc(52px + var(--announcement-height, 0px));
+  }
+  .grid-container {
+    gap: 0.4rem;
+    padding: 0 0.4rem 0.4rem;
+  }
+  .grid-item {
+    border-radius: 8px;
+  }
+  .grid-item p {
+    font-size: 0.78rem;
+    padding: 0.4rem 0.5rem 0.5rem;
   }
 }
 
@@ -2331,25 +2273,25 @@ a.router-link-active.router-link-exact-active{
   transform: translateY(0);
 }
 
-/* 移动端始终显示按钮，并缩小尺寸 */
+/* 移动端始终显示按钮，适配无 padding 卡片 */
 @media (max-width: 768px) {
   .card-actions {
     opacity: 1;
     transform: translateY(0);
     gap: 4px;
-    top: 5px;
-    right: 5px;
+    top: 6px;
+    right: 6px;
   }
 
   .action-btn {
-    width: 28px;
-    height: 28px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+    width: 26px;
+    height: 26px;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
   }
 
   .action-btn svg {
-    width: 13px;
-    height: 13px;
+    width: 12px;
+    height: 12px;
   }
 }
 
