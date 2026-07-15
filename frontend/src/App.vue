@@ -5,6 +5,7 @@ import apiClient from './axiosConfig.js';
 import SideDrawer from './components/SideDrawer.vue';
 import TopAnnouncement from './components/TopAnnouncement.vue';
 import FabricGoQRModal from './components/FabricGoQRModal.vue';
+import TutorialGuide from './components/TutorialGuide.vue';
 
 
 // --- 新增：导航栏滑动效果的逻辑 ---
@@ -431,6 +432,9 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     </Transition>
 
     <FabricGoQRModal v-model="showQRModal" />
+
+    <!-- 新手引导 -->
+    <TutorialGuide v-if="!isAdminRoute" />
   </div>
 </template>
 
