@@ -54,6 +54,7 @@ jobs:
             cd /www/fangdu
 
             echo ">>> 拉取最新代码（后端 + 源码）..."
+            git stash
             git pull origin main
 
             echo ">>> 安装后端依赖..."
