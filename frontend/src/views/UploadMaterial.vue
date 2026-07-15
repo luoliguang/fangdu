@@ -296,9 +296,11 @@ const switchMode = (mode) => {
 
 <template>
   <div class="admin-page-shell">
+    <div class="page-header">
+      <h1>上传素材</h1>
+      <p>支持单个精细上传或批量快速上传，上传后即刻在前台展示。</p>
+    </div>
     <div class="card">
-    <h2>上传新素材</h2>
-    
     <!-- 上传模式切换 -->
     <div class="mode-switch">
       <button 
@@ -547,6 +549,26 @@ const switchMode = (mode) => {
   width: 100%;
   min-width: 0;
   overflow-x: hidden;
+}
+
+.page-header {
+  padding: 0 0.25rem 1.25rem;
+  border-bottom: 1px solid #e9ecef;
+  margin-bottom: 1.25rem;
+}
+
+.page-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0a3d22;
+}
+
+.page-header p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.5;
 }
 
 .admin-page-shell :deep(.el-form-item__content),

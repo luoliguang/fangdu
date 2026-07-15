@@ -9,6 +9,7 @@ import {
   ChatDotRound,
   DataAnalysis,
   Setting,
+  Tickets,
   SwitchButton
 } from '@element-plus/icons-vue';
 
@@ -27,7 +28,7 @@ const navItems = [
   { name: 'FeedbackManagement', label: '留言管理', icon: ChatDotRound },
   { name: 'Statistics', label: '访问统计', icon: DataAnalysis },
   { name: 'DrawerConfig', label: '抽屉配置', icon: Setting },
-  { name: 'PageCategoryConfig', label: '页面分类', icon: Setting }
+  { name: 'PageCategoryConfig', label: '页面分类', icon: Tickets }
 ];
 
 const mobileMenuTitle = computed(() => {
@@ -138,7 +139,24 @@ onUnmounted(() => {
     <Transition name="mobile-menu">
       <div v-show="showSidebar" class="sidebar" :class="{ 'is-open': showMobileMenu }">
         <div class="sidebar-header">
-          <h2>管理后台</h2>
+          <div class="brand-mark">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="28" height="28" rx="8" fill="url(#adminLogoGrad)"/>
+              <path d="M9 19 C9 13 14 8 19 9 C16 12 15 16 16 19" stroke="white" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.9"/>
+              <path d="M9 19 C10 15 13 13 16 19" stroke="white" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.65"/>
+              <circle cx="9" cy="19" r="1.5" fill="white" opacity="0.9"/>
+              <defs>
+                <linearGradient id="adminLogoGrad" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#0a3d22"/>
+                  <stop offset="100%" stop-color="#1d6b43"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">方度管理</span>
+            <span class="brand-sub">Admin Console</span>
+          </div>
         </div>
         <div class="sidebar-nav">
           <div
@@ -212,8 +230,8 @@ onUnmounted(() => {
   width: 100%;
   min-width: 0;
   background:
-    radial-gradient(120% 120% at 0% 0%, rgba(168, 85, 247, 0.18) 0%, rgba(168, 85, 247, 0) 55%),
-    linear-gradient(180deg, #0f1117 0%, #0b0d12 100%);
+    radial-gradient(120% 120% at 0% 0%, rgba(90, 143, 115, 0.14) 0%, rgba(90, 143, 115, 0) 55%),
+    linear-gradient(180deg, #0c1912 0%, #080f0a 100%);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
@@ -229,9 +247,9 @@ onUnmounted(() => {
 
 .mobile-nav-toggle__btn {
   width: 100%;
-  border: 1px solid rgba(168, 85, 247, 0.35);
+  border: 1px solid rgba(90, 143, 115, 0.4);
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(168, 85, 247, 0.14));
+  background: linear-gradient(135deg, rgba(10, 61, 34, 0.5), rgba(29, 107, 67, 0.35));
   color: #f8fafc;
   padding: 0.7rem 0.9rem;
   display: flex;
@@ -251,17 +269,36 @@ onUnmounted(() => {
 }
 
 .sidebar-header {
-  padding: 1.25rem 1.25rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1.1rem 1.1rem 0.9rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
 }
 
-.sidebar-header h2 {
-  margin: 0;
-  font-size: 1rem;
+.brand-mark {
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.brand-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: 0.03em;
+}
+
+.brand-sub {
+  font-size: 0.68rem;
+  color: rgba(90, 143, 115, 0.85);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  font-weight: 650;
-  color: #f8fafc;
 }
 
 .sidebar-nav {
@@ -293,9 +330,9 @@ onUnmounted(() => {
 
 .nav-item.active {
   color: #ffffff;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.32), rgba(168, 85, 247, 0.22));
-  border-color: rgba(168, 85, 247, 0.45);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, rgba(10, 61, 34, 0.55), rgba(29, 107, 67, 0.35));
+  border-color: rgba(90, 143, 115, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .nav-item.active::before {
@@ -306,7 +343,7 @@ onUnmounted(() => {
   width: 3px;
   height: 60%;
   border-radius: 999px;
-  background: linear-gradient(180deg, #c084fc, #a855f7);
+  background: linear-gradient(180deg, #5a8f73, #0a3d22);
 }
 
 .nav-hover-effect {

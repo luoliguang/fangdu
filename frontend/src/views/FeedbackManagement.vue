@@ -96,13 +96,16 @@ onUnmounted(() => {
 
 <template>
   <div class="admin-page-shell">
+    <div class="page-header">
+      <div class="page-header-row">
+        <h1>留言管理</h1>
+        <span v-if="pendingFeedbacksCount > 0" class="pending-badge">
+          {{ pendingFeedbacksCount }} 条未处理
+        </span>
+      </div>
+      <p>查看并处理用户通过侧边抽屉提交的反馈留言。</p>
+    </div>
     <div class="card">
-    <h2>
-      用户留言管理
-      <span v-if="pendingFeedbacksCount > 0" class="pending-badge">
-        {{ pendingFeedbacksCount }} 条未处理
-      </span>
-    </h2>
     
     <DataTable 
       :data="feedbacks"
@@ -176,6 +179,33 @@ onUnmounted(() => {
   overflow-x: hidden;
 }
 
+.page-header {
+  padding: 0 0.25rem 1.25rem;
+  border-bottom: 1px solid #e9ecef;
+  margin-bottom: 1.25rem;
+}
+
+.page-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0a3d22;
+}
+
+.page-header p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
 .card {
   background: white;
   border-radius: 12px;
@@ -183,15 +213,6 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   margin-bottom: 20px;
   border: 1px solid #f0f0f0;
-}
-
-h2 {
-  color: #2c3e50;
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  font-weight: 600;
-  font-size: 1.8rem;
 }
 
 /* 表格样式优化 */

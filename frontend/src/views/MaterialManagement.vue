@@ -149,9 +149,11 @@ onUnmounted(() => {
 
 <template>
   <div class="admin-page-shell">
+    <div class="page-header">
+      <h1>素材管理</h1>
+      <p>查看、搜索、编辑或删除已上传的全部素材。</p>
+    </div>
     <div class="card">
-    <h2>素材管理</h2>
-
     <!-- 搜索与筛选栏 -->
     <div class="search-bar">
       <input
@@ -259,6 +261,26 @@ onUnmounted(() => {
   width: 100%;
   min-width: 0;
   overflow-x: hidden;
+}
+
+.page-header {
+  padding: 0 0.25rem 1.25rem;
+  border-bottom: 1px solid #e9ecef;
+  margin-bottom: 1.25rem;
+}
+
+.page-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0a3d22;
+}
+
+.page-header p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.5;
 }
 
 :deep(.data-table-wrapper),
