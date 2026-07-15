@@ -334,8 +334,9 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
 
 <template>
   <div id="app">
-    <!-- 全局左侧抽屉 -->
-    <SideDrawer 
+    <!-- 全局左侧抽屉（管理员后台不显示） -->
+    <SideDrawer
+      v-if="!isAdminRoute"
       :favorites="favorites"
       @showMedia="handleShowMedia"
       @removeFromFavorites="handleRemoveFromFavorites"
@@ -453,6 +454,11 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
   main {
     margin-top: calc(64px + var(--announcement-height, 0px)); /* 导航栏高度 + 公告高度 */
     transition: margin-top 0.3s ease; /* 平滑过渡 */
+  }
+
+  /* 管理员后台：admin-topbar 底部约 62px，给 main 更多间距避免视觉重叠 */
+  .admin-topbar ~ main {
+    margin-top: calc(80px + var(--announcement-height, 0px));
   }
 
   .admin-topbar {
