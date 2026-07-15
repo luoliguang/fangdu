@@ -238,7 +238,7 @@ class MaterialController {
    */
   async getAllTags(req, res) {
     try {
-      const result = await this.materialService.getAllTags();
+      const result = await this.materialService.getAllTags(req.query);
       res.json(result);
     } catch (error) {
       console.error('获取标签失败:', error);

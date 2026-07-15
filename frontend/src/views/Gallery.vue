@@ -362,6 +362,7 @@ const fetchMaterials = async (isLoadMore = false) => {
     const query = {
       search: searchTerm.value.trim(),
       tag: activeTag.value,
+      exclude_tags: '杂款领口,特殊领口',
       page: currentPage.value,
       limit: 20
     };
@@ -585,7 +586,9 @@ const formatDateTime = (isoString) => {
 
 const fetchTags = async () => {
   try {
-    const response = await apiClient.get(`/api/v1/materials/tags/all`);
+    const response = await apiClient.get(`/api/v1/materials/tags/all`, {
+      params: { exclude_tags: '杂款领口,特殊领口' }
+    });
     tags.value = response.data.data;
     // 标签加载完成后计算可见标签数量
     setTimeout(async () => {

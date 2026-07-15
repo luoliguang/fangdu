@@ -312,6 +312,7 @@ const goToFrontendHome = () => {
     <nav v-if="!isAdminRoute" class="main-nav" :class="{ 'is-hidden': !showNavBar }" ref="mainNav">
       <div class="nav-slider" ref="navSlider"></div>
       <router-link to="/" @click="handleNavClick">实拍</router-link>
+      <router-link to="/special-necklines" @click="handleNavClick">杂款领口</router-link>
       <a ref="fabricGoBtn" href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank" @click.prevent="openFabricGoModal">面料细节</a>
       <a href="https://fangdutex.cn/welcome" target="_blank">知识库「所有知识」</a>
       <router-link to="/color-card" @click="handleNavClick">设计专用</router-link>

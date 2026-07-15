@@ -14,6 +14,8 @@ class Material {
     const {
       search = '',
       tag = '',
+      any_tag = '',      // 逗号分隔，匹配其中任意一个 tag（用于特殊领口页）
+      exclude_tags = '', // 逗号分隔，排除包含这些 tag 的素材（用于主页）
       media_type = '',
       page = 1,
       limit = 20
@@ -36,11 +38,30 @@ class Material {
       whereClause += ` AND media_type = ?`;
       params.push(media_type);
     }
-    
-    // 添加标签过滤
+
+    // 精确标签过滤（AND，单个 tag）
     if (tag) {
       whereClause += ` AND tags LIKE ?`;
       params.push(`%${tag}%`);
+    }
+
+    // 任意标签匹配（OR，多个 tag 取并集）
+    if (any_tag) {
+      const anyTags = any_tag.split(',').map(t => t.trim()).filter(Boolean);
+      if (anyTags.length > 0) {
+        const orClauses = anyTags.map(() => `tags LIKE ?`).join(' OR ');
+        whereClause += ` AND (${orClauses})`;
+        anyTags.forEach(t => params.push(`%${t}%`));
+      }
+    }
+
+    // 排除标签（主页用，隐藏特殊分类素材）
+    if (exclude_tags) {
+      const exTags = exclude_tags.split(',').map(t => t.trim()).filter(Boolean);
+      exTags.forEach(t => {
+        whereClause += ` AND (tags IS NULL OR tags NOT LIKE ?)`;
+        params.push(`%${t}%`);
+      });
     }
 
     // 获取总数
@@ -171,18 +192,40 @@ class Material {
   /**
    * 获取所有唯一标签
    */
-  async getAllTags() {
-    const sql = "SELECT tags FROM materials";
-    const rows = await this.queryAll(sql);
-    
+  async getAllTags(options = {}) {
+    const { exclude_tags = '', any_tag = '' } = options;
+
+    let sql = "SELECT tags FROM materials WHERE 1=1";
+    const params = [];
+
+    // 排除特殊分类（主页标签列表不显示这些 tag 下的素材）
+    if (exclude_tags) {
+      const exTags = exclude_tags.split(',').map(t => t.trim()).filter(Boolean);
+      exTags.forEach(t => {
+        sql += ` AND (tags IS NULL OR tags NOT LIKE ?)`;
+        params.push(`%${t}%`);
+      });
+    }
+
+    // 只取特定分类的素材（特殊领口页标签列表）
+    if (any_tag) {
+      const anyTags = any_tag.split(',').map(t => t.trim()).filter(Boolean);
+      if (anyTags.length > 0) {
+        const orClauses = anyTags.map(() => `tags LIKE ?`).join(' OR ');
+        sql += ` AND (${orClauses})`;
+        anyTags.forEach(t => params.push(`%${t}%`));
+      }
+    }
+
+    const rows = await this.queryAll(sql, params);
+
     const allTags = rows
       .map(row => row.tags ? row.tags.split(',') : [])
       .flat()
       .map(tag => tag.trim())
       .filter(tag => tag);
-    
-    const uniqueTags = [...new Set(allTags)];
-    return uniqueTags;
+
+    return [...new Set(allTags)];
   }
 
   /**

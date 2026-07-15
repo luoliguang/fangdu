@@ -19,14 +19,16 @@ class MaterialService {
    */
   async getMaterials(query) {
     try {
-      const { search, tag, media_type, page, limit } = query;
-      
+      const { search, tag, any_tag, exclude_tags, media_type, page, limit } = query;
+
       const options = {
         search: search || '',
         tag: tag || '',
+        any_tag: any_tag || '',
+        exclude_tags: exclude_tags || '',
         media_type: media_type || '',
         page: parseInt(page) || 1,
-        limit: Math.min(parseInt(limit) || 20, 100) // 限制最大每页数量
+        limit: Math.min(parseInt(limit) || 20, 100)
       };
 
       const result = await this.materialModel.getAll(options);
@@ -242,10 +244,11 @@ class MaterialService {
   /**
    * 获取所有标签
    */
-  async getAllTags() {
+  async getAllTags(query = {}) {
     try {
-      const tags = await this.materialModel.getAllTags();
-      
+      const { exclude_tags = '', any_tag = '' } = query;
+      const tags = await this.materialModel.getAllTags({ exclude_tags, any_tag });
+
       return {
         success: true,
         data: tags
