@@ -37,11 +37,14 @@ jobs:
           echo ">>> Deploying backend..."
           cd backend
           npm install
+
+          # 重启服务（服务器启动时会自动执行数据库迁移）
           pm2 restart material-hub-api
 
           # 部署前端
           echo ">>> Deploying frontend..."
           cd ../frontend
           npm install
+          npm run build
 
           echo ">>> Deployment finished!"

@@ -23,14 +23,12 @@ async function testConnection() {
   }
 }
 
-// 同步数据库表结构（快速启动模式）
+// 同步数据库表结构
+// alter: true 会自动对比模型定义与当前表结构，添加缺失字段
 async function syncDatabase() {
   try {
-    // 快速启动：只在表不存在时创建表，不进行结构变更检查
-    // 这样可以大大加快启动速度（从几秒缩短到毫秒级）
-    // 如果需要添加新字段，请手动运行迁移脚本或使用 alter: true（会慢）
-    await sequelize.sync({ force: false, alter: false });
-    console.log('✅ 数据库表结构检查完成（快速启动模式）');
+    await sequelize.sync({ force: false, alter: true });
+    console.log('✅ drawer_config 数据库表结构同步完成');
   } catch (error) {
     console.error('数据库表结构同步失败:', error);
     // 即使失败也继续，避免阻塞启动
