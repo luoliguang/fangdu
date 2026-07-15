@@ -10,6 +10,7 @@ import {
   DataAnalysis,
   Setting,
   Tickets,
+  Picture,
   SwitchButton
 } from '@element-plus/icons-vue';
 
@@ -28,7 +29,8 @@ const navItems = [
   { name: 'FeedbackManagement', label: '留言管理', icon: ChatDotRound },
   { name: 'Statistics', label: '访问统计', icon: DataAnalysis },
   { name: 'DrawerConfig', label: '抽屉配置', icon: Setting },
-  { name: 'PageCategoryConfig', label: '页面分类', icon: Tickets }
+  { name: 'PageCategoryConfig', label: '页面分类', icon: Tickets },
+  { name: 'FabricDetailConfig', label: '面料图配置', icon: Picture }
 ];
 
 const mobileMenuTitle = computed(() => {

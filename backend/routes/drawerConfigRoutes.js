@@ -1,6 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const DrawerConfigController = require('../controllers/DrawerConfigController');
+
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    cb(null, file.mimetype.startsWith('image/'));
+  }
+});
 
 // 获取完整的抽屉配置
 router.get('/config', DrawerConfigController.getDrawerConfig);
@@ -41,5 +50,9 @@ router.get('/page-categories', DrawerConfigController.getPageCategories);
 router.post('/page-categories', DrawerConfigController.createPageCategory);
 router.put('/page-categories/:id', DrawerConfigController.updatePageCategory);
 router.delete('/page-categories/:id', DrawerConfigController.deletePageCategory);
+
+// 站点配置（面料细节图等）
+router.get('/site-config/:key', DrawerConfigController.getSiteConfig);
+router.post('/site-config/fabric-detail-image', imageUpload.single('image'), DrawerConfigController.uploadFabricDetailImage);
 
 module.exports = router;

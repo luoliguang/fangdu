@@ -5,9 +5,11 @@ const {
   QuickFilter,
   DrawerTab,
   ContactInfo,
-  PageCategory
+  PageCategory,
+  SiteConfig
 } = require('../models/DrawerConfig');
 const { Op } = require('sequelize');
+const ServerConfig = require('../config/server');
 
 class DrawerConfigController {
   // 获取完整的抽屉配置
@@ -782,6 +784,58 @@ class DrawerConfigController {
       res.json({ success: true, message: '删除成功' });
     } catch (error) {
       res.status(500).json({ success: false, message: '删除失败', error: error.message });
+    }
+  }
+
+  // ── SiteConfig ────────────────────────────────────────────────────
+
+  // 获取单个站点配置（公开）
+  static async getSiteConfig(req, res) {
+    try {
+      const { key } = req.params;
+      const config = await SiteConfig.findOne({ where: { key } });
+      res.json({ success: true, data: config ? config.value : null });
+    } catch (error) {
+      res.status(500).json({ success: false, message: '获取配置失败', error: error.message });
+    }
+  }
+
+  // 上传面料细节图片到 OSS，并将 CDN URL 写入 SiteConfig
+  static async uploadFabricDetailImage(req, res) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: '请选择要上传的图片' });
+      }
+
+      const ossClient = ServerConfig.getConfig().ossClient;
+      if (!ossClient) {
+        return res.status(500).json({ success: false, message: 'OSS 客户端未初始化' });
+      }
+
+      const { originalname, buffer, mimetype } = req.file;
+      const ext = originalname.split('.').pop().toLowerCase();
+      const fileName = `site-config/fabric-detail-${Date.now()}.${ext}`;
+
+      await ossClient.put(fileName, buffer, {
+        headers: {
+          'Content-Type': mimetype,
+          'Content-Disposition': 'inline',
+          'Cache-Control': 'public, max-age=2592000'
+        }
+      });
+
+      // 构造 CDN URL（与 MaterialService 保持一致）
+      const ossBase = `https://${process.env.ALI_OSS_BUCKET}.${process.env.ALI_OSS_REGION}.aliyuncs.com`;
+      const cdnBase = process.env.CDN_BASE_URL || ossBase;
+      const cdnUrl = `${cdnBase}/${fileName}`;
+
+      // 写入或更新 SiteConfig
+      await SiteConfig.upsert({ key: 'fabric_detail_image_url', value: cdnUrl });
+
+      res.json({ success: true, data: { url: cdnUrl } });
+    } catch (error) {
+      console.error('上传面料细节图片失败:', error);
+      res.status(500).json({ success: false, message: '上传失败', error: error.message });
     }
   }
 }

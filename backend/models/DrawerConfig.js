@@ -308,6 +308,28 @@ const PageCategory = sequelize.define('PageCategory', {
   updatedAt: 'updated_at'
 });
 
+// 站点级键值配置表（用于面料细节图等单值配置）
+const SiteConfig = sequelize.define('SiteConfig', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  key: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    unique: true
+  },
+  value: {
+    type: DataTypes.TEXT
+  }
+}, {
+  tableName: 'site_configs',
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
+});
+
 module.exports = {
   DrawerConfig,
   Announcement,
@@ -315,5 +337,6 @@ module.exports = {
   QuickFilter,
   DrawerTab,
   ContactInfo,
-  PageCategory
+  PageCategory,
+  SiteConfig
 };

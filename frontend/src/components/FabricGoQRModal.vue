@@ -1,5 +1,7 @@
 <script setup>
-import { watch, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import apiClient from '../axiosConfig.js'
+import fallbackImg from '../assets/fabricgo-qr.jpg'
 
 const props = defineProps({
   modelValue: {
@@ -9,6 +11,14 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
+const imageUrl = ref(fallbackImg)
+
+onMounted(async () => {
+  try {
+    const { data } = await apiClient.get('/api/v1/drawer-config/site-config/fabric_detail_image_url')
+    if (data?.data) imageUrl.value = data.data
+  } catch {}
+})
 
 const close = () => {
   emit('update:modelValue', false)
@@ -57,7 +67,7 @@ onUnmounted(() => {
 
         <img
           class="fabricgo-qr-image"
-          src="../assets/fabricgo-qr.jpg"
+          :src="imageUrl"
           alt="fabricGo 小程序二维码"
           width="220"
           height="220"

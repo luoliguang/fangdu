@@ -8,6 +8,7 @@ import FeedbackManagement from '../views/FeedbackManagement.vue';
 import Statistics from '../views/Statistics.vue';
 import DrawerConfig from '../views/admin/DrawerConfig.vue';
 import PageCategoryConfig from '../views/admin/PageCategoryConfig.vue';
+import FabricDetailConfig from '../views/admin/FabricDetailConfig.vue';
 import ColorCard from '../views/ColorCard.vue';
 import SizeConverter from '../views/SizeConverter.vue';
 import CategoryPage from '../views/CategoryPage.vue';
@@ -66,6 +67,11 @@ const routes = [
                 path: 'page-categories',
                 name: 'PageCategoryConfig',
                 component: PageCategoryConfig
+            },
+            {
+                path: 'fabric-detail',
+                name: 'FabricDetailConfig',
+                component: FabricDetailConfig
             }
         ]
     }
