@@ -469,6 +469,7 @@ const goToFrontendHome = () => {
     align-items: center;
     justify-content: center;
     gap: 2.1rem;
+    flex-wrap: nowrap; /* 永不折行 */
     position: fixed;
     top: calc(var(--announcement-height, 0px) + 10px);
     left: 50%;
@@ -622,8 +623,30 @@ const goToFrontendHome = () => {
     transform: translateY(8px);
   }
 
+  /* --- 中等屏幕：导航切换为可滚动模式（避免折行）--- */
+  @media (max-width: 1100px) {
+    .main-nav {
+      justify-content: flex-start;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+      padding-left: 1.4rem;
+      padding-right: 1.4rem;
+      gap: 1.6rem;
+    }
+
+    .main-nav::-webkit-scrollbar {
+      display: none;
+    }
+
+    .main-nav a {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      font-size: 0.95rem;
+    }
+  }
+
   /* --- 移动端适配样式 --- */
-  /* Keep in sync with BREAKPOINTS.tablet */
   @media (max-width: 768px) {
     main {
       margin-top: calc(72px + var(--announcement-height, 0px));

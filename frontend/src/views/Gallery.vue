@@ -1973,19 +1973,21 @@ const quickCopyImage = async (material) => {
 
   /* ── Hero ── */
   .hero-header {
-    padding: clamp(1.2rem, 4vw, 2rem) 1rem clamp(1.4rem, 4vw, 2rem);
+    padding: 1.6rem 1rem 1.8rem;
     border-bottom-left-radius: 20px;
     border-bottom-right-radius: 20px;
   }
   .hero-title {
-    font-size: clamp(1.6rem, 6.5vw, 2.4rem);
-    letter-spacing: 0.5px;
-    margin-bottom: 0.4rem;
+    font-size: clamp(1.5rem, 6vw, 2.2rem);
+    letter-spacing: 1px;
+    margin-bottom: 0;
   }
+  /* 移动端隐藏副标题，搜索栏直接跟在标题后 */
   .hero-subtitle {
-    font-size: clamp(0.8rem, 2.8vw, 1rem);
-    margin: 0.4rem 0 clamp(1rem, 3vw, 1.6rem);
-    opacity: 0.88;
+    display: none;
+  }
+  .search-wrapper {
+    margin-top: 1rem;
   }
   .search-input-cool {
     padding: 0.75rem 0.75rem 0.75rem 1rem;
