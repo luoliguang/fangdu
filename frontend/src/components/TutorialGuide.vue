@@ -67,6 +67,17 @@ const getSteps = () => [
 
 let driverInstance = null;
 
+const lockScroll = () => { document.documentElement.style.overflow = 'hidden'; };
+const unlockScroll = () => { document.documentElement.style.overflow = ''; };
+
+const handleReflow = () => { driverInstance?.refresh(); };
+
+const teardown = () => {
+  unlockScroll();
+  window.removeEventListener('scroll', handleReflow);
+  window.removeEventListener('resize', handleReflow);
+};
+
 const createDriver = () => driver({
   showProgress: true,
   progressText: '{{current}} / {{total}}',
@@ -78,12 +89,18 @@ const createDriver = () => driver({
   popoverClass: 'fangdu-popover',
   onDestroyStarted: () => {
     localStorage.setItem('tutorial_seen', '1');
+    teardown();
     setTimeout(() => driverInstance?.destroy(), 0);
   },
   steps: getSteps()
 });
 
 const startTour = () => {
+  // 回顶确保元素起始位置准确
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  lockScroll();
+  window.addEventListener('scroll', handleReflow, { passive: true });
+  window.addEventListener('resize', handleReflow, { passive: true });
   driverInstance = createDriver();
   driverInstance.drive();
 };
