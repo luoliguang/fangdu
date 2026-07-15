@@ -30,7 +30,7 @@
               <span class="slug-badge">/category/{{ cat.slug }}</span>
               <span v-if="!cat.is_active" class="inactive-badge">已停用</span>
             </div>
-            <div class="card-actions">
+            <div class="cat-card-actions">
               <el-button type="success" size="small" @click="openEdit(cat)">编辑</el-button>
               <el-button type="danger" size="small" @click="handleDelete(cat.id)">删除</el-button>
             </div>
@@ -378,7 +378,7 @@ onMounted(fetchCategories);
   border: 1px solid #fecaca;
 }
 
-.card-actions {
+.cat-card-actions {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
