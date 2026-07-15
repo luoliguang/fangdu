@@ -24,6 +24,9 @@ const toCdnUrl = (url) => {
   return url.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, CDN_BASE_URL);
 };
 
+// ── 复用 App 已拉取的分类列表，避免重复请求 ──────────────────
+const injectedCategories = inject('pageCategories', ref([]));
+
 // ── 收藏（复用 App 全局状态）────────────────────────────────────
 const appFavorites = inject('appFavorites', { favorites: ref([]), addToFavorites: () => {} });
 const favorites = appFavorites.favorites;
@@ -185,9 +188,13 @@ const loadConfig = async () => {
   configLoading.value = true;
   configError.value = false;
   try {
-    const { data: res } = await apiClient.get('/api/v1/drawer-config/page-categories');
     const slug = route.params.slug;
-    const found = (res?.data ?? []).find(c => c.slug === slug && c.is_active);
+    // 优先复用 App 已拉取的分类，避免重复请求
+    let found = injectedCategories.value.find(c => c.slug === slug && c.is_active);
+    if (!found) {
+      const { data: res } = await apiClient.get('/api/v1/drawer-config/page-categories');
+      found = (res?.data ?? []).find(c => c.slug === slug && c.is_active);
+    }
     if (!found) { configError.value = true; return; }
     categoryConfig.value = found;
     await Promise.all([fetchMaterials(), fetchTags()]);
@@ -196,6 +203,9 @@ const loadConfig = async () => {
     configError.value = true;
   } finally {
     configLoading.value = false;
+    // v-else 渲染完再绑定 observer（之前在 onMounted 时 observerEl 还是 null）
+    await nextTick();
+    if (observerEl.value && !observer) setupObserver();
   }
 };
 
@@ -266,6 +276,8 @@ watch(() => route.params.slug, () => {
   tags.value = [];
   activeTag.value = '';
   searchTerm.value = '';
+  observer?.disconnect();
+  observer = null;
   loadConfig();
 });
 
@@ -282,7 +294,6 @@ const setupObserver = () => {
 
 onMounted(() => {
   loadConfig();
-  setupObserver();
 });
 
 onUnmounted(() => {

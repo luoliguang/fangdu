@@ -176,9 +176,9 @@ const openEdit = (cat) => {
     name: cat.name,
     slug: cat.slug,
     description: cat.description ?? '',
-    tags: [...(cat.tags ?? [])],
-    is_active: cat.is_active,
-    sort_order: cat.sort_order
+    tags: Array.isArray(cat.tags) ? [...cat.tags] : [],
+    is_active: Boolean(cat.is_active),
+    sort_order: cat.sort_order ?? 0
   };
   newTag.value = '';
   dialogVisible.value = true;

@@ -30,6 +30,8 @@ const fetchPageCategories = async () => {
   try {
     const { data: res } = await apiClient.get('/api/v1/drawer-config/page-categories');
     pageCategories.value = (res?.data ?? []).filter(c => c.is_active);
+    await nextTick();
+    updateSlider();
   } catch (err) {
     console.error('加载分类配置失败:', err);
   }
@@ -193,6 +195,7 @@ const scrollToTop = () => {
 provide('appFavorites', { favorites, addToFavorites });
 provide('galleryCallbacks', galleryCallbacks);
 provide('excludeTagsParam', excludeTagsParam);
+provide('pageCategories', pageCategories);
 
 // 4. 在组件挂载时，监听整个窗口的滚动事件
 onMounted(() => {
