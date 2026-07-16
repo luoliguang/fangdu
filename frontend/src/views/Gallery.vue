@@ -1820,12 +1820,12 @@ const quickCopyImage = async (material) => {
 /* ── 需求记录浮动 Widget ── */
 .req-widget {
   position: fixed;
-  bottom: 24px;
-  left: 20px;
+  bottom: 90px;
+  right: 24px;
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 10px;
 }
 
