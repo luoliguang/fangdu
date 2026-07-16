@@ -67,8 +67,14 @@ const getSteps = () => [
 
 let driverInstance = null;
 
-const lockScroll = () => { document.documentElement.style.overflow = 'hidden'; };
-const unlockScroll = () => { document.documentElement.style.overflow = ''; };
+const lockScroll = () => {
+  document.documentElement.style.overflow = 'hidden';
+  document.body.classList.add('tutorial-active');
+};
+const unlockScroll = () => {
+  document.documentElement.style.overflow = '';
+  document.body.classList.remove('tutorial-active');
+};
 
 const handleReflow = () => { driverInstance?.refresh(); };
 
@@ -252,5 +258,13 @@ onMounted(() => {
   .fangdu-popover {
     max-width: calc(100vw - 40px) !important;
   }
+}
+
+/* 教程进行时强制保持导航栏可见，防止滚动事件触发隐藏 */
+body.tutorial-active .main-nav.is-hidden,
+body.tutorial-active .mobile-nav.is-hidden {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translate(-50%, 0) !important;
 }
 </style>
