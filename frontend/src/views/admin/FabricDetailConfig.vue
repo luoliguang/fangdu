@@ -15,6 +15,7 @@
               :src="currentUrl"
               class="preview-img"
               alt="当前面料细节图"
+              referrerpolicy="no-referrer"
             />
             <div v-else class="preview-empty">
               <span>暂未配置图片，将使用默认图</span>
