@@ -13,21 +13,34 @@
 
     <!-- 顶部4个核心指标 -->
     <div class="kpi-grid reveal" :class="{ 'is-ready': pageReady }" style="--d: 90ms;">
-      <div class="kpi-card">
-        <span class="kpi-label">今日访问</span>
+      <div class="kpi-card kpi-today">
+        <div class="kpi-top">
+          <svg class="kpi-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span class="kpi-label">今日访问</span>
+        </div>
         <span class="kpi-value">{{ formatNumber(displayedOverview.todayVisits) }}</span>
       </div>
-      <div class="kpi-card">
-        <span class="kpi-label">本周访问</span>
+      <div class="kpi-card kpi-week">
+        <div class="kpi-top">
+          <svg class="kpi-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span class="kpi-label">本周访问</span>
+        </div>
         <span class="kpi-value">{{ formatNumber(displayedOverview.weekVisits) }}</span>
       </div>
-      <div class="kpi-card">
-        <span class="kpi-label">总访问量</span>
+      <div class="kpi-card kpi-total">
+        <div class="kpi-top">
+          <svg class="kpi-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span class="kpi-label">累计访问</span>
+        </div>
         <span class="kpi-value">{{ formatNumber(displayedOverview.totalVisits) }}</span>
       </div>
-      <div class="kpi-card">
-        <span class="kpi-label">当前在线</span>
+      <div class="kpi-card kpi-online">
+        <div class="kpi-top">
+          <svg class="kpi-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="kpi-label">当前在线</span>
+        </div>
         <span class="kpi-value">{{ formatNumber(displayedOverview.onlineCount) }}</span>
+        <span class="kpi-badge">实时</span>
       </div>
     </div>
 
@@ -49,16 +62,32 @@
       <div ref="trendChartRef" class="chart-area"></div>
     </div>
 
+    <!-- 分布图：时段 + 页面 -->
+    <div class="dist-grid reveal" :class="{ 'is-ready': pageReady }" style="--d: 250ms;">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>访问时段分布 <span class="panel-sub">近7天·按小时</span></h3>
+        </div>
+        <div ref="hourlyChartRef" class="chart-area chart-small"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <h3>页面访问分布 <span class="panel-sub">近30天</span></h3>
+        </div>
+        <div ref="pageChartRef" class="chart-area chart-small"></div>
+      </div>
+    </div>
+
     <!-- 下方三列 -->
     <div class="bottom-grid">
-      <div class="panel reveal" :class="{ 'is-ready': pageReady }" style="--d: 250ms;">
+      <div class="panel reveal" :class="{ 'is-ready': pageReady }" style="--d: 340ms;">
         <div class="panel-header">
           <h3>访客来源分布</h3>
         </div>
         <div ref="sourceChartRef" class="chart-area chart-small"></div>
       </div>
 
-      <div class="panel reveal" :class="{ 'is-ready': pageReady }" style="--d: 330ms;">
+      <div class="panel reveal" :class="{ 'is-ready': pageReady }" style="--d: 420ms;">
         <div class="panel-header">
           <h3>热门搜索关键词 Top 10</h3>
         </div>
@@ -76,7 +105,7 @@
         </ul>
       </div>
 
-      <div class="panel reveal" :class="{ 'is-ready': pageReady }" style="--d: 410ms;">
+      <div class="panel reveal" :class="{ 'is-ready': pageReady }" style="--d: 500ms;">
         <div class="panel-header">
           <h3>热门素材 Top 5</h3>
         </div>
@@ -133,6 +162,10 @@ export default {
       topMaterials: [],
       trendChart: null,
       sourceChart: null,
+      hourlyChart: null,
+      pageChart: null,
+      hourlyData: [],
+      pageData: [],
       refreshTimer: null,
       resizeHandler: null
     }
@@ -152,6 +185,8 @@ export default {
     if (this.resizeHandler) window.removeEventListener('resize', this.resizeHandler)
     if (this.trendChart) this.trendChart.dispose()
     if (this.sourceChart) this.sourceChart.dispose()
+    if (this.hourlyChart) this.hourlyChart.dispose()
+    if (this.pageChart) this.pageChart.dispose()
   },
   methods: {
     formatNumber(num) {
@@ -165,11 +200,15 @@ export default {
         this.loadTrendData(),
         this.loadReferrerData(),
         this.loadTopKeywords(),
-        this.loadTopMaterials()
+        this.loadTopMaterials(),
+        this.loadHourlyData(),
+        this.loadPageData()
       ])
       this.$nextTick(() => {
         this.renderTrendChart()
         this.renderSourceChart()
+        this.renderHourlyChart()
+        this.renderPageChart()
       })
     },
 
@@ -217,6 +256,16 @@ export default {
       this.topMaterials = response.data?.data || []
     },
 
+    async loadHourlyData() {
+      const response = await apiClient.get('/api/v1/visits/hourly')
+      this.hourlyData = response.data?.data || []
+    },
+
+    async loadPageData() {
+      const response = await apiClient.get('/api/v1/visits/pages?limit=8')
+      this.pageData = response.data?.data || []
+    },
+
     async changeTimeRange(range) {
       this.selectedRange = range
       await this.loadTrendData()
@@ -244,6 +293,8 @@ export default {
       this.resizeHandler = () => {
         if (this.trendChart) this.trendChart.resize()
         if (this.sourceChart) this.sourceChart.resize()
+        if (this.hourlyChart) this.hourlyChart.resize()
+        if (this.pageChart) this.pageChart.resize()
       }
       window.addEventListener('resize', this.resizeHandler)
     },
@@ -375,6 +426,130 @@ export default {
       })
     },
 
+    renderHourlyChart() {
+      if (!this.$refs.hourlyChartRef) return
+      if (this.hourlyChart) this.hourlyChart.dispose()
+      this.hourlyChart = echarts.init(this.$refs.hourlyChartRef)
+
+      const hours = this.hourlyData.map((d) => `${d.hour}时`)
+      const visits = this.hourlyData.map((d) => d.visits)
+      const maxVal = Math.max(...visits, 1)
+
+      this.hourlyChart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: {
+          trigger: 'axis',
+          formatter: (p) => `${p[0].name}　${p[0].value} 次`
+        },
+        grid: { left: 36, right: 16, top: 12, bottom: 24, containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: hours,
+          axisLine: { lineStyle: { color: 'rgba(148,163,184,0.3)' } },
+          axisLabel: {
+            color: '#94a3b8',
+            fontSize: 11,
+            interval: 2
+          },
+          axisTick: { show: false }
+        },
+        yAxis: {
+          type: 'value',
+          minInterval: 1,
+          axisLine: { show: false },
+          splitLine: { lineStyle: { color: 'rgba(148,163,184,0.12)' } },
+          axisLabel: { color: '#94a3b8', fontSize: 11 }
+        },
+        series: [
+          {
+            type: 'bar',
+            data: visits.map((v) => ({
+              value: v,
+              itemStyle: {
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: v >= maxVal * 0.7 ? 'rgba(90,143,115,0.95)' : 'rgba(90,143,115,0.6)' },
+                  { offset: 1, color: 'rgba(10,61,34,0.4)' }
+                ]),
+                borderRadius: [3, 3, 0, 0]
+              }
+            })),
+            barMaxWidth: 18
+          }
+        ]
+      })
+    },
+
+    renderPageChart() {
+      if (!this.$refs.pageChartRef) return
+      if (this.pageChart) this.pageChart.dispose()
+      this.pageChart = echarts.init(this.$refs.pageChartRef)
+
+      const pages = this.pageData.slice(0, 8)
+      if (pages.length === 0) {
+        this.pageChart.setOption({
+          backgroundColor: 'transparent',
+          graphic: [{
+            type: 'text',
+            left: 'center', top: 'middle',
+            style: { text: '暂无页面数据', fill: '#64748b', fontSize: 13 }
+          }]
+        })
+        return
+      }
+
+      const labels = pages.map((d) => {
+        const p = d.page || '/'
+        return p.length > 20 ? p.slice(0, 18) + '…' : p
+      })
+      const values = pages.map((d) => d.visits)
+
+      this.pageChart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'none' },
+          formatter: (p) => `${pages[p[0].dataIndex]?.page || '/'}<br/>${p[0].value} 次`
+        },
+        grid: { left: 12, right: 20, top: 8, bottom: 8, containLabel: true },
+        xAxis: {
+          type: 'value',
+          minInterval: 1,
+          axisLine: { show: false },
+          splitLine: { lineStyle: { color: 'rgba(148,163,184,0.12)' } },
+          axisLabel: { color: '#94a3b8', fontSize: 11 }
+        },
+        yAxis: {
+          type: 'category',
+          data: labels,
+          inverse: true,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#cbd5e1', fontSize: 11 }
+        },
+        series: [
+          {
+            type: 'bar',
+            data: values,
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(1, 0, 0, 0, [
+                { offset: 0, color: 'rgba(90,143,115,0.9)' },
+                { offset: 1, color: 'rgba(10,61,34,0.35)' }
+              ]),
+              borderRadius: [0, 3, 3, 0]
+            },
+            barMaxWidth: 14,
+            label: {
+              show: true,
+              position: 'right',
+              color: '#94a3b8',
+              fontSize: 11,
+              formatter: '{c}'
+            }
+          }
+        ]
+      })
+    },
+
     normalizeSources(raw) {
       const bucket = { 微信: 0, 直接访问: 0, 其他: 0 }
       ;(raw || []).forEach((item) => {
@@ -449,20 +624,49 @@ export default {
 }
 
 .kpi-card {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.45));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.5));
   border-radius: 14px;
-  padding: 0.95rem 1rem;
+  padding: 1rem 1.1rem 0.9rem;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.5rem;
   transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+  position: relative;
+  overflow: hidden;
 }
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+  border-radius: 14px 0 0 14px;
+  background: rgba(90, 143, 115, 0.6);
+}
+
+.kpi-card.kpi-online::before { background: rgba(52, 211, 153, 0.7); }
+.kpi-card.kpi-today::before  { background: rgba(90, 143, 115, 0.7); }
+.kpi-card.kpi-week::before   { background: rgba(56, 189, 248, 0.6); }
+.kpi-card.kpi-total::before  { background: rgba(167, 139, 250, 0.6); }
 
 .kpi-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.18);
-  border-color: rgba(192, 132, 252, 0.42);
+  box-shadow: 0 10px 24px rgba(10, 61, 34, 0.28);
+  border-color: rgba(90, 143, 115, 0.38);
+}
+
+.kpi-top {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.kpi-svg {
+  width: 15px;
+  height: 15px;
+  color: #94a3b8;
+  flex-shrink: 0;
 }
 
 .kpi-label {
@@ -472,8 +676,23 @@ export default {
 
 .kpi-value {
   color: #f8fafc;
-  font-size: 1.45rem;
-  font-weight: 650;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding-left: 0.1rem;
+}
+
+.kpi-badge {
+  position: absolute;
+  top: 0.7rem; right: 0.85rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: 99px;
+  padding: 1px 7px;
+  letter-spacing: 0.03em;
 }
 
 .panel {
@@ -492,6 +711,20 @@ export default {
 
 .trend-panel {
   margin-bottom: 1rem;
+}
+
+.dist-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.panel-sub {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #64748b;
+  margin-left: 0.4rem;
 }
 
 .panel-header {
@@ -671,6 +904,10 @@ export default {
 @media (max-width: 1180px) {
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dist-grid {
+    grid-template-columns: 1fr;
   }
 
   .bottom-grid {
