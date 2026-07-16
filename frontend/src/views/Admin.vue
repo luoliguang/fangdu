@@ -38,6 +38,11 @@ const mobileMenuTitle = computed(() => {
   return current?.label || '管理菜单';
 });
 
+const todayLabel = computed(() => {
+  const d = new Date();
+  return d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' });
+});
+
 // --- 获取未处理留言数量 ---
 const fetchPendingFeedbacksCount = async () => {
   try {
@@ -193,7 +198,21 @@ onUnmounted(() => {
     
     <!-- 内容区域 -->
     <div class="content-area">
-      <router-view></router-view>
+      <header class="content-topbar">
+        <div class="topbar-left">
+          <span class="topbar-page">{{ mobileMenuTitle }}</span>
+        </div>
+        <div class="topbar-right">
+          <span class="topbar-date">{{ todayLabel }}</span>
+          <span class="topbar-admin-badge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            管理员
+          </span>
+        </div>
+      </header>
+      <div class="content-body">
+        <router-view></router-view>
+      </div>
     </div>
     
     <!-- 退出登录确认对话框 -->
@@ -388,19 +407,76 @@ onUnmounted(() => {
   overflow-y: auto;
   border-radius: 16px;
   border: 1px solid #e5e7eb;
-  background: #ffffff;
+  background: #f8fafc;
   color: #1a1a1a;
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+  display: flex;
+  flex-direction: column;
+}
+
+.content-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.2rem;
+  height: 52px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  border-radius: 16px 16px 0 0;
+  flex-shrink: 0;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-page {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0a3d22;
+  letter-spacing: 0.01em;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-date {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.topbar-admin-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #5a8f73;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 3px 10px;
+  border-radius: 99px;
+}
+
+.content-body {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 1rem;
 }
 
-.content-area :deep(*) {
+.content-body :deep(*) {
   max-width: 100%;
 }
 
-.content-area :deep(.el-table__inner-wrapper),
-.content-area :deep(.el-scrollbar),
-.content-area :deep(.el-form-item__content) {
+.content-body :deep(.el-table__inner-wrapper),
+.content-body :deep(.el-scrollbar),
+.content-body :deep(.el-form-item__content) {
   min-width: 0;
 }
 
@@ -540,6 +616,10 @@ onUnmounted(() => {
   .content-area {
     min-height: 65vh;
   }
+
+  .content-topbar {
+    border-radius: 14px 14px 0 0;
+  }
 }
 
 @media (max-width: 640px) {
@@ -584,9 +664,20 @@ onUnmounted(() => {
   }
 
   .content-area {
-    padding: 0.58rem;
     border-radius: 12px;
   }
+
+  .content-body {
+    padding: 0.58rem;
+  }
+
+  .content-topbar {
+    border-radius: 12px 12px 0 0;
+    padding: 0 0.58rem;
+    height: 44px;
+  }
+
+  .topbar-date { display: none; }
 
   .logout-dialog {
     min-width: 0;
@@ -614,7 +705,7 @@ onUnmounted(() => {
     padding: 0.52rem 0.58rem;
   }
 
-  .content-area {
+  .content-body {
     padding: 0.5rem;
   }
 }
