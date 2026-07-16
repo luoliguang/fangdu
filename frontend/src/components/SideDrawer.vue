@@ -237,7 +237,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import apiClient from '../axiosConfig.js';
 import { ElMessage } from 'element-plus';
 import { MdPreview } from 'md-editor-v3';
@@ -257,6 +257,14 @@ const emit = defineEmits(['showMedia', 'removeFromFavorites', 'applyFilter', 'su
 // 抽屉状态
 const isDrawerOpen = ref(false);
 const activeDrawerTab = ref('announcement');
+
+watch(isDrawerOpen, (open) => {
+  document.body.style.overflow = open ? 'hidden' : '';
+});
+
+onUnmounted(() => {
+  document.body.style.overflow = '';
+});
 const feedbackMessage = ref('');
 
 // 用户留言相关状态
