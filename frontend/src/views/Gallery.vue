@@ -722,14 +722,8 @@ onUnmounted(() => {
     document.removeEventListener('click', handleDocumentClick);
 });
 
-// 新增：处理小部件鼠标进入事件
-const handleWidgetMouseEnter = () => {
-  isWidgetHovered.value = true;
-};
-
-// 新增：处理小部件鼠标离开事件
-const handleWidgetMouseLeave = () => {
-  isWidgetHovered.value = false;
+const toggleWidget = () => {
+  isWidgetHovered.value = !isWidgetHovered.value;
 };
 
 
@@ -1003,39 +997,50 @@ const quickCopyImage = async (material) => {
     @close="videoModalVisible = false"
   />
 
-  <!-- 新增：用户留言时间线小部件 -->
-  <div v-if="userFeedbacks && userFeedbacks.length > 0" 
-    :class="{ 'feedback-timeline-widget': true, 'expanded': isWidgetHovered }"
-    @mouseenter="handleWidgetMouseEnter" 
-    @mouseleave="handleWidgetMouseLeave"
-  >
-    <div class="widget-header">
-      <span class="icon">💬</span>
-      <transition name="fade" mode="out-in">
-        <span v-if="isWidgetHovered" class="title">我的实拍图请求</span>
-      </transition>
-      <span v-if="(userFeedbacks && Array.isArray(userFeedbacks)) && userFeedbacks.filter(f => f.status === 'pending').length > 0" class="pending-badge">
-        <span v-if="isWidgetHovered">{{ (userFeedbacks && Array.isArray(userFeedbacks)) ? userFeedbacks.filter(f => f.status === 'pending').length : 0 }}</span>
-        <span v-else class="dot"></span> <!-- 红点占位 -->
-      </span>
-      <transition name="fade" mode="out-in">
-        <span v-if="isWidgetHovered" class="toggle-icon">{{ isWidgetHovered ? '▲' : '▼' }}</span>
-      </transition>
-    </div>
-    <div v-if="isWidgetHovered" class="widget-content">
-      <div v-if="isUserFeedbacksLoading" class="loading-message">加载中...</div>
-      <div v-else class="feedback-list">
-        <div v-for="feedback in (userFeedbacks || [])" :key="feedback.id" class="feedback-item">
-          <div class="feedback-meta">
-            <span :class="{ 'status-tag': true, 'status-pending': feedback.status === 'pending', 'status-resolved': feedback.status === 'resolved' || feedback.status === 'approved' }">
-              {{ feedback.status === 'pending' ? '待处理' : '已处理' }}
-            </span>
-            <span class="timestamp">{{ formatDateTime(feedback.created_at) }}</span>
+  <!-- 需求记录浮动 Widget -->
+  <div v-if="userFeedbacks && userFeedbacks.length > 0" class="req-widget">
+    <!-- 展开面板 -->
+    <transition name="req-panel">
+      <div v-if="isWidgetHovered" class="req-panel">
+        <div class="req-panel-header">
+          <div class="req-panel-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            我的需求记录
           </div>
-          <p class="feedback-message">{{ feedback.message }}</p>
+          <button class="req-panel-close" @click="isWidgetHovered = false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="req-panel-body">
+          <div v-if="isUserFeedbacksLoading" class="req-loading">
+            <div class="req-loading-dot"></div>
+            <div class="req-loading-dot"></div>
+            <div class="req-loading-dot"></div>
+          </div>
+          <ul v-else class="req-list">
+            <li v-for="feedback in (userFeedbacks || [])" :key="feedback.id" class="req-item">
+              <div class="req-item-top">
+                <span :class="['req-status', feedback.status === 'pending' ? 'req-status-pending' : 'req-status-done']">
+                  <span class="req-status-dot"></span>
+                  {{ feedback.status === 'pending' ? '处理中' : '已完成' }}
+                </span>
+                <span class="req-time">{{ formatDateTime(feedback.created_at) }}</span>
+              </div>
+              <p class="req-text">{{ feedback.message }}</p>
+            </li>
+          </ul>
         </div>
       </div>
-    </div>
+    </transition>
+
+    <!-- 触发按钮 -->
+    <button class="req-trigger" @click="toggleWidget" :class="{ active: isWidgetHovered }">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <span
+        v-if="(userFeedbacks || []).filter(f => f.status === 'pending').length > 0"
+        class="req-badge"
+      >{{ (userFeedbacks || []).filter(f => f.status === 'pending').length }}</span>
+    </button>
   </div>
 </template>
 
@@ -1812,200 +1817,216 @@ const quickCopyImage = async (material) => {
   box-shadow: 0 2px 10px rgba(90, 143, 115, 0.2);
 }
 
-/* 新增：留言时间线小部件样式 */
-.feedback-timeline-widget {
+/* ── 需求记录浮动 Widget ── */
+.req-widget {
   position: fixed;
-  bottom: 30px; /* 调整位置 */
-  left: 20px; /* 调整位置，更靠近左侧 */
-  width: 60px; /* 默认收起宽度 */
-  background-color: #ffffff;
-  border-radius: 18px; /* 更大圆角 */
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18); /* 更柔和更深阴影 */
-  overflow: hidden;
+  bottom: 24px;
+  left: 20px;
   z-index: 1000;
-  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* 更平滑的过渡 */
-  max-height: 60px; /* 默认收起高度 */
-  border: 1px solid #e0e0e0; /* 柔和边框 */
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  backdrop-filter: blur(10px); /* 毛玻璃效果 */
-  -webkit-backdrop-filter: blur(10px);
+  gap: 10px;
 }
 
-.feedback-timeline-widget.expanded {
-  width: 320px; /* 展开后的宽度 */
-  max-height: 450px; /* 展开后的最大高度 */
-}
-
-.widget-header {
+/* 触发按钮 */
+.req-trigger {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
+  color: #fff;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  padding: 12px 12px;
-  background: linear-gradient(135deg, #0a3d22, #5a8f73);
-  color: white;
-  cursor: pointer;
-  font-weight: 600; /* 更粗字重 */
-  font-size: 1.1em; /* 调整字体大小 */
-  position: sticky; /* 吸顶效果 */
-  top: 0;
-  z-index: 10;
-  width: 100%; /* 确保在 expanded 状态下铺满 */
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(10, 61, 34, 0.35);
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
+}
+.req-trigger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(10, 61, 34, 0.45);
+}
+.req-trigger.active {
+  background: linear-gradient(135deg, #062818, #3d6b52);
+}
+
+/* 角标 */
+.req-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
   box-sizing: border-box;
+  border: 2px solid #fff;
 }
 
-.widget-header .icon {
-  font-size: 1.4em; /* 调整图标大小 */
-  margin-right: 0; /* 默认没有右边距 */
-  transition: margin-right 0.3s ease;
-  position: relative; /* 为红点定位提供上下文 */
-}
-
-.feedback-timeline-widget.expanded .widget-header .icon {
-  margin-right: 12px; /* 展开后有右边距 */
-}
-
-.widget-header .title {
-  flex-grow: 1;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
+/* 面板 */
+.req-panel {
+  width: 300px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
   overflow: hidden;
-  text-overflow: ellipsis;
+  border: 1px solid #e2e8f0;
 }
 
-.feedback-meta .status-tag {
-  padding: 0.3em 0.7em;
-  border-radius: 10px;
+/* 面板入场动画 */
+.req-panel-enter-active,
+.req-panel-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.req-panel-enter-from,
+.req-panel-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+/* 面板头部 */
+.req-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #0a3d22, #1e6b42);
+  color: #fff;
+}
+.req-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
   font-weight: 600;
-  text-transform: capitalize;
+  letter-spacing: 0.01em;
+}
+.req-panel-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.req-panel-close:hover {
+  background: rgba(255, 255, 255, 0.28);
 }
 
-.feedback-meta .status-pending {
-  background-color: #ffc107; /* 警告色保持不变 */
-  color: white;
-}
-
-.feedback-meta .status-resolved {
-  background-color: #28a745; /* 成功色保持不变 */
-  color: white;
-}
-
-.pending-badge {
-  background-color: #ff3b30; /* 醒目红色 */
-  color: white;
-  border-radius: 50%; /* 更圆的徽章 */
-  padding: 0.2em 0.5em; /* 调整默认内边距 */
-  font-size: 0.7em; /* 调整默认字体大小 */
-  margin-left: 5px; /* 默认左边距 */
-  font-weight: bold;
-  min-width: 20px; /* 调整默认最小宽度 */
-  text-align: center;
-  transition: all 0.3s ease; /* 添加过渡效果 */
-  line-height: 1; /* 确保垂直居中 */
-  box-sizing: border-box; /* 确保 padding 包含在 width/height 内 */
-}
-
-/* 只有当 .pending-badge 内部有 .dot 元素时才应用样式 */
-.pending-badge .dot {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background-color: inherit; /* 继承父级的背景颜色 */
-  border-radius: 50%;
-}
-
-.feedback-timeline-widget:not(.expanded) .widget-header .pending-badge {
-  position: absolute; /* 绝对定位，脱离文档流 */
-  top: 10px; /* 距离顶部 */
-  right: 10px; /* 距离右侧 */
-  width: 10px; /* 红点尺寸 */
-  height: 10px; /* 红点尺寸 */
-  padding: 0; /* 移除内边距 */
-  font-size: 0; /* 隐藏数字 */
-  min-width: 0; /* 移除最小宽度限制 */
-  margin: 0; /* 移除外边距 */
-}
-
-.feedback-timeline-widget.expanded .widget-header .pending-badge {
-  margin-left: 10px; /* 展开后有左边距 */
-}
-
-.widget-header .toggle-icon {
-  margin-left: 12px;
-  font-size: 0.9em;
-  transition: transform 0.3s ease;
-}
-.widget-header .toggle-icon.expanded {
-  transform: rotate(180deg);
-}
-
-.widget-content {
-  padding: 15px;
-  max-height: 380px; /* 调整内容区最大高度 */
+/* 面板内容区 */
+.req-panel-body {
+  max-height: 360px;
   overflow-y: auto;
-  background-color: #f8f9fa; /* 柔和背景色 */
-  flex-grow: 1;
-  width: 100%;
-  box-sizing: border-box;
+  padding: 12px;
+}
+.req-panel-body::-webkit-scrollbar { width: 4px; }
+.req-panel-body::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
+
+/* 加载动画 */
+.req-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px 0;
+}
+.req-loading-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5a8f73;
+  animation: req-bounce 1.2s ease-in-out infinite;
+}
+.req-loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.req-loading-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes req-bounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+  40%            { transform: scale(1);   opacity: 1; }
 }
 
-.loading-message {
-  text-align: center;
-  color: #888;
-  padding: 20px;
-  font-style: italic;
-}
-
-.feedback-list {
+/* 列表 */
+.req-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px; /* 增加留言项间距 */
+  gap: 2px;
 }
-
-.feedback-item {
-  border-bottom: 1px solid #e9ecef; /* 柔和边框 */
-  padding: 10px 0;
-  background-color: #ffffff; /* 白色背景 */
-  border-radius: 8px;
-  padding: 12px 15px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+.req-item {
+  padding: 11px 12px;
+  border-radius: 9px;
+  transition: background 0.15s;
 }
+.req-item:hover { background: #f8fafc; }
 
-.feedback-item:last-child {
-  border-bottom: none;
-}
-
-.feedback-meta {
+.req-item-top {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  font-size: 0.8em;
-  color: #6c757d;
-  margin-bottom: 8px;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
 
-.feedback-meta .status-tag {
-  padding: 0.3em 0.7em;
-  border-radius: 10px;
+/* 状态标签 */
+.req-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
   font-weight: 600;
-  text-transform: capitalize;
+  padding: 3px 9px;
+  border-radius: 99px;
 }
-
-.feedback-meta .status-pending {
-  background-color: #ffc107; /* 警告色保持不变 */
-  color: white;
+.req-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
-
-.feedback-meta .status-resolved {
-  background-color: #28a745; /* 成功色保持不变 */
-  color: white;
+.req-status-pending {
+  background: rgba(234, 88, 12, 0.1);
+  color: #ea580c;
 }
+.req-status-pending .req-status-dot {
+  background: #ea580c;
+  animation: req-bounce 1.5s ease-in-out infinite;
+}
+.req-status-done {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+.req-status-done .req-status-dot { background: #059669; }
 
-.feedback-message {
+.req-time {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+.req-text {
   margin: 0;
-  font-size: 0.9em;
-  color: #343a40;
+  font-size: 0.87rem;
+  color: #374151;
   line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════════
