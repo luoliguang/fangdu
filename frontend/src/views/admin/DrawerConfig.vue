@@ -205,8 +205,11 @@
         <div v-for="contact in contactInfos" :key="contact.id" class="contact-card">
           <div class="card-header">
             <div class="contact-title-row">
-              <span class="contact-icon">{{ contact.icon }}</span>
-              <h3>{{ contact.label }}</h3>
+              <span class="contact-icon-badge">{{ contact.icon }}</span>
+              <div>
+                <h3>{{ contact.label }}</h3>
+                <p class="contact-value-inline">{{ contact.value }}</p>
+              </div>
             </div>
             <div class="card-actions" style="display: flex !important; gap: 8px;">
               <el-button 
@@ -227,7 +230,6 @@
               </el-button>
             </div>
           </div>
-          <p class="contact-value">{{ contact.value }}</p>
           <div class="contact-meta">
             <span class="type-badge">{{ contact.type }}</span>
             <span class="order">排序: {{ contact.sort_order }}</span>
@@ -417,7 +419,21 @@
           </div>
           <div class="form-group">
             <label>图标</label>
-            <input v-model="contactForm.icon" type="text" required>
+            <div class="icon-picker-preview">
+              <span class="icon-selected">{{ contactForm.icon }}</span>
+              <span class="icon-preview-label">点击下方选择，或直接输入</span>
+            </div>
+            <div class="icon-picker-grid">
+              <button
+                v-for="ic in CONTACT_ICON_PRESETS"
+                :key="ic"
+                type="button"
+                class="icon-option"
+                :class="{ selected: contactForm.icon === ic }"
+                @click="contactForm.icon = ic"
+              >{{ ic }}</button>
+            </div>
+            <input v-model="contactForm.icon" type="text" placeholder="或手动输入 emoji" class="icon-custom-input">
           </div>
           <div class="form-group">
             <label>类型</label>
@@ -532,6 +548,17 @@ const contactForm = ref({
   sort_order: 0,
   is_active: true
 });
+
+const CONTACT_ICON_PRESETS = [
+  '📞','📱','☎️','📲',
+  '📧','✉️','📨','📩',
+  '💬','🗨️','💭','📝',
+  '🏠','📍','🗺️','🏢',
+  '🌐','🔗','💡','🎯',
+  '👤','👥','🤝','🏷️',
+  '⚡','🎁','💰','📅',
+  '🔑','🛡️','🌟','❤️',
+];
 
 // 标签页配置
 const configTabs = [
@@ -1084,10 +1111,99 @@ onMounted(() => {
 }
 
 .tutorial-icon,
-.filter-icon,
-.contact-icon {
+.filter-icon {
   font-size: 18px;
 }
+
+/* 联系方式卡片 icon badge */
+.contact-icon-badge {
+  font-size: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.contact-value-inline {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+/* 图标选择器 */
+.icon-picker-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.icon-selected {
+  font-size: 28px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.icon-preview-label {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  padding: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.icon-option {
+  font-size: 18px;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+  line-height: 1;
+  padding: 0;
+}
+
+.icon-option:hover { background: #e0f2fe; border-color: #7dd3fc; }
+.icon-option.selected { background: #dcfce7; border-color: #5a8f73; }
+
+.icon-custom-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.icon-custom-input:focus { border-color: #5a8f73; }
 
 .card-actions {
   display: flex !important;
