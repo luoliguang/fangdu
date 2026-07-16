@@ -328,6 +328,27 @@ const currentPageTitle = computed(() => {
 // 路由变化时关闭移动菜单
 watch(() => route.path, () => { mobileNavOpen.value = false; });
 
+// 前后台切换遮罩：用 beforeEach/afterEach 在导航前后控制遮罩显隐
+const showModeOverlay = ref(false);
+let overlayHideTimer = null;
+
+router.beforeEach((to, from) => {
+  const toAdmin = to.path.startsWith('/admin') || to.path === '/login';
+  const fromAdmin = (from.path || '').startsWith('/admin') || from.path === '/login';
+  if (toAdmin !== fromAdmin) {
+    clearTimeout(overlayHideTimer);
+    showModeOverlay.value = true;
+  }
+});
+
+router.afterEach((to, from) => {
+  const toAdmin = to.path.startsWith('/admin') || to.path === '/login';
+  const fromAdmin = (from.path || '').startsWith('/admin') || from.path === '/login';
+  if (toAdmin !== fromAdmin) {
+    overlayHideTimer = setTimeout(() => { showModeOverlay.value = false; }, 80);
+  }
+});
+
 const closeMobileNav = () => { mobileNavOpen.value = false; };
 
 </script>
@@ -422,6 +443,11 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
       </router-view>
     </main>
 
+    <!-- 前后台切换遮罩 -->
+    <Transition name="mode-overlay">
+      <div v-if="showModeOverlay" class="mode-transition-overlay"></div>
+    </Transition>
+
     <Transition name="fade">
       <button
         v-if="showScrollTopButton"
@@ -443,7 +469,27 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
 </template>
 
 <style>
-  /* ... 您原有的全局样式保持不变 ... */
+  /* ── 前后台切换遮罩动画 ──────────────────────────── */
+  .mode-transition-overlay {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #0a3d22 0%, #050e08 100%);
+    z-index: 9990;
+    pointer-events: none;
+  }
+
+  /* 进场快（遮住旧页），退场慢（新页渐显） */
+  .mode-overlay-enter-active {
+    transition: opacity 0.16s ease;
+  }
+  .mode-overlay-leave-active {
+    transition: opacity 0.32s ease;
+  }
+  .mode-overlay-enter-from,
+  .mode-overlay-leave-to {
+    opacity: 0;
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background-color: #f0f2f5;
