@@ -12,6 +12,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 const imageUrl = ref(fallbackImg)
+const modalTitle = ref('扫码进入 fabricGo')
 
 const toCdnUrl = (url) => {
   if (!url) return url
@@ -20,8 +21,16 @@ const toCdnUrl = (url) => {
 
 onMounted(async () => {
   try {
-    const { data } = await apiClient.get('/api/v1/drawer-config/site-config/fabric_detail_image_url')
-    if (data?.data) imageUrl.value = toCdnUrl(data.data)
+    const [imgRes, titleRes] = await Promise.allSettled([
+      apiClient.get('/api/v1/drawer-config/site-config/fabric_detail_image_url'),
+      apiClient.get('/api/v1/drawer-config/site-config/fabric_detail_title'),
+    ])
+    if (imgRes.status === 'fulfilled' && imgRes.value.data?.data) {
+      imageUrl.value = toCdnUrl(imgRes.value.data.data)
+    }
+    if (titleRes.status === 'fulfilled' && titleRes.value.data?.data) {
+      modalTitle.value = titleRes.value.data.data
+    }
   } catch {}
 })
 
@@ -68,14 +77,13 @@ onUnmounted(() => {
           ✕
         </button>
 
-        <h2 id="fabricgo-qr-title" class="fabricgo-qr-title">扫码进入 fabricGo</h2>
+        <h2 id="fabricgo-qr-title" class="fabricgo-qr-title">{{ modalTitle }}</h2>
 
         <img
           class="fabricgo-qr-image"
           :src="imageUrl"
           alt="fabricGo 小程序二维码"
-          width="220"
-          height="220"
+          referrerpolicy="no-referrer"
         />
 
         <p class="fabricgo-qr-subtext">微信扫一扫，即可查看所有面料细节</p>
@@ -133,9 +141,10 @@ onUnmounted(() => {
 }
 
 .fabricgo-qr-image {
-  width: 220px;
-  height: 220px;
-  object-fit: cover;
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  object-fit: contain;
   display: block;
   margin: 0 auto;
   border-radius: 8px;

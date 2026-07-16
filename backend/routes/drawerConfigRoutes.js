@@ -53,6 +53,7 @@ router.delete('/page-categories/:id', DrawerConfigController.deletePageCategory)
 
 // 站点配置（面料细节图等）
 router.get('/site-config/:key', DrawerConfigController.getSiteConfig);
+router.put('/site-config/:key', DrawerConfigController.updateSiteConfig);
 router.post('/site-config/fabric-detail-image', imageUpload.single('image'), DrawerConfigController.uploadFabricDetailImage);
 
 module.exports = router;

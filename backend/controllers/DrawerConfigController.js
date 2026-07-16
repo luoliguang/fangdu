@@ -805,6 +805,21 @@ class DrawerConfigController {
     }
   }
 
+  // 更新文本类站点配置
+  static async updateSiteConfig(req, res) {
+    try {
+      const { key } = req.params;
+      const { value } = req.body;
+      if (value === undefined) {
+        return res.status(400).json({ success: false, message: '缺少 value 字段' });
+      }
+      await SiteConfig.upsert({ key, value: String(value) });
+      res.json({ success: true, data: value });
+    } catch (error) {
+      res.status(500).json({ success: false, message: '保存配置失败', error: error.message });
+    }
+  }
+
   // 上传面料细节图片到 OSS，并将 CDN URL 写入 SiteConfig
   static async uploadFabricDetailImage(req, res) {
     try {

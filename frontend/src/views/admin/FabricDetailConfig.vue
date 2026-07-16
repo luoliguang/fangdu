@@ -6,6 +6,22 @@
         <p class="page-description">配置点击导航栏"面料细节"时弹窗展示的图片（如微信小程序二维码），支持随时替换。</p>
       </div>
 
+      <div class="title-section">
+        <div class="field-label">弹窗标题</div>
+        <div class="title-input-row">
+          <input
+            v-model="modalTitle"
+            class="title-input"
+            type="text"
+            placeholder="扫码进入 fabricGo"
+            maxlength="40"
+          />
+          <button class="save-title-btn" :disabled="savingTitle" @click="handleSaveTitle">
+            {{ savingTitle ? '保存中…' : '保存' }}
+          </button>
+        </div>
+      </div>
+
       <div class="image-section">
         <div class="preview-area">
           <div class="preview-label">当前图片</div>
@@ -85,6 +101,8 @@ const previewFile = ref('');
 const uploading = ref(false);
 const isDragging = ref(false);
 const fileInputRef = ref(null);
+const modalTitle = ref('');
+const savingTitle = ref(false);
 
 const authHeaders = () => {
   const token = localStorage.getItem('authToken');
@@ -93,9 +111,34 @@ const authHeaders = () => {
 
 const fetchCurrentImage = async () => {
   try {
-    const { data } = await apiClient.get('/api/v1/drawer-config/site-config/fabric_detail_image_url');
-    if (data?.data) currentUrl.value = toCdnUrl(data.data);
+    const [imgRes, titleRes] = await Promise.allSettled([
+      apiClient.get('/api/v1/drawer-config/site-config/fabric_detail_image_url'),
+      apiClient.get('/api/v1/drawer-config/site-config/fabric_detail_title'),
+    ]);
+    if (imgRes.status === 'fulfilled' && imgRes.value.data?.data) {
+      currentUrl.value = toCdnUrl(imgRes.value.data.data);
+    }
+    if (titleRes.status === 'fulfilled' && titleRes.value.data?.data) {
+      modalTitle.value = titleRes.value.data.data;
+    }
   } catch {}
+};
+
+const handleSaveTitle = async () => {
+  const val = modalTitle.value.trim();
+  if (!val) { ElMessage.warning('标题不能为空'); return; }
+  savingTitle.value = true;
+  try {
+    await apiClient.put('/api/v1/drawer-config/site-config/fabric_detail_title',
+      { value: val },
+      { headers: authHeaders() }
+    );
+    ElMessage.success('标题已保存，弹窗即时生效');
+  } catch (err) {
+    ElMessage.error(err.response?.data?.message || '保存失败');
+  } finally {
+    savingTitle.value = false;
+  }
 };
 
 const triggerFileInput = () => fileInputRef.value?.click();
@@ -169,6 +212,63 @@ onMounted(fetchCurrentImage);
   font-size: 0.9rem;
   line-height: 1.6;
   margin: 0;
+}
+
+.title-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.field-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 10px;
+}
+
+.title-input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.title-input {
+  flex: 1;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #1a2332;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.title-input:focus {
+  border-color: #5a8f73;
+}
+
+.save-title-btn {
+  padding: 0 18px;
+  height: 38px;
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.2s;
+}
+
+.save-title-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-title-btn:not(:disabled):hover {
+  filter: brightness(1.1);
 }
 
 .image-section {
