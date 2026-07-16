@@ -202,19 +202,23 @@
           </div>
           
           <!-- 用户留言历史记录 -->
-          <div v-if="userFeedbacks && userFeedbacks.length > 0" class="feedback-history">
+          <div class="feedback-history">
             <h5>我的反馈历史</h5>
             <div v-if="isUserFeedbacksLoading" class="loading-message">加载中...</div>
-            <div v-else class="feedback-list">
+            <div v-else-if="userFeedbacks && userFeedbacks.length > 0" class="feedback-list">
               <div v-for="feedback in userFeedbacks" :key="feedback.id" class="feedback-item">
                 <div class="feedback-meta">
-                  <span :class="{ 'status-tag': true, 'status-pending': feedback.status === 'pending', 'status-resolved': feedback.status === 'resolved' }">
+                  <span :class="{ 'status-tag': true, 'status-pending': feedback.status === 'pending', 'status-resolved': feedback.status !== 'pending' }">
                     {{ feedback.status === 'pending' ? '待处理' : '已处理' }}
                   </span>
                   <span class="timestamp">{{ formatDateTime(feedback.created_at) }}</span>
                 </div>
                 <p class="feedback-message">{{ feedback.message }}</p>
               </div>
+            </div>
+            <div v-else class="feedback-empty">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>还没有提交过反馈</span>
             </div>
           </div>
           
@@ -1339,6 +1343,27 @@ onMounted(() => {
 .feedback-submit-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(10, 61, 34, 0.22);
+}
+
+.feedback-history {
+  margin-bottom: 20px;
+}
+
+.feedback-history h5 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+
+.feedback-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 0;
+  color: #94a3b8;
+  font-size: 13px;
 }
 
 .contact-info {
