@@ -726,6 +726,14 @@ const toggleWidget = () => {
   isWidgetHovered.value = !isWidgetHovered.value;
 };
 
+const widgetFilter = ref('all'); // 'all' | 'pending' | 'approved'
+const filteredFeedbacks = computed(() => {
+  if (widgetFilter.value === 'all') return userFeedbacks.value;
+  return userFeedbacks.value.filter(f => f.status === widgetFilter.value);
+});
+const pendingFeedbacks = computed(() => userFeedbacks.value.filter(f => f.status === 'pending'));
+const approvedFeedbacks = computed(() => userFeedbacks.value.filter(f => f.status !== 'pending'));
+
 
 // 留言表单始终显示
 showFeedbackForm.value = true;
@@ -1011,14 +1019,26 @@ const quickCopyImage = async (material) => {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
+        <div class="req-filter-tabs">
+          <button :class="['req-filter-tab', widgetFilter === 'all' && 'active']" @click="widgetFilter = 'all'">
+            全部 <span class="req-filter-count">{{ userFeedbacks.length }}</span>
+          </button>
+          <button :class="['req-filter-tab', widgetFilter === 'pending' && 'active']" @click="widgetFilter = 'pending'">
+            处理中 <span class="req-filter-count pending">{{ pendingFeedbacks.length }}</span>
+          </button>
+          <button :class="['req-filter-tab', widgetFilter === 'approved' && 'active']" @click="widgetFilter = 'approved'">
+            已完成 <span class="req-filter-count done">{{ approvedFeedbacks.length }}</span>
+          </button>
+        </div>
         <div class="req-panel-body">
           <div v-if="isUserFeedbacksLoading" class="req-loading">
             <div class="req-loading-dot"></div>
             <div class="req-loading-dot"></div>
             <div class="req-loading-dot"></div>
           </div>
+          <div v-else-if="filteredFeedbacks.length === 0" class="req-empty">暂无记录</div>
           <ul v-else class="req-list">
-            <li v-for="feedback in (userFeedbacks || [])" :key="feedback.id" class="req-item">
+            <li v-for="feedback in filteredFeedbacks" :key="feedback.id" class="req-item">
               <div class="req-item-top">
                 <span :class="['req-status', feedback.status === 'pending' ? 'req-status-pending' : 'req-status-done']">
                   <span class="req-status-dot"></span>
@@ -1929,11 +1949,63 @@ const quickCopyImage = async (material) => {
   background: rgba(255, 255, 255, 0.28);
 }
 
+/* 筛选 Tabs */
+.req-filter-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.req-filter-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.req-filter-tab:hover { background: #f1f5f9; }
+.req-filter-tab.active { background: #f0f7f3; color: #1a6640; font-weight: 600; }
+.req-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.req-filter-count.pending { background: rgba(234,88,12,0.12); color: #ea580c; }
+.req-filter-count.done    { background: rgba(5,150,105,0.12);  color: #059669; }
+.req-filter-tab.active .req-filter-count { background: rgba(26,102,64,0.15); color: #1a6640; }
+.req-filter-tab.active .req-filter-count.pending { background: rgba(234,88,12,0.18); color: #ea580c; }
+.req-filter-tab.active .req-filter-count.done    { background: rgba(5,150,105,0.18);  color: #059669; }
+
+/* 空状态 */
+.req-empty {
+  padding: 24px 0;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
 /* 面板内容区 */
 .req-panel-body {
-  max-height: 360px;
+  max-height: 320px;
   overflow-y: auto;
-  padding: 12px;
+  padding: 10px 12px 12px;
 }
 .req-panel-body::-webkit-scrollbar { width: 4px; }
 .req-panel-body::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
