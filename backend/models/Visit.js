@@ -316,6 +316,29 @@ class Visit {
   }
 
   /**
+   * 获取地区访问分布（近30天，联表 ip_locations 缓存）
+   */
+  async getRegionStats(limit = 15) {
+    const sql = `
+      SELECT
+        CASE
+          WHEN il.region IS NULL OR il.region = '' THEN '未知地区'
+          ELSE il.region
+        END AS region,
+        COUNT(*) AS visits,
+        COUNT(DISTINCT v.ip_address) AS unique_ips
+      FROM visits v
+      LEFT JOIN ip_locations il ON v.ip_address = il.ip
+      WHERE v.visit_time >= datetime('now', '-30 days')
+        AND v.visit_time IS NOT NULL
+      GROUP BY region
+      ORDER BY visits DESC
+      LIMIT ?
+    `;
+    return await this.queryAll(sql, [limit]);
+  }
+
+  /**
    * 获取访问时段分布
    */
   async getHourlyDistribution() {

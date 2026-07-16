@@ -1,4 +1,5 @@
 const Visit = require('../models/Visit');
+const IpLocationService = require('./IpLocationService');
 
 /**
  * Visit 服务层
@@ -7,6 +8,7 @@ const Visit = require('../models/Visit');
 class VisitService {
   constructor(db) {
     this.visitModel = new Visit(db);
+    this.ipLocationService = new IpLocationService(db);
     this.rateLimitCache = new Map(); // 简单的内存缓存用于频率限制
   }
 
@@ -59,6 +61,11 @@ class VisitService {
 
       // 更新频率限制缓存
       this.updateRateLimit(identifier);
+
+      // 异步查询 IP 地理位置（不阻塞当前响应）
+      setImmediate(() => {
+        this.ipLocationService.enrichAsync(cleanIP).catch(() => {});
+      });
 
       return {
         success: true,
@@ -308,6 +315,19 @@ class VisitService {
     } catch (error) {
       console.error('获取访问时段分布失败:', error);
       throw new Error('获取访问时段分布失败');
+    }
+  }
+
+  /**
+   * 获取地区访问分布
+   */
+  async getRegionStats(limit = 15) {
+    try {
+      const data = await this.visitModel.getRegionStats(limit);
+      return { success: true, data };
+    } catch (error) {
+      console.error('获取地区统计失败:', error);
+      throw new Error('获取地区统计失败');
     }
   }
 

@@ -87,8 +87,17 @@
       </div>
     </div>
 
+    <!-- 地区分布 -->
+    <div class="card region-card reveal" :class="{ 'is-ready': pageReady }" style="--d: 310ms;">
+      <div class="card-header">
+        <h3 class="card-title">访客地区分布</h3>
+        <span class="card-meta">近30天 · IP归属</span>
+      </div>
+      <div ref="regionChartRef" class="chart-region"></div>
+    </div>
+
     <!-- 来源 + 关键词 + 热门素材 -->
-    <div class="three-col reveal" :class="{ 'is-ready': pageReady }" style="--d: 320ms;">
+    <div class="three-col reveal" :class="{ 'is-ready': pageReady }" style="--d: 400ms;">
       <!-- 访客来源 -->
       <div class="card">
         <div class="card-header">
@@ -171,10 +180,12 @@ export default {
       topMaterials: [],
       hourlyData: [],
       pageData: [],
+      regionData: [],
       trendChart: null,
       sourceChart: null,
       hourlyChart: null,
       pageChart: null,
+      regionChart: null,
       refreshTimer: null,
       resizeHandler: null
     }
@@ -190,7 +201,7 @@ export default {
   beforeUnmount() {
     if (this.refreshTimer) clearInterval(this.refreshTimer)
     if (this.resizeHandler) window.removeEventListener('resize', this.resizeHandler)
-    ;[this.trendChart, this.sourceChart, this.hourlyChart, this.pageChart]
+    ;[this.trendChart, this.sourceChart, this.hourlyChart, this.pageChart, this.regionChart]
       .forEach(c => c?.dispose())
   },
   methods: {
@@ -207,13 +218,15 @@ export default {
         this.loadTopKeywords(),
         this.loadTopMaterials(),
         this.loadHourlyData(),
-        this.loadPageData()
+        this.loadPageData(),
+        this.loadRegionData()
       ])
       this.$nextTick(() => {
         this.renderTrendChart()
         this.renderSourceChart()
         this.renderHourlyChart()
         this.renderPageChart()
+        this.renderRegionChart()
       })
     },
 
@@ -265,6 +278,11 @@ export default {
       this.pageData = res.data?.data || []
     },
 
+    async loadRegionData() {
+      const res = await apiClient.get('/api/v1/visits/regions?limit=15')
+      this.regionData = res.data?.data || []
+    },
+
     async changeTimeRange(range) {
       this.selectedRange = range
       await this.loadTrendData()
@@ -288,7 +306,7 @@ export default {
 
     setupResize() {
       this.resizeHandler = () => {
-        ;[this.trendChart, this.sourceChart, this.hourlyChart, this.pageChart]
+        ;[this.trendChart, this.sourceChart, this.hourlyChart, this.pageChart, this.regionChart]
           .forEach(c => c?.resize())
       }
       window.addEventListener('resize', this.resizeHandler)
@@ -554,6 +572,92 @@ export default {
       })
     },
 
+    renderRegionChart() {
+      if (!this.$refs.regionChartRef) return
+      if (this.regionChart) this.regionChart.dispose()
+      this.regionChart = echarts.init(this.$refs.regionChartRef)
+
+      const data = this.regionData.filter(d => d.region !== '未知地区')
+      const unknownRow = this.regionData.find(d => d.region === '未知地区')
+
+      if (data.length === 0 && !unknownRow) {
+        this.regionChart.setOption({
+          backgroundColor: 'transparent',
+          graphic: [{ type: 'text', left: 'center', top: 'middle',
+            style: { text: '暂无地区数据\n访客被记录后将自动解析归属地', fill: '#94a3b8', fontSize: 13, lineHeight: 22 } }]
+        })
+        return
+      }
+
+      // 只展示有明确地区的前15条，未知的汇总显示在最后
+      const items = data.slice(0, 15)
+      const totalKnown = items.reduce((s, d) => s + d.visits, 0)
+      const totalAll = this.regionData.reduce((s, d) => s + d.visits, 0)
+      const maxVal = Math.max(...items.map(d => d.visits), 1)
+
+      const regions = items.map(d => d.region)
+      const visits = items.map(d => d.visits)
+
+      // 动态颜色：访问量越高越深
+      const colors = visits.map(v => {
+        const ratio = v / maxVal
+        if (ratio >= 0.8) return '#0a3d22'
+        if (ratio >= 0.5) return '#1e6b42'
+        if (ratio >= 0.3) return '#5a8f73'
+        return '#93c4a8'
+      })
+
+      this.regionChart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: TOOLTIP_BG,
+          borderColor: 'transparent',
+          textStyle: { color: '#f1f5f9', fontSize: 13 },
+          axisPointer: { type: 'none' },
+          formatter: p => {
+            const item = items[p[0].dataIndex]
+            const pct = totalAll > 0 ? ((item.visits / totalAll) * 100).toFixed(1) : 0
+            return `${item.region}<br/>访问 ${item.visits} 次（${pct}%）<br/>独立IP ${item.unique_ips} 个`
+          }
+        },
+        grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
+        xAxis: {
+          type: 'value',
+          minInterval: 1,
+          axisLine: { show: false },
+          splitLine: { lineStyle: { color: SPLIT_LINE, type: 'dashed' } },
+          axisLabel: { color: AXIS_LABEL, fontSize: 11 }
+        },
+        yAxis: {
+          type: 'category',
+          data: regions,
+          inverse: true,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#475569', fontSize: 12 }
+        },
+        series: [{
+          type: 'bar',
+          data: visits.map((v, i) => ({
+            value: v,
+            itemStyle: { color: colors[i], borderRadius: [0, 4, 4, 0] }
+          })),
+          barMaxWidth: 16,
+          label: {
+            show: true,
+            position: 'right',
+            color: '#64748b',
+            fontSize: 12,
+            formatter: p => {
+              const pct = totalAll > 0 ? ((p.value / totalAll) * 100).toFixed(1) : 0
+              return `${p.value}  ${pct}%`
+            }
+          }
+        }]
+      })
+    },
+
     normalizeSources(raw) {
       const bucket = { 微信: 0, 直接访问: 0, 其他: 0 }
       ;(raw || []).forEach(item => {
@@ -739,6 +843,8 @@ export default {
 .trend-card { margin-bottom: 16px; }
 .chart-lg { width: 100%; height: 300px; }
 .chart-md { width: 100%; height: 240px; }
+.region-card { margin-bottom: 16px; }
+.chart-region { width: 100%; height: 340px; }
 
 /* ── 两列 ── */
 .two-col {
@@ -895,6 +1001,7 @@ export default {
   .stats-header { flex-direction: column; gap: 10px; }
   .chart-lg { height: 240px; }
   .chart-md { height: 200px; }
+  .chart-region { height: auto; min-height: 200px; }
   .kpi-num { font-size: 1.3rem; }
 }
 </style>

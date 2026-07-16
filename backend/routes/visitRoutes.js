@@ -44,6 +44,9 @@ function createVisitRoutes(db) {
   // 获取热门搜索关键词
   router.get('/search/top', visitController.getTopSearchKeywords.bind(visitController));
 
+  // 获取地区访问分布
+  router.get('/regions', visitController.getRegionStats.bind(visitController));
+
   // 获取访问时段分布
   router.get('/hourly', visitController.getHourlyDistribution.bind(visitController));
 

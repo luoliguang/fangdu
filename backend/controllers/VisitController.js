@@ -255,6 +255,20 @@ class VisitController {
   }
 
   /**
+   * 获取地区访问分布
+   */
+  async getRegionStats(req, res) {
+    try {
+      const { limit = 15 } = req.query;
+      const result = await this.visitService.getRegionStats(Math.min(parseInt(limit) || 15, 30));
+      res.json(result);
+    } catch (error) {
+      console.error('获取地区统计失败:', error);
+      res.status(500).json({ success: false, message: error.message || '获取地区统计失败' });
+    }
+  }
+
+  /**
    * 获取访问时段分布
    */
   async getHourlyDistribution(req, res) {
