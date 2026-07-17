@@ -7,6 +7,7 @@ import TopAnnouncement from './components/TopAnnouncement.vue';
 import FabricGoQRModal from './components/FabricGoQRModal.vue';
 import TutorialGuide from './components/TutorialGuide.vue';
 import { useTheme } from './composables/useTheme.js';
+import GalaxyBackground from './components/GalaxyBackground.vue';
 
 const { isDark, toggleTheme, initTheme } = useTheme();
 
@@ -477,6 +478,9 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
 
     <!-- 新手引导 -->
     <TutorialGuide v-if="!isAdminRoute" />
+
+    <!-- 星空背景：放在 App 根层，路由切换不销毁，暗色模式 + 非后台页面时显示 -->
+    <GalaxyBackground v-if="isDark && !isAdminRoute" />
   </div>
 </template>
 
@@ -508,10 +512,12 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     margin: 0;
   }
   
-  /* 为main元素添加上边距，避免被固定导航栏遮挡 */
+  /* 为main元素添加上边距，避免被固定导航栏遮挡；z-index 确保内容在 Galaxy 画布之上 */
   main {
-    margin-top: calc(64px + var(--announcement-height, 0px)); /* 导航栏高度 + 公告高度 */
-    transition: margin-top 0.3s ease; /* 平滑过渡 */
+    margin-top: calc(64px + var(--announcement-height, 0px));
+    transition: margin-top 0.3s ease;
+    position: relative;
+    z-index: 1;
   }
 
   /* 管理员后台：admin-topbar 底部约 62px，给 main 更多间距避免视觉重叠 */

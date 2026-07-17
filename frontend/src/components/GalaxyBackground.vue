@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { Renderer, Program, Mesh, Color, Triangle } from 'ogl'
 
 const props = defineProps({
@@ -137,15 +137,43 @@ void main(){
 }
 `
 
+// 把可变状态都放在组件实例级别（setup 作用域内），不用模块级变量
 let animateId = null
-let renderer = null
-let cleanupFns = []
+let rafRunning = false
+let glState = null   // { renderer, gl, program, mesh, resize, target, smooth, onMouseMove, onMouseLeave }
+
+function startRaf() {
+  if (rafRunning || !glState) return
+  rafRunning = true
+  const { program, mesh, renderer, target, smooth } = glState
+
+  function update(t) {
+    if (!rafRunning) return
+    animateId = requestAnimationFrame(update)
+    program.uniforms.uTime.value = t * 0.001
+    program.uniforms.uStarSpeed.value = (t * 0.001 * props.starSpeed) / 10.0
+    const lf = 0.05
+    smooth.x += (target.x - smooth.x) * lf
+    smooth.y += (target.y - smooth.y) * lf
+    smooth.active += (target.active - smooth.active) * lf
+    program.uniforms.uMouse.value[0] = smooth.x
+    program.uniforms.uMouse.value[1] = smooth.y
+    program.uniforms.uMouseActiveFactor.value = smooth.active
+    renderer.render({ scene: mesh })
+  }
+  animateId = requestAnimationFrame(update)
+}
+
+function stopRaf() {
+  rafRunning = false
+  if (animateId) { cancelAnimationFrame(animateId); animateId = null }
+}
 
 onMounted(() => {
   const ctn = container.value
   if (!ctn) return
 
-  renderer = new Renderer({ alpha: true, premultipliedAlpha: false })
+  const renderer = new Renderer({ alpha: true, premultipliedAlpha: false })
   const gl = renderer.gl
   gl.enable(gl.BLEND)
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
@@ -154,15 +182,14 @@ onMounted(() => {
   let program
 
   function resize() {
-    renderer.setSize(ctn.offsetWidth, ctn.offsetHeight)
+    const w = window.innerWidth
+    const h = window.innerHeight
+    renderer.setSize(w, h)
     if (program) {
-      program.uniforms.uResolution.value = new Color(
-        gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height
-      )
+      program.uniforms.uResolution.value = new Color(gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height)
     }
   }
   window.addEventListener('resize', resize)
-  resize()
 
   const geometry = new Triangle(gl)
   program = new Program(gl, {
@@ -170,7 +197,7 @@ onMounted(() => {
     fragment: fragmentShader,
     uniforms: {
       uTime:              { value: 0 },
-      uResolution:        { value: new Color(gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height) },
+      uResolution:        { value: new Color(1, 1, 1) },
       uFocal:             { value: new Float32Array([0.5, 0.5]) },
       uRotation:          { value: new Float32Array([1.0, 0.0]) },
       uStarSpeed:         { value: props.starSpeed },
@@ -190,33 +217,14 @@ onMounted(() => {
 
   const mesh = new Mesh(gl, { geometry, program })
   ctn.appendChild(gl.canvas)
+  resize()
 
-  // smooth mouse tracking
   const target = { x: 0.5, y: 0.5, active: 0 }
   const smooth = { x: 0.5, y: 0.5, active: 0 }
 
-  function update(t) {
-    animateId = requestAnimationFrame(update)
-    program.uniforms.uTime.value = t * 0.001
-    program.uniforms.uStarSpeed.value = (t * 0.001 * props.starSpeed) / 10.0
-
-    const lf = 0.05
-    smooth.x += (target.x - smooth.x) * lf
-    smooth.y += (target.y - smooth.y) * lf
-    smooth.active += (target.active - smooth.active) * lf
-
-    program.uniforms.uMouse.value[0] = smooth.x
-    program.uniforms.uMouse.value[1] = smooth.y
-    program.uniforms.uMouseActiveFactor.value = smooth.active
-
-    renderer.render({ scene: mesh })
-  }
-  animateId = requestAnimationFrame(update)
-
   function onMouseMove(e) {
-    const rect = ctn.getBoundingClientRect()
-    target.x = (e.clientX - rect.left) / rect.width
-    target.y = 1.0 - (e.clientY - rect.top) / rect.height
+    target.x = e.clientX / window.innerWidth
+    target.y = 1.0 - e.clientY / window.innerHeight
     target.active = 1.0
   }
   function onMouseLeave() { target.active = 0.0 }
@@ -226,19 +234,37 @@ onMounted(() => {
     document.addEventListener('mouseleave', onMouseLeave)
   }
 
-  cleanupFns = [
-    () => window.removeEventListener('resize', resize),
-    () => props.mouseInteraction && document.removeEventListener('mousemove', onMouseMove),
-    () => props.mouseInteraction && document.removeEventListener('mouseleave', onMouseLeave),
-    () => { if (ctn.contains(gl.canvas)) ctn.removeChild(gl.canvas) },
-    () => gl.getExtension('WEBGL_lose_context')?.loseContext(),
-  ]
+  glState = { renderer, gl, program, mesh, resize, target, smooth, onMouseMove, onMouseLeave }
+  startRaf()
+})
+
+// 路由切回来时恢复（KeepAlive 场景）
+onActivated(() => {
+  if (glState) {
+    glState.resize()
+    startRaf()
+  }
+})
+
+// 路由切走时暂停，节省 GPU
+onDeactivated(() => {
+  stopRaf()
 })
 
 onUnmounted(() => {
-  if (animateId) cancelAnimationFrame(animateId)
-  cleanupFns.forEach(fn => fn())
-  renderer = null
+  stopRaf()
+  if (glState) {
+    const { gl, onMouseMove, onMouseLeave, resize } = glState
+    window.removeEventListener('resize', resize)
+    if (props.mouseInteraction) {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseleave', onMouseLeave)
+    }
+    const ctn = container.value
+    if (ctn && gl.canvas.parentNode === ctn) ctn.removeChild(gl.canvas)
+    gl.getExtension('WEBGL_lose_context')?.loseContext()
+    glState = null
+  }
 })
 </script>
 

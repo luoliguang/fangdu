@@ -4,7 +4,6 @@ import apiClient from '../axiosConfig.js';
 import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
-import GalaxyBackground from '../components/GalaxyBackground.vue';
 import { useTheme } from '../composables/useTheme.js';
 
 const { isDark } = useTheme();
@@ -793,7 +792,6 @@ const quickCopyImage = async (material) => {
 </script>
 
 <template>
-  <GalaxyBackground v-if="isDark" />
   <header class="hero-header">
     <div class="hero-content">
       <h1 class="hero-title">方度实拍图</h1>
@@ -1119,11 +1117,6 @@ const quickCopyImage = async (material) => {
   }
   .fade-enter-from, .fade-leave-to {
     opacity: 0;
-  }
-
-  main {
-    position: relative;
-    z-index: 1;
   }
 
   .hero-header {
