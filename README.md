@@ -11,9 +11,39 @@
 
 [快速开始](#快速开始) · [功能特性](#功能特性) · [技术栈](#技术栈) · [部署](#部署)
 
-![项目预览](./project-images/image.png)
+![当前版本预览](./project-images/screenshot-now.png)
 
 </div>
+
+---
+
+## 设计蜕变
+
+从一个内部工具，经过三个阶段演进为具有专业视觉语言的产品。
+
+<table>
+<tr>
+  <th align="center">v1 · 起点</th>
+  <th align="center">v2 · 成长</th>
+  <th align="center">v3 · 现在</th>
+</tr>
+<tr>
+  <td align="center"><img src="./project-images/image.png" alt="v1 最初版本" /></td>
+  <td align="center"><img src="./project-images/image copy.png" alt="v2 蓝紫探索期" /></td>
+  <td align="center"><img src="./project-images/screenshot-now.png" alt="v3 当前版本" /></td>
+</tr>
+<tr>
+  <td align="center">亮色基础版</td>
+  <td align="center">蓝紫渐变探索期</td>
+  <td align="center">深色星空主题</td>
+</tr>
+</table>
+
+**v1 · 起点** — 完成核心功能验证：素材上传、搜索、标签管理。朴素的亮色布局，以可用为第一目标。
+
+**v2 · 成长** — 陆续引入尺码工具、知识库入口、收藏夹、侧边菜单，功能快速扩张。视觉上探索了蓝紫渐变风格，但与品牌气质还不完全契合。
+
+**v3 · 现在** — 确立了深色 `#060d08` + 鼠尾草绿 `#5a8f73` 的设计语言：WebGL 星空动态背景、磨砂玻璃卡片、浮动胶囊导航、暗/亮双主题切换。从一个工具升级为一个产品。
 
 ---
 
