@@ -4,6 +4,10 @@ import apiClient from '../axiosConfig.js';
 import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
+import GalaxyBackground from '../components/GalaxyBackground.vue';
+import { useTheme } from '../composables/useTheme.js';
+
+const { isDark } = useTheme();
 
 // 简单的 UUID 生成函数
 function generateUUID() {
@@ -789,6 +793,7 @@ const quickCopyImage = async (material) => {
 </script>
 
 <template>
+  <GalaxyBackground v-if="isDark" />
   <header class="hero-header">
     <div class="hero-content">
       <h1 class="hero-title">方度实拍图</h1>
@@ -1066,6 +1071,39 @@ const quickCopyImage = async (material) => {
 
 <style>
   body { font-family: sans-serif; background-color: #060d08; margin: 0; overflow-y: scroll; }
+  /* 亮色主题：恢复浅色背景 */
+  body.theme-light { background-color: #f0f2f5; }
+  body.theme-light .tags-container { background: #f5f5f5; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+  body.theme-light .tags-container button { background: #e0e0e0; border: none; color: #555; }
+  body.theme-light .tags-container button:hover { background: #d0d0d0; color: #333; }
+  body.theme-light .grid-item { background: white; backdrop-filter: none; -webkit-backdrop-filter: none; border: none; box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
+  body.theme-light .grid-item:hover { background: white; border-color: transparent; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+  body.theme-light .grid-item img, body.theme-light .grid-item video { background-color: #e9ecef; }
+  body.theme-light .grid-item p { color: #343a40; }
+  body.theme-light .no-results, body.theme-light .loading-results { color: #6c757d; }
+  body.theme-light .search-suggestions { background: white; border: none; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+  body.theme-light .suggestions-header { background: linear-gradient(135deg,#f5f7fa,#c3cfe2); border-bottom: 1px solid #e0e0e0; }
+  body.theme-light .suggestions-title { color: #555; }
+  body.theme-light .suggestion-item { color: #333; }
+  body.theme-light .search-tip-card { background: #f8fafc; border: 1px solid #dfe3e8; box-shadow: 0 6px 16px rgba(15,23,42,0.08); }
+  body.theme-light .search-tip-title { color: #1f2937; }
+  body.theme-light .search-tip-subtitle { color: #4b5563; }
+  body.theme-light .search-progress { color: #6b7280; }
+  body.theme-light .show-more-btn { background: #fff; border: 1px solid #cbd5e1; color: #111827; box-shadow: 0 2px 8px rgba(15,23,42,0.08); }
+  body.theme-light .show-more-btn:hover { background: #f3f4f6; box-shadow: 0 6px 14px rgba(15,23,42,0.12); }
+  body.theme-light .btn-icon { color: #374151; }
+  body.theme-light .browse-load-count { color: #9ca3af; }
+  body.theme-light .browse-load-count strong { color: #3d6b52; }
+  body.theme-light .empty-title { color: #1a2332; }
+  body.theme-light .empty-subtitle { color: #64748b; }
+  body.theme-light .empty-keyword { color: #0a3d22; }
+  body.theme-light .suggestion-chip { border-color: rgba(10,61,34,0.25); color: #0a3d22; }
+  body.theme-light .suggestion-chip:hover { background: #0a3d22; border-color: #0a3d22; color: #fff; }
+  body.theme-light .empty-feedback { background: #f8fafc; border: 1px solid #e2e8f0; }
+  body.theme-light .empty-textarea { background: #fff; border-color: #e2e8f0; color: #374151; }
+  body.theme-light .empty-suggestions-label { color: #94a3b8; }
+  body.theme-light .load-more-container { color: #6c757d; }
+  body.theme-light .loader { border-color: #e8f7f0; border-top-color: #5a8f73; }
   main { 
     padding: 1rem; 
     max-width: 1200px; 
@@ -1083,7 +1121,14 @@ const quickCopyImage = async (material) => {
     opacity: 0;
   }
 
+  main {
+    position: relative;
+    z-index: 1;
+  }
+
   .hero-header {
+    position: relative;
+    z-index: 1;
     background: linear-gradient(-45deg, #020d07, #062818, #0a3d22, #051f10, #0d4a2a, #021208);
     background-size: 400% 400%;
     animation: gradient-animation 18s ease infinite;
