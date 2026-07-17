@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
+import { ref, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { Renderer, Program, Mesh, Color, Triangle } from 'ogl'
 
 const props = defineProps({
@@ -14,6 +14,7 @@ const props = defineProps({
   speed:              { type: Number,  default: 0.8  },
   mouseRepulsion:     { type: Boolean, default: true },
   mouseInteraction:   { type: Boolean, default: true },
+  paused:             { type: Boolean, default: false },
 })
 
 const container = ref(null)
@@ -169,6 +170,12 @@ function stopRaf() {
   if (animateId) { cancelAnimationFrame(animateId); animateId = null }
 }
 
+// 外部暂停控制（如进入管理后台）
+watch(() => props.paused, (p) => {
+  if (p) stopRaf()
+  else if (glState) { glState.resize(); startRaf() }
+})
+
 onMounted(() => {
   const ctn = container.value
   if (!ctn) return
@@ -235,12 +242,12 @@ onMounted(() => {
   }
 
   glState = { renderer, gl, program, mesh, resize, target, smooth, onMouseMove, onMouseLeave }
-  startRaf()
+  if (!props.paused) startRaf()
 })
 
 // 路由切回来时恢复（KeepAlive 场景）
 onActivated(() => {
-  if (glState) {
+  if (glState && !props.paused) {
     glState.resize()
     startRaf()
   }

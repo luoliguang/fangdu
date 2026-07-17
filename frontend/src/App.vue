@@ -479,8 +479,8 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     <!-- 新手引导 -->
     <TutorialGuide v-if="!isAdminRoute" />
 
-    <!-- 星空背景：放在 App 根层，路由切换不销毁，暗色模式 + 非后台页面时显示 -->
-    <GalaxyBackground v-if="isDark && !isAdminRoute" />
+    <!-- 星空背景：放在 App 根层，路由切换不销毁；进出后台只暂停 RAF，不销毁 WebGL context -->
+    <GalaxyBackground v-if="isDark" v-show="!isAdminRoute" :paused="isAdminRoute" />
   </div>
 </template>
 
