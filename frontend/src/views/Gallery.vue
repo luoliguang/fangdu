@@ -1440,29 +1440,33 @@ const quickCopyImage = async (material) => {
   gap: 1.5rem; /* 增加间距 */
   padding: 1rem 0;
 }
-.grid-item { 
-  border: none; /* 移除边框 */
-  border-radius: 12px; /* 更大圆角 */
-  background-color: white; 
-  text-align: center; 
-  padding: 1.5rem; /* 增加内边距 */
-  box-shadow: 0 6px 20px rgba(0,0,0,0.08); /* 柔和阴影 */
-  transition: all 0.3s ease-in-out; 
-  cursor: pointer; 
+.grid-item {
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  text-align: center;
+  padding: 1.5rem;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
   position: relative;
-  overflow: hidden; /* 隐藏超出内容 */
+  overflow: hidden;
 }
 .grid-item:hover {
-  transform: translateY(-5px) scale(1.02); /* 增强悬浮效果 */
-  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  transform: translateY(-5px) scale(1.02);
+  background: rgba(255,255,255,0.09);
+  border-color: rgba(90,143,115,0.45);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(90,143,115,0.15);
 }
-.grid-item img, .grid-item video { 
-  max-width: 100%; 
-  height: 180px; /* 增加高度 */
-  object-fit: cover; 
-  border-radius: 8px; /* 调整图片圆角 */
-  display: block; 
-  background-color: #e9ecef; /* 占位背景色 */
+.grid-item img, .grid-item video {
+  max-width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+  background-color: rgba(255,255,255,0.06);
   margin-bottom: 1rem;
 }
 
