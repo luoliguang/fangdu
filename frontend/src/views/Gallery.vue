@@ -1065,7 +1065,7 @@ const quickCopyImage = async (material) => {
 </template>
 
 <style>
-  body { font-family: sans-serif; background-color: #f0f2f5; margin: 0; overflow-y: scroll; }
+  body { font-family: sans-serif; background-color: #060d08; margin: 0; overflow-y: scroll; }
   main { 
     padding: 1rem; 
     max-width: 1200px; 
@@ -1207,8 +1207,8 @@ const quickCopyImage = async (material) => {
 
 .suggestions-header {
   padding: 12px 16px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  border-bottom: 1px solid #e0e0e0;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1299,9 +1299,10 @@ const quickCopyImage = async (material) => {
   
 .tags-container {
   margin-bottom: 0rem;
-  background-color: #f5f5f5;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
   overflow: hidden;
 }
 .tags-inner {
@@ -1349,21 +1350,22 @@ const quickCopyImage = async (material) => {
   flex-wrap: wrap;
   justify-content: center;
 }
-.tags-container button { 
-  background-color: #e0e0e0; 
-  border: none; /* 移除边框 */
-  border-radius: 20px; /* 更圆的标签 */
-  padding: 0.7rem 1.4rem; 
-  margin: 0.4rem; 
-  cursor: pointer; 
-  transition: all 0.3s ease; 
-  font-weight: 500; 
-  color: #555; /* 字体颜色 */
+.tags-container button {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 0.7rem 1.4rem;
+  margin: 0.4rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  color: rgba(255,255,255,0.65);
 }
-.tags-container button:hover { 
-  background-color: #d0d0d0; 
+.tags-container button:hover {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.9);
   transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
 }
 .tags-container button.active {
   background: linear-gradient(135deg, #0a3d22, #5a8f73);
@@ -1412,12 +1414,12 @@ const quickCopyImage = async (material) => {
 .grid-item p { 
   margin-top: 0.5rem; 
   font-weight: 600; /* 更粗字重 */
-  color: #343a40; /* 字体颜色 */
+  color: rgba(255,255,255,0.88);
   font-size: 1.1em;
 }
-.no-results, .loading-results { 
-  text-align: center; 
-  color: #6c757d; 
+.no-results, .loading-results {
+  text-align: center;
+  color: rgba(255,255,255,0.45); 
   /* margin-top: 3rem;  */
   /* font-size: 1.2em; */
 }
@@ -1450,7 +1452,7 @@ const quickCopyImage = async (material) => {
   align-items: center; 
   /* padding: 2rem 1rem; */
   margin-top: 0px;
-  color: #6c757d; 
+  color: rgba(255,255,255,0.45); 
   font-size: 1.1em;
   text-align: center;
 }
@@ -1462,7 +1464,7 @@ const quickCopyImage = async (material) => {
 }
 
 .browse-load-count {
-  color: #9ca3af;
+  color: rgba(255,255,255,0.35);
   font-size: 0.82rem;
   margin: 0.6rem 0 0.2rem;
   letter-spacing: 0.01em;
@@ -1530,7 +1532,7 @@ const quickCopyImage = async (material) => {
 
 .btn-icon {
   font-size: 0.76rem;
-  color: #374151;
+  color: rgba(255,255,255,0.5);
 }
 
 .show-more-btn:hover {
@@ -1561,7 +1563,7 @@ const quickCopyImage = async (material) => {
 .empty-icon-wrap {
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, rgba(10,61,34,0.07), rgba(90,143,115,0.12));
+  background: linear-gradient(135deg, rgba(90,143,115,0.18), rgba(90,143,115,0.28));
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1705,7 +1707,7 @@ const quickCopyImage = async (material) => {
   box-shadow: 0 6px 20px rgba(90, 143, 115, 0.4);
 }
 .loader {
-  border: 4px solid #e8f7f0;
+  border: 4px solid rgba(255,255,255,0.1);
   border-top: 4px solid #5a8f73;
   border-radius: 50%;
   width: 40px;
