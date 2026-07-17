@@ -742,14 +742,22 @@ const approvedFeedbacks = computed(() => userFeedbacks.value.filter(f => f.statu
 showFeedbackForm.value = true;
 
 // 将任意图片 blob 转为 PNG（ClipboardItem 只支持 image/png）
-const blobToPngBlob = (blob) => new Promise((resolve, reject) => {
+// maxDim: 最长边超过此值时按比例缩小，避免大图 toBlob 耗时过长
+const blobToPngBlob = (blob, maxDim = 1500) => new Promise((resolve, reject) => {
   const url = URL.createObjectURL(blob);
   const img = new Image();
   img.onload = () => {
+    let w = img.naturalWidth;
+    let h = img.naturalHeight;
+    if (Math.max(w, h) > maxDim) {
+      const scale = maxDim / Math.max(w, h);
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+    }
     const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    canvas.getContext('2d').drawImage(img, 0, 0);
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
     URL.revokeObjectURL(url);
     canvas.toBlob(png => png ? resolve(png) : reject(new Error('toBlob failed')), 'image/png');
   };
@@ -757,12 +765,22 @@ const blobToPngBlob = (blob) => new Promise((resolve, reject) => {
   img.src = url;
 });
 
+// 为 OSS/CDN 图片 URL 追加复制专用的缩略参数，减少下载体积
+const getCopyOptimizedUrl = (url) => {
+  const cdnDomain = 'assets.fangdutex.cn';
+  const ossDomain = 'aliyuncs.com';
+  if (!url.includes(cdnDomain) && !url.includes(ossDomain)) return url;
+  const base = url.split('?')[0];
+  // m_lfit: 等比缩放不裁剪；limit_1: 仅缩小不放大；w_1500 宽度上限
+  return `${base}?x-oss-process=image/resize,m_lfit,w_1500,limit_1,quality,q_92`;
+};
+
 // 快捷复制图片（通过后端代理绕过 CORS，转 PNG 后写入剪贴板）
 const quickCopyImage = async (material) => {
   if (material.media_type !== 'image') return;
 
   const imageName = material.name || '图片';
-  const imageUrl = toCdnUrl(material.file_path);
+  const imageUrl = getCopyOptimizedUrl(toCdnUrl(material.file_path));
 
   showCustomToast(`正在复制"${imageName}"...`, 'success');
 
@@ -782,7 +800,7 @@ const quickCopyImage = async (material) => {
   } catch (error) {
     console.error('复制图片失败:', error);
     try {
-      await navigator.clipboard.writeText(imageUrl);
+      await navigator.clipboard.writeText(toCdnUrl(material.file_path));
       showCustomToast('已复制图片链接', 'info');
     } catch {
       showCustomToast('复制失败，请重试', 'error');
