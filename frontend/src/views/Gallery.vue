@@ -931,10 +931,10 @@ const quickCopyImage = async (material) => {
           <!-- 图标 -->
           <div class="empty-icon-wrap">
             <svg class="empty-svg" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="34" cy="34" r="22" stroke="#0a3d22" stroke-width="3.5" stroke-linecap="round"/>
-              <line x1="50" y1="50" x2="66" y2="66" stroke="#0a3d22" stroke-width="3.5" stroke-linecap="round"/>
-              <line x1="27" y1="27" x2="41" y2="41" stroke="#5a8f73" stroke-width="2.5" stroke-linecap="round"/>
-              <line x1="41" y1="27" x2="27" y2="41" stroke="#5a8f73" stroke-width="2.5" stroke-linecap="round"/>
+              <circle cx="34" cy="34" r="22" class="empty-svg-ring" stroke-width="3.5" stroke-linecap="round"/>
+              <line x1="50" y1="50" x2="66" y2="66" class="empty-svg-ring" stroke-width="3.5" stroke-linecap="round"/>
+              <line x1="27" y1="27" x2="41" y2="41" class="empty-svg-cross" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="41" y1="27" x2="27" y2="41" class="empty-svg-cross" stroke-width="2.5" stroke-linecap="round"/>
             </svg>
           </div>
 
@@ -1092,14 +1092,17 @@ const quickCopyImage = async (material) => {
   body.theme-light .btn-icon { color: #374151; }
   body.theme-light .browse-load-count { color: #9ca3af; }
   body.theme-light .browse-load-count strong { color: #3d6b52; }
+  body.theme-light .empty-svg-ring  { stroke: #0a3d22; }
+  body.theme-light .empty-svg-cross { stroke: #5a8f73; }
   body.theme-light .empty-title { color: #1a2332; }
   body.theme-light .empty-subtitle { color: #64748b; }
   body.theme-light .empty-keyword { color: #0a3d22; }
+  body.theme-light .empty-suggestions-label { color: #94a3b8; }
   body.theme-light .suggestion-chip { border-color: rgba(10,61,34,0.25); color: #0a3d22; }
   body.theme-light .suggestion-chip:hover { background: #0a3d22; border-color: #0a3d22; color: #fff; }
   body.theme-light .empty-feedback { background: #f8fafc; border: 1px solid #e2e8f0; }
   body.theme-light .empty-textarea { background: #fff; border-color: #e2e8f0; color: #374151; }
-  body.theme-light .empty-suggestions-label { color: #94a3b8; }
+  body.theme-light .empty-textarea::placeholder { color: #94a3b8; }
   body.theme-light .load-more-container { color: #6c757d; }
   body.theme-light .loader { border-color: #e8f7f0; border-top-color: #5a8f73; }
   main { 
@@ -1614,21 +1617,24 @@ const quickCopyImage = async (material) => {
   height: 44px;
 }
 
+.empty-svg-ring  { stroke: rgba(255,255,255,0.35); }
+.empty-svg-cross { stroke: #5a8f73; }
+
 .empty-title {
   font-size: 1.15rem;
   font-weight: 600;
-  color: #1a2332;
+  color: rgba(255,255,255,0.9);
   margin: 0 0 8px;
   line-height: 1.4;
 }
 
 .empty-keyword {
-  color: #0a3d22;
+  color: #9ed4b5;
 }
 
 .empty-subtitle {
   font-size: 0.9rem;
-  color: #64748b;
+  color: rgba(255,255,255,0.48);
   margin: 0 0 20px;
   line-height: 1.6;
   max-width: 320px;
@@ -1646,24 +1652,24 @@ const quickCopyImage = async (material) => {
 
 .empty-suggestions-label {
   font-size: 0.82rem;
-  color: #94a3b8;
+  color: rgba(255,255,255,0.38);
   flex-shrink: 0;
 }
 
 .suggestion-chip {
   padding: 5px 14px;
-  border: 1.5px solid rgba(10,61,34,0.25);
+  border: 1.5px solid rgba(90,143,115,0.45);
   border-radius: 99px;
   background: transparent;
-  color: #0a3d22;
+  color: rgba(255,255,255,0.7);
   font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .suggestion-chip:hover {
-  background: #0a3d22;
-  border-color: #0a3d22;
+  background: rgba(90,143,115,0.28);
+  border-color: #5a8f73;
   color: #fff;
 }
 
@@ -1671,8 +1677,8 @@ const quickCopyImage = async (material) => {
 .empty-feedback {
   width: 100%;
   max-width: 420px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 14px;
   padding: 16px;
   display: flex;
@@ -1682,14 +1688,14 @@ const quickCopyImage = async (material) => {
 
 .empty-textarea {
   width: 100%;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 0.9rem;
-  color: #374151;
+  color: rgba(255,255,255,0.85);
   resize: none;
   outline: none;
-  background: #fff;
+  background: rgba(255,255,255,0.06);
   transition: border-color 0.15s;
   box-sizing: border-box;
   line-height: 1.5;
@@ -1701,7 +1707,7 @@ const quickCopyImage = async (material) => {
 }
 
 .empty-textarea::placeholder {
-  color: #94a3b8;
+  color: rgba(255,255,255,0.28);
 }
 
 .empty-submit {
