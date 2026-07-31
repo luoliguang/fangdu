@@ -15,7 +15,6 @@ class ServerConfig {
    */
   validateEnvironment() {
     const requiredEnvVars = [
-      'SECRET_TOKEN',
       'ALI_OSS_REGION',
       'ALI_OSS_ACCESS_KEY_ID',
       'ALI_OSS_ACCESS_KEY_SECRET',
@@ -62,7 +61,7 @@ class ServerConfig {
       nodeEnv: process.env.NODE_ENV || 'development',
       secretToken: process.env.SECRET_TOKEN,
       cors: {
-        origin: process.env.CORS_ORIGIN || '*',
+        origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? false : '*'),
         credentials: true
       },
       upload: {

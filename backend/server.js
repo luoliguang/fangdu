@@ -113,8 +113,8 @@ class Server {
       next();
     }, express.static(uploadsDir));
     
-    // 信任代理（用于获取真实IP）
-    this.app.set('trust proxy', true);
+    // 信任代理（1 = 信任一层反向代理如 Nginx，避免 IP 伪造绕过限速）
+    this.app.set('trust proxy', 1);
     
     // 访问记录中间件
     this.visitController = new VisitController(this.db);
