@@ -44,18 +44,6 @@ function createRoutes(db) {
     });
   });
 
-  // 验证令牌有效性
-  apiV1.post('/validate-token', (req, res) => {
-    const { token } = req.body;
-    const secretToken = process.env.SECRET_TOKEN || 'your-secret-token';
-    
-    if (token === secretToken) {
-      res.json({ valid: true });
-    } else {
-      res.status(401).json({ valid: false, message: '令牌无效' });
-    }
-  });
-
   // API信息路由
   apiV1.get('/info', (req, res) => {
     res.json({
