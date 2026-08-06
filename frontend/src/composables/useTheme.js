@@ -14,15 +14,12 @@ function isLowEndDevice() {
 
 const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('fangdu-theme') : null
 
-// 优先级：手动保存的偏好 > 设备性能检测 > 默认暗色
-let initialDark = true
+// 优先级：手动保存的偏好 > 默认亮色
+let initialDark = false
 if (saved === 'light') {
   initialDark = false
 } else if (saved === 'dark') {
   initialDark = true
-} else {
-  // 首次访问，无历史偏好 → 按设备性能决定
-  initialDark = !isLowEndDevice()
 }
 
 const isDark = ref(initialDark)

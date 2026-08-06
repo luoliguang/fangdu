@@ -35,4 +35,20 @@ apiClient.interceptors.request.use(
     }
 );
 
+// 响应拦截器：token 过期或无效时自动退出并跳转登录页
+apiClient.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            const isAuthRoute = error.config?.url?.includes('/auth/login') ||
+                                error.config?.url?.includes('/auth/verify')
+            if (!isAuthRoute) {
+                localStorage.removeItem('authToken')
+                window.location.href = '/login'
+            }
+        }
+        return Promise.reject(error)
+    }
+)
+
 export default apiClient;
