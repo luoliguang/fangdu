@@ -241,6 +241,38 @@
       </div>
     </div>
 
+    <!-- 站点设置 -->
+    <div v-if="activeTab === 'site-settings'" class="config-section">
+      <div class="section-header">
+        <h2>站点设置</h2>
+      </div>
+      <div class="site-settings-card">
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">默认显示主题</span>
+            <span class="setting-desc">新访客首次打开网站时使用的主题。已手动切换过主题的用户不受影响。</span>
+          </div>
+          <div class="theme-options">
+            <label class="theme-option" :class="{ active: defaultTheme === 'light' }">
+              <input type="radio" v-model="defaultTheme" value="light" />
+              <span class="theme-icon">☀️</span>
+              <span>亮色</span>
+            </label>
+            <label class="theme-option" :class="{ active: defaultTheme === 'dark' }">
+              <input type="radio" v-model="defaultTheme" value="dark" />
+              <span class="theme-icon">🌙</span>
+              <span>暗色</span>
+            </label>
+          </div>
+        </div>
+        <div class="setting-actions">
+          <button @click="saveSiteSettings" class="save-btn" :disabled="themeSaving">
+            {{ themeSaving ? '保存中...' : '保存设置' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 公告表单弹窗 -->
     <div v-if="showAnnouncementForm" class="modal-overlay" @click="closeAnnouncementForm">
       <div class="modal-content" @click.stop>
@@ -489,7 +521,8 @@ import {
   Top,
   Document,
   Check,
-  Message
+  Message,
+  Setting
 } from '@element-plus/icons-vue';
 
 // 响应式数据
@@ -565,8 +598,39 @@ const configTabs = [
   { key: 'announcements', label: '公告', icon: Bell, iconName: 'bell' },
   { key: 'tutorials', label: '教程', icon: Notebook, iconName: 'notebook' },
   { key: 'filters', label: '筛选器', icon: Search, iconName: 'search' },
-  { key: 'contacts', label: '联系信息', icon: Phone, iconName: 'phone' }
+  { key: 'contacts', label: '联系信息', icon: Phone, iconName: 'phone' },
+  { key: 'site-settings', label: '站点设置', icon: Setting, iconName: 'setting' }
 ];
+
+// 站点设置
+const defaultTheme = ref('light');
+const themeSaving = ref(false);
+
+const fetchSiteSettings = async () => {
+  try {
+    const res = await apiClient.get('/api/v1/drawer-config/site-config/default_theme');
+    if (res.data?.data?.value) {
+      defaultTheme.value = res.data.data.value;
+    }
+  } catch (_) {}
+};
+
+const saveSiteSettings = async () => {
+  themeSaving.value = true;
+  try {
+    const token = localStorage.getItem('authToken');
+    await apiClient.put(
+      '/api/v1/drawer-config/site-config/default_theme',
+      { value: defaultTheme.value },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    ElMessage.success('默认主题已保存');
+  } catch (e) {
+    ElMessage.error('保存失败');
+  } finally {
+    themeSaving.value = false;
+  }
+};
 
 // 获取配置数据
 const fetchConfig = async () => {
@@ -636,6 +700,8 @@ const fetchConfig = async () => {
   } finally {
     loading.value = false;
   }
+  // 站点设置单独拉取（公开接口，无需鉴权）
+  fetchSiteSettings();
 };
 
 // 公告相关方法
@@ -1880,5 +1946,80 @@ onMounted(() => {
   .markdown-editor-wrapper :deep(.md-editor) {
     min-width: 0;
   }
+}
+
+/* 站点设置 */
+.site-settings-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e4e7ed);
+  border-radius: 12px;
+  padding: 28px 32px;
+  max-width: 600px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.setting-info {
+  flex: 1;
+  min-width: 160px;
+}
+
+.setting-label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #303133);
+  margin-bottom: 4px;
+}
+
+.setting-desc {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary, #909399);
+  line-height: 1.5;
+}
+
+.theme-options {
+  display: flex;
+  gap: 12px;
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: 2px solid var(--border-color, #dcdfe6);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: border-color 0.2s, background 0.2s;
+  user-select: none;
+}
+
+.theme-option input[type="radio"] {
+  display: none;
+}
+
+.theme-option.active {
+  border-color: #5a8f73;
+  background: rgba(90, 143, 115, 0.08);
+  color: #5a8f73;
+  font-weight: 600;
+}
+
+.theme-icon {
+  font-size: 18px;
+}
+
+.setting-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 </style>
