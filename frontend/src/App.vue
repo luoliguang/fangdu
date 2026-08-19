@@ -376,7 +376,12 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
         管理后台
       </div>
       <div class="admin-topbar__meta">专注内容与数据运营</div>
-      <button class="admin-topbar__back" @click="goToFrontendHome">返回前台</button>
+      <button class="admin-topbar__back" @click="goToFrontendHome">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        返回前台
+      </button>
     </div>
 
     <!-- 桌面端导航（>768px） -->
@@ -540,8 +545,10 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     padding: 0 1rem;
     box-sizing: border-box;
     z-index: 1000;
-    background: rgba(9, 12, 18, 0.82);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background:
+      radial-gradient(120% 180% at 0% 0%, rgba(90, 143, 115, 0.18) 0%, rgba(90, 143, 115, 0) 60%),
+      rgba(9, 15, 12, 0.85);
+    border: 1px solid rgba(90, 143, 115, 0.22);
     box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -562,8 +569,8 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #7c3aed, #a855f7);
-    box-shadow: 0 0 12px rgba(168, 85, 247, 0.7);
+    background: linear-gradient(135deg, #5a8f73, #7bc49a);
+    box-shadow: 0 0 12px rgba(90, 143, 115, 0.75);
     flex-shrink: 0;
   }
 
@@ -575,8 +582,11 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
 
   .admin-topbar__back {
     flex-shrink: 0;
-    border: 1px solid rgba(168, 85, 247, 0.28);
-    background: linear-gradient(135deg, rgba(124, 58, 237, 0.95), rgba(168, 85, 247, 0.92));
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid rgba(90, 143, 115, 0.35);
+    background: linear-gradient(135deg, #0a3d22, #5a8f73);
     color: #fff;
     border-radius: 999px;
     padding: 0.55rem 0.95rem;
@@ -584,12 +594,20 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     font-weight: 600;
     cursor: pointer;
     transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 10px 20px rgba(124, 58, 237, 0.25);
+    box-shadow: 0 10px 20px rgba(10, 61, 34, 0.3);
+  }
+
+  .admin-topbar__back svg {
+    transition: transform 0.2s ease;
   }
 
   .admin-topbar__back:hover {
-    filter: brightness(1.08);
+    filter: brightness(1.1);
     transform: translateY(-1px);
+  }
+
+  .admin-topbar__back:hover svg {
+    transform: translateX(-2px);
   }
 
   .main-nav {
