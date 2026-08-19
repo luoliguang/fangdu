@@ -201,11 +201,10 @@ onUnmounted(() => {
 
         <!-- 退出登录按钮 -->
         <div class="sidebar-footer">
-          <div class="nav-item logout-item" @click="showLogoutDialog">
-            <span class="nav-hover-effect"></span>
-            <el-icon class="nav-icon"><SwitchButton /></el-icon>
-            <span class="nav-text">退出登录</span>
-          </div>
+          <button class="logout-btn" @click="showLogoutDialog">
+            <el-icon class="logout-btn__icon"><SwitchButton /></el-icon>
+            <span>退出登录</span>
+          </button>
         </div>
       </div>
     </Transition>
@@ -518,14 +517,31 @@ onUnmounted(() => {
   padding: 0.9rem;
 }
 
-.logout-item {
-  color: #fda4af !important;
+.logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  font-weight: 540;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
-.logout-item:hover {
-  color: #ffe4e6 !important;
-  background: rgba(244, 63, 94, 0.12) !important;
-  border-color: rgba(244, 63, 94, 0.28) !important;
+.logout-btn__icon {
+  font-size: 1rem;
+}
+
+.logout-btn:hover {
+  color: #fecdd3;
+  background: rgba(244, 63, 94, 0.14);
+  border-color: rgba(244, 63, 94, 0.35);
 }
 
 .logout-overlay {
