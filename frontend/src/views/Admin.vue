@@ -1,7 +1,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { storeToRefs } from 'pinia';
 import apiClient from '../axiosConfig.js';
+import { useUserStore } from '@/stores/user';
 import { BREAKPOINTS } from '../config/breakpoints.js';
 import {
   Upload,
@@ -18,6 +20,13 @@ const DESKTOP_BREAKPOINT = BREAKPOINTS.desktop;
 
 const router = useRouter();
 const route = useRoute();
+const userStore = useUserStore();
+const { user } = storeToRefs(userStore);
+
+// 当前登录用户显示名：优先 name，其次 username，兜底"管理员"
+const displayName = computed(() => user.value?.name || user.value?.username || '管理员');
+const roleLabel = computed(() => (user.value?.role === 'user' ? '普通用户' : '管理员'));
+
 const pendingFeedbacksCount = ref(0);
 const showLogoutConfirm = ref(false);
 const showMobileMenu = ref(false);
@@ -112,6 +121,11 @@ const handleFeedbackUpdate = () => {
 let interval = null;
 
 onMounted(() => {
+  // 若用户信息尚未加载（如刷新页面后），拉取当前登录用户
+  if (!user.value) {
+    userStore.fetchUserInfo();
+  }
+
   fetchPendingFeedbacksCount();
   interval = setInterval(fetchPendingFeedbacksCount, 60000);
 
@@ -206,7 +220,8 @@ onUnmounted(() => {
           <span class="topbar-date">{{ todayLabel }}</span>
           <span class="topbar-admin-badge">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            管理员
+            <span class="topbar-username">{{ displayName }}</span>
+            <span class="topbar-role">{{ roleLabel }}</span>
           </span>
         </div>
       </header>
@@ -453,7 +468,7 @@ onUnmounted(() => {
 .topbar-admin-badge {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 0.78rem;
   font-weight: 600;
   color: #5a8f73;
@@ -461,6 +476,23 @@ onUnmounted(() => {
   border: 1px solid #bbf7d0;
   padding: 3px 10px;
   border-radius: 99px;
+}
+
+.topbar-username {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-role {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: #5a8f73;
+  padding: 1px 6px;
+  border-radius: 99px;
+  letter-spacing: 0.02em;
 }
 
 .content-body {
