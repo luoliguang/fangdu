@@ -8,7 +8,7 @@ import { BREAKPOINTS } from '../config/breakpoints.js';
 import {
   Upload,
   PictureRounded,
-  ChatDotRound,
+  ChatLineSquare,
   DataAnalysis,
   Setting,
   Tickets,
@@ -35,7 +35,7 @@ const isDesktop = ref(window.innerWidth > DESKTOP_BREAKPOINT);
 const navItems = [
   { name: 'UploadMaterial', label: '上传素材', icon: Upload },
   { name: 'MaterialManagement', label: '素材管理', icon: PictureRounded },
-  { name: 'FeedbackManagement', label: '留言管理', icon: ChatDotRound },
+  { name: 'FeedbackManagement', label: '留言管理', icon: ChatLineSquare },
   { name: 'Statistics', label: '访问统计', icon: DataAnalysis },
   { name: 'DrawerConfig', label: '抽屉配置', icon: Setting },
   { name: 'PageCategoryConfig', label: '页面分类', icon: Tickets },
