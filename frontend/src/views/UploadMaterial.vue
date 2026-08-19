@@ -2,6 +2,7 @@
 import { ref, reactive, computed } from 'vue';
 import { useMaterialStore } from '@/stores/material';
 import { useToast } from 'vue-toastification';
+import { UploadFilled, Picture, VideoCamera, Close } from '@element-plus/icons-vue';
 
 const toast = useToast();
 const materialStore = useMaterialStore();
@@ -354,7 +355,7 @@ const switchMode = (mode) => {
           @dragover="handleDragOver"
         >
           <div v-if="!newMaterial.file">
-            <i class="upload-icon">📁</i>
+            <el-icon class="upload-icon"><UploadFilled /></el-icon>
             <p>拖放文件到这里或</p>
             <input 
               type="file" 
@@ -428,7 +429,7 @@ const switchMode = (mode) => {
           @dragover="handleDragOver"
         >
           <div v-if="batchFiles.length === 0">
-            <i class="upload-icon">📁</i>
+            <el-icon class="upload-icon"><UploadFilled /></el-icon>
             <p>拖放多个文件到这里或</p>
             <input 
               type="file" 
@@ -465,18 +466,21 @@ const switchMode = (mode) => {
               >
                 <div class="file-item-header">
                   <div class="file-basic-info">
-                    <span class="file-icon">{{ item.file.type.startsWith('image/') ? '🖼️' : '🎬' }}</span>
+                    <el-icon class="file-icon">
+                      <Picture v-if="item.file.type.startsWith('image/')" />
+                      <VideoCamera v-else />
+                    </el-icon>
                     <span class="file-original-name" :title="item.file.name">{{ item.file.name }}</span>
                     <span class="file-size">{{ (item.file.size / 1024 / 1024).toFixed(2) }} MB</span>
                   </div>
-                  <button 
-                    type="button" 
-                    class="btn-remove-file" 
+                  <button
+                    type="button"
+                    class="btn-remove-file"
                     @click="removeBatchFile(index)"
                     title="移除"
                     :disabled="item.uploading"
                   >
-                    ×
+                    <el-icon><Close /></el-icon>
                   </button>
                 </div>
                 
@@ -692,10 +696,10 @@ input[type="text"]:focus {
 }
 
 .upload-icon {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
+  font-size: 3rem;
+  margin: 0 auto 1rem;
   display: block;
-  color: #6c757d;
+  color: #5a8f73;
 }
 
 .file-input {
@@ -920,8 +924,9 @@ input[type="text"]:focus {
 }
 
 .file-icon {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   flex-shrink: 0;
+  color: #5a8f73;
 }
 
 .file-original-name {
@@ -1046,16 +1051,6 @@ input[type="text"]:focus {
   background-color: #0056b3;
 }
 
-.file-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.file-icon {
-  font-size: 1.2rem;
-}
-
 .file-name {
   flex-grow: 1;
   overflow: hidden;
@@ -1069,14 +1064,22 @@ input[type="text"]:focus {
 }
 
 .btn-remove-file {
-  padding: 0.2rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
   background-color: #dc3545;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   transition: background-color 0.3s ease;
+}
+
+.btn-remove-file:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-remove-file:hover {
