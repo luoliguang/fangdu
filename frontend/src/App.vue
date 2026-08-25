@@ -395,7 +395,7 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
         @click="handleNavClick"
       >{{ cat.name }}</router-link>
       <a ref="fabricGoBtn" href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank" @click.prevent="openFabricGoModal">面料细节</a>
-      <a href="https://fangdutex.cn/welcome" target="_blank">知识库「所有知识」</a>
+      <a href="https://fangdutex.cn/" target="_blank">官网</a>
       <router-link to="/color-card" @click="handleNavClick">设计专用</router-link>
       <router-link to="/size-converter" @click="handleNavClick">尺码转换</router-link>
       <router-link v-if="!isLoggedIn" to="/login" @click="handleNavClick">登录</router-link>
