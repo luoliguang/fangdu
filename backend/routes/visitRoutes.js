@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const VisitController = require('../controllers/VisitController');
 const { requireAuth } = require('../middleware/auth');
 
@@ -11,13 +12,22 @@ function createVisitRoutes(db) {
   const router = express.Router();
   const visitController = new VisitController(db);
 
+  // 公开埋点接口限流：同一 IP 每分钟最多 60 次，防止刷库写入垃圾数据
+  const trackingLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: '请求过于频繁，请稍后再试' }
+  });
+
   // ── 埋点接口（公开，前台页面调用）──
 
   // 记录访问
-  router.post('/record', visitController.recordVisit.bind(visitController));
+  router.post('/record', trackingLimiter, visitController.recordVisit.bind(visitController));
 
   // 记录搜索关键词
-  router.post('/search', visitController.recordSearchKeyword.bind(visitController));
+  router.post('/search', trackingLimiter, visitController.recordSearchKeyword.bind(visitController));
 
   // 心跳接口（更新在线状态）
   router.post('/heartbeat', visitController.heartbeat.bind(visitController));

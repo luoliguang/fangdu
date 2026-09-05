@@ -42,10 +42,34 @@ class VisitController {
     try {
       const { keyword, page, sessionId } = req.body;
 
+      // 输入校验：关键词必须是合理长度的字符串
+      if (typeof keyword !== 'string' || !keyword.trim() || keyword.length > 200) {
+        return res.status(400).json({
+          success: false,
+          message: '搜索关键词无效'
+        });
+      }
+
+      // 必须携带合法会话 ID（前台页面始终会带），阻挡无会话的脚本刷库
+      if (typeof sessionId !== 'string' || sessionId.length < 8 || sessionId.length > 128) {
+        return res.status(400).json({
+          success: false,
+          message: '会话标识无效'
+        });
+      }
+
+      // page 若提供必须是字符串
+      if (page !== undefined && typeof page !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: '页面标识无效'
+        });
+      }
+
       const result = await this.visitService.recordSearchKeyword({
         keyword,
         page: page || req.path || '/',
-        sessionId: sessionId || null,
+        sessionId,
         ipAddress: this.getClientIP(req),
         userAgent: req.get('User-Agent')
       });

@@ -98,14 +98,16 @@ class Visit {
           AND ip_address != 'unknown' 
           THEN ip_address 
         END) as unique_visitors
-      FROM visits 
-      WHERE visit_time >= datetime('now', '-${days} days')
+      FROM visits
+      WHERE visit_time >= datetime('now', ?)
       AND visit_time IS NOT NULL
       GROUP BY DATE(datetime(visit_time, '+8 hours'))
       ORDER BY date ASC
     `;
-    
-    return await this.queryAll(sql);
+
+    // 参数化查询，避免 SQL 拼接；整数兜底防止非法输入
+    const daysModifier = `-${parseInt(days, 10) || 7} days`;
+    return await this.queryAll(sql, [daysModifier]);
   }
 
   /**
