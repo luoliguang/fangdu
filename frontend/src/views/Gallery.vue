@@ -1242,17 +1242,19 @@ const quickCopyImage = async (material) => {
   border-color: rgba(255, 255, 255, 0.4);
 }
 
-/* 右侧预览图：2×2 网格 */
+/* 右侧预览图：2×2 网格，固定高度避免撑破 banner */
 .hero-preview {
   flex-shrink: 0;
-  width: 42%;
-  max-width: 520px;
+  width: 34%;
+  max-width: 400px;
+  height: 340px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  grid-template-rows: 1fr 1fr;
+  gap: 0.7rem;
 }
 .hero-preview-item {
-  aspect-ratio: 3 / 4;
+  height: 100%;
   border-radius: 14px;
   overflow: hidden;
   cursor: pointer;
