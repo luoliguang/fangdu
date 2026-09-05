@@ -103,6 +103,14 @@ const visibleTags = computed(() => {
   return tags.value.slice(0, visibleTagsCount.value);
 });
 
+// Hero 右侧预览图：取当前已加载素材里的前 4 张图片
+const heroPreviewImages = computed(() =>
+  (displayMaterials.value || []).filter(m => m.media_type === 'image').slice(0, 4)
+);
+
+// Hero 热门搜索标签：取前 6 个标签
+const heroHotTags = computed(() => (tags.value || []).slice(0, 6));
+
 // 计算实际可见的标签数量（仅桌面端执行）
 const calculateVisibleTags = async () => {
   if (isMobile.value) return; // 移动端不需要折行计算
@@ -811,38 +819,61 @@ const quickCopyImage = async (material) => {
 
 <template>
   <header class="hero-header">
-    <div class="hero-content">
-      <h1 class="hero-title">方度实拍图</h1>
-      <p class="hero-subtitle">您可以在这里获取到各种面料、款式、等实拍图素材</p>
-      <div class="search-wrapper">
-        <div class="search-bar-row">
-          <input
-            type="text"
-            v-model="searchTerm"
-            placeholder="请以关键词的形式搜索 如：圆领短袖 插肩"
-            class="search-input-cool"
-            @focus="handleSearchFocus"
-            @blur="handleSearchBlur"
-            @keydown.enter="handleFilterChange"
-          >
-          <button class="search-btn" @click="handleFilterChange">搜索</button>
-        </div>
-        <!-- 搜索建议下拉列表 -->
-        <div v-if="showSuggestions && searchSuggestions.length > 0" class="search-suggestions">
-          <div class="suggestions-header">
-            <span class="suggestions-icon">💡</span>
-            <span class="suggestions-title">为您推荐以下关键词：</span>
-          </div>
-          <div class="suggestions-list">
-            <button
-              v-for="(suggestion, index) in searchSuggestions"
-              :key="index"
-              @click="useSuggestion(suggestion)"
-              class="suggestion-item"
+    <div class="hero-layout">
+      <div class="hero-content">
+        <h1 class="hero-title">方度实拍图</h1>
+        <p class="hero-subtitle">您可以在这里获取到各种面料、款式、等实拍图素材</p>
+        <div class="search-wrapper">
+          <div class="search-bar-row">
+            <input
+              type="text"
+              v-model="searchTerm"
+              placeholder="请以关键词的形式搜索 如：圆领短袖 插肩"
+              class="search-input-cool"
+              @focus="handleSearchFocus"
+              @blur="handleSearchBlur"
+              @keydown.enter="handleFilterChange"
             >
-              {{ suggestion }}
-            </button>
+            <button class="search-btn" @click="handleFilterChange">搜索</button>
           </div>
+          <!-- 搜索建议下拉列表 -->
+          <div v-if="showSuggestions && searchSuggestions.length > 0" class="search-suggestions">
+            <div class="suggestions-header">
+              <span class="suggestions-icon">💡</span>
+              <span class="suggestions-title">为您推荐以下关键词：</span>
+            </div>
+            <div class="suggestions-list">
+              <button
+                v-for="(suggestion, index) in searchSuggestions"
+                :key="index"
+                @click="useSuggestion(suggestion)"
+                class="suggestion-item"
+              >
+                {{ suggestion }}
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- 热门搜索 -->
+        <div v-if="heroHotTags.length" class="hero-hot-tags">
+          <span class="hero-hot-label">热门搜索：</span>
+          <button
+            v-for="t in heroHotTags"
+            :key="t"
+            class="hero-hot-tag"
+            @click="filterByTag(t)"
+          >{{ t }}</button>
+        </div>
+      </div>
+      <!-- 右侧预览图 -->
+      <div v-if="heroPreviewImages.length" class="hero-preview">
+        <div
+          v-for="img in heroPreviewImages"
+          :key="img.id"
+          class="hero-preview-item"
+          @click="showMedia(img)"
+        >
+          <img :src="toCdnUrl(img.thumbnail_url || img.file_path)" :alt="img.name" loading="lazy" decoding="async">
         </div>
       </div>
     </div>
@@ -1147,8 +1178,7 @@ const quickCopyImage = async (material) => {
     background-size: 400% 400%;
     animation: gradient-animation 18s ease infinite;
     color: white;
-    text-align: center;
-    padding: 3rem 1rem;
+    padding: 3rem 1.5rem;
     border-bottom-left-radius: 25px;
     border-bottom-right-radius: 25px;
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -1160,21 +1190,83 @@ const quickCopyImage = async (material) => {
     100% { background-position: 0% 50%; }
   }
 
-.hero-content { max-width: 700px; margin: 0 auto; }
-.hero-title { 
+/* Hero 左右分栏布局 */
+.hero-layout {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+}
+.hero-content { flex: 1; min-width: 0; text-align: left; }
+.hero-title {
   font-family: 'Montserrat', sans-serif; /* 现代字体 */
-  font-size: 3.5rem; /* 更大标题 */
+  font-size: 3.2rem; /* 更大标题 */
   font-weight: 800; /* 更粗字重 */
-  margin: 0; 
-  letter-spacing: 3px; /* 增加字间距 */
+  margin: 0;
+  letter-spacing: 2px; /* 增加字间距 */
   text-shadow: 0 4px 10px rgba(0,0,0,0.3); /* 更深更柔和的阴影 */
 }
-.hero-subtitle { 
+.hero-subtitle {
   font-family: 'Roboto', sans-serif; /* 现代字体 */
-  font-size: 1.3rem; 
-  font-weight: 300; 
-  opacity: 0.95; 
-  margin: 1rem 0 2.5rem 0; /* 调整间距 */
+  font-size: 1.2rem;
+  font-weight: 300;
+  opacity: 0.95;
+  margin: 0.9rem 0 2rem 0; /* 调整间距 */
+}
+
+/* 热门搜索 */
+.hero-hot-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+}
+.hero-hot-label {
+  font-size: 0.88rem;
+  opacity: 0.7;
+}
+.hero-hot-tag {
+  padding: 0.3rem 0.85rem;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.hero-hot-tag:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* 右侧预览图：2×2 网格 */
+.hero-preview {
+  flex-shrink: 0;
+  width: 42%;
+  max-width: 520px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.hero-preview-item {
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transition: transform 0.25s ease;
+}
+.hero-preview-item:hover {
+  transform: translateY(-4px);
+}
+.hero-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 /* 搜索栏行：输入框 + 按钮组合 */
 .search-bar-row {
@@ -1795,6 +1887,21 @@ const quickCopyImage = async (material) => {
     max-height: 100px;
   }
   
+  /* 移动端：分栏堆叠，隐藏右侧预览图，标题居中 */
+  .hero-layout {
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+  .hero-content {
+    text-align: center;
+  }
+  .hero-hot-tags {
+    justify-content: center;
+  }
+  .hero-preview {
+    display: none;
+  }
+
   .hero-title {
     font-size: 2rem; /* 在小屏幕上适当缩小标题字号 */
   }
