@@ -103,10 +103,13 @@ const visibleTags = computed(() => {
   return tags.value.slice(0, visibleTagsCount.value);
 });
 
-// Hero 右侧预览图：取当前已加载素材里的前 4 张图片
-const heroPreviewImages = computed(() =>
-  (displayMaterials.value || []).filter(m => m.media_type === 'image').slice(0, 4)
-);
+// Hero 右侧预览图：只在首屏取一次固定展示，避免筛选/搜索时闪烁
+const heroPreviewImages = ref([]);
+watch(displayMaterials, (list) => {
+  if (heroPreviewImages.value.length > 0) return; // 已固定，不再更新
+  const imgs = (list || []).filter(m => m.media_type === 'image').slice(0, 4);
+  if (imgs.length > 0) heroPreviewImages.value = imgs;
+});
 
 // Hero 热门搜索标签：取前 6 个标签
 const heroHotTags = computed(() => (tags.value || []).slice(0, 6));
@@ -1178,7 +1181,7 @@ const quickCopyImage = async (material) => {
     background-size: 400% 400%;
     animation: gradient-animation 18s ease infinite;
     color: white;
-    padding: 1.75rem 1.5rem;
+    padding: 2.75rem 1.5rem 1.75rem;
     border-bottom-left-radius: 25px;
     border-bottom-right-radius: 25px;
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
