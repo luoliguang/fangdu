@@ -1242,16 +1242,15 @@ const quickCopyImage = async (material) => {
   border-color: rgba(255, 255, 255, 0.4);
 }
 
-/* 右侧预览图：2×2 网格，固定高度避免撑破 banner */
+/* 右侧预览图：横排 4 张，单行更矮更省纵向空间 */
 .hero-preview {
   flex-shrink: 0;
-  width: 34%;
-  max-width: 400px;
-  height: 270px;
+  width: 42%;
+  max-width: 480px;
+  height: 200px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 0.7rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
 }
 .hero-preview-item {
   height: 100%;
@@ -1547,26 +1546,14 @@ const quickCopyImage = async (material) => {
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  /* 卡片进场动画：新插入的卡片淡入上浮；backwards 保证结束后不残留 transform，不影响 hover */
-  animation: cardEnter 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  /* 卡片进场动画：纯淡入，不做位移，避免分帧插入时的抖动 */
+  animation: cardEnter 0.35s ease backwards;
 }
 
 @keyframes cardEnter {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-
-/* 前排卡片错落入场，形成明显的"一波"过渡感 */
-.grid-item:nth-child(1)  { animation-delay: 0.00s; }
-.grid-item:nth-child(2)  { animation-delay: 0.05s; }
-.grid-item:nth-child(3)  { animation-delay: 0.10s; }
-.grid-item:nth-child(4)  { animation-delay: 0.15s; }
-.grid-item:nth-child(5)  { animation-delay: 0.20s; }
-.grid-item:nth-child(6)  { animation-delay: 0.25s; }
-.grid-item:nth-child(7)  { animation-delay: 0.30s; }
-.grid-item:nth-child(8)  { animation-delay: 0.35s; }
-.grid-item:nth-child(9)  { animation-delay: 0.40s; }
-.grid-item:nth-child(10) { animation-delay: 0.45s; }
 
 /* 尊重系统「减少动效」设置 */
 @media (prefers-reduced-motion: reduce) {
