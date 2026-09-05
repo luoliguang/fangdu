@@ -930,8 +930,13 @@ const quickCopyImage = async (material) => {
       </div>
     </div>
     <div class="sort-toolbar">
-      <button class="sort-tab" :class="{ active: sortBy === 'latest' }" @click="changeSort('latest')">最新上传</button>
-      <button class="sort-tab" :class="{ active: sortBy === 'popular' }" @click="changeSort('popular')">最多浏览</button>
+      <span class="sort-toolbar__count">
+        {{ totalItems > 0 ? `共 ${totalItems} 个素材` : '全部素材' }}
+      </span>
+      <div class="sort-tabs">
+        <button class="sort-tab" :class="{ active: sortBy === 'latest' }" @click="changeSort('latest')">最新上传</button>
+        <button class="sort-tab" :class="{ active: sortBy === 'popular' }" @click="changeSort('popular')">最多浏览</button>
+      </div>
     </div>
     <TransitionGroup :name="isChunkRendering ? '' : 'gallery'" tag="div" class="grid-container">
       <div 
@@ -1577,10 +1582,23 @@ const quickCopyImage = async (material) => {
 /* 排序工具栏 */
 .sort-toolbar {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+.sort-toolbar__count {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.6);
+}
+body.theme-light .sort-toolbar__count {
+  color: #6b7280;
+}
+.sort-tabs {
+  display: flex;
   gap: 0.5rem;
-  max-width: 1400px;
-  margin: 0 auto 1rem;
-  padding: 0 1rem;
 }
 .sort-tab {
   padding: 0.4rem 1rem;
