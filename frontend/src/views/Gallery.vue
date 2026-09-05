@@ -241,6 +241,14 @@ const toCdnUrl = (url) => {
   return url.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, CDN_BASE_URL);
 };
 
+// 浏览量数字格式化：1200 → 1.2k，1000000 → 1.0m
+const formatCount = (n) => {
+  const num = Number(n) || 0;
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'm';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+  return String(num);
+};
+
 // 检查URL是否跨域
 const isCrossOriginUrl = (url) => {
   try {
@@ -926,7 +934,17 @@ const quickCopyImage = async (material) => {
             disablePictureInPicture
             @click.prevent
         ></video>
-        <p>{{ material.name }}</p>
+        <div class="card-body">
+          <p class="card-title">{{ material.name }}</p>
+          <div class="card-meta">
+            <span class="card-views">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+              {{ formatCount(material.view_count) }}
+            </span>
+          </div>
+        </div>
         <div v-if="material.media_type === 'video'" class="media-icon">▶</div>
         
         <!-- 快捷操作按钮组 -->
@@ -1130,6 +1148,9 @@ const quickCopyImage = async (material) => {
   body.theme-light .grid-item:hover { background: white; border-color: transparent; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
   body.theme-light .grid-item img, body.theme-light .grid-item video { background-color: #e9ecef; }
   body.theme-light .grid-item p { color: #343a40; }
+  body.theme-light .card-title { color: #1f2937; }
+  body.theme-light .card-meta { border-top-color: rgba(0,0,0,0.08); }
+  body.theme-light .card-views { color: #9ca3af; }
   body.theme-light .no-results, body.theme-light .loading-results { color: #6c757d; }
   body.theme-light .search-suggestions { background: white; border: none; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
   body.theme-light .suggestions-header { background: linear-gradient(135deg,#f5f7fa,#c3cfe2); border-bottom: 1px solid #e0e0e0; }
@@ -1582,11 +1603,39 @@ const quickCopyImage = async (material) => {
 .grid-item video {
   pointer-events: none; /* 禁止video自身的交互 */
 }
-.grid-item p { 
-  margin-top: 0.5rem; 
-  font-weight: 600; /* 更粗字重 */
-  color: rgba(255,255,255,0.88);
-  font-size: 1.1em;
+.card-body {
+  margin-top: 0.6rem;
+  text-align: left;
+}
+.card-title {
+  margin: 0;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  font-size: 0.98rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.card-views {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.55);
+}
+.card-views svg {
+  width: 14px;
+  height: 14px;
 }
 .no-results, .loading-results {
   text-align: center;
@@ -2455,15 +2504,12 @@ body.theme-light .req-badge { border-color: #fff; }
     margin-bottom: 0;
     display: block;
   }
-  .grid-item p {
+  .card-title {
     font-size: 0.82rem;
     font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin: 0;
-    padding: 0.45rem 0.6rem 0.55rem;
-    text-align: left;
+  }
+  .card-body {
+    padding: 0 0.3rem;
   }
   .media-icon {
     width: 30px;
@@ -2505,9 +2551,8 @@ body.theme-light .req-badge { border-color: #fff; }
   .grid-item {
     border-radius: 8px;
   }
-  .grid-item p {
+  .card-title {
     font-size: 0.78rem;
-    padding: 0.4rem 0.5rem 0.5rem;
   }
 }
 
