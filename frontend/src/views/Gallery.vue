@@ -1178,7 +1178,7 @@ const quickCopyImage = async (material) => {
     background-size: 400% 400%;
     animation: gradient-animation 18s ease infinite;
     color: white;
-    padding: 3rem 1.5rem;
+    padding: 1.75rem 1.5rem;
     border-bottom-left-radius: 25px;
     border-bottom-right-radius: 25px;
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -1201,7 +1201,7 @@ const quickCopyImage = async (material) => {
 .hero-content { flex: 1; min-width: 0; text-align: left; }
 .hero-title {
   font-family: 'Montserrat', sans-serif; /* 现代字体 */
-  font-size: 3.2rem; /* 更大标题 */
+  font-size: 2.6rem; /* 更大标题 */
   font-weight: 800; /* 更粗字重 */
   margin: 0;
   letter-spacing: 2px; /* 增加字间距 */
@@ -1209,10 +1209,10 @@ const quickCopyImage = async (material) => {
 }
 .hero-subtitle {
   font-family: 'Roboto', sans-serif; /* 现代字体 */
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 300;
   opacity: 0.95;
-  margin: 0.9rem 0 2rem 0; /* 调整间距 */
+  margin: 0.6rem 0 1.3rem 0; /* 调整间距 */
 }
 
 /* 热门搜索 */
@@ -1221,7 +1221,7 @@ const quickCopyImage = async (material) => {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 1.1rem;
+  margin-top: 0.9rem;
 }
 .hero-hot-label {
   font-size: 0.88rem;
@@ -1247,7 +1247,7 @@ const quickCopyImage = async (material) => {
   flex-shrink: 0;
   width: 34%;
   max-width: 400px;
-  height: 340px;
+  height: 270px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
@@ -1547,6 +1547,30 @@ const quickCopyImage = async (material) => {
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  /* 卡片进场动画：新插入的卡片淡入上浮；backwards 保证结束后不残留 transform，不影响 hover */
+  animation: cardEnter 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+@keyframes cardEnter {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 前排卡片错落入场，形成明显的"一波"过渡感 */
+.grid-item:nth-child(1)  { animation-delay: 0.00s; }
+.grid-item:nth-child(2)  { animation-delay: 0.05s; }
+.grid-item:nth-child(3)  { animation-delay: 0.10s; }
+.grid-item:nth-child(4)  { animation-delay: 0.15s; }
+.grid-item:nth-child(5)  { animation-delay: 0.20s; }
+.grid-item:nth-child(6)  { animation-delay: 0.25s; }
+.grid-item:nth-child(7)  { animation-delay: 0.30s; }
+.grid-item:nth-child(8)  { animation-delay: 0.35s; }
+.grid-item:nth-child(9)  { animation-delay: 0.40s; }
+.grid-item:nth-child(10) { animation-delay: 0.45s; }
+
+/* 尊重系统「减少动效」设置 */
+@media (prefers-reduced-motion: reduce) {
+  .grid-item { animation: none; }
 }
 .grid-item:hover {
   transform: translateY(-5px) scale(1.02);
