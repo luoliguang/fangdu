@@ -391,8 +391,33 @@ class MaterialService {
         throw new Error('请选择要删除的素材');
       }
 
+      // 先取出这些素材的文件信息，用于同步删除 OSS 文件，避免产生孤儿文件
+      const materials = [];
+      for (const id of ids) {
+        try {
+          const m = await this.materialModel.getById(id);
+          if (m) materials.push(m);
+        } catch (_) {
+          // 单条获取失败不影响整体流程
+        }
+      }
+
+      // 删除 OSS 文件（主文件 + 封面图）；OSS 删除失败不阻止数据库删除，仅记录
+      for (const material of materials) {
+        try {
+          if (material.file_path) {
+            await this.ossClient.delete(this.extractFileNameFromUrl(material.file_path));
+          }
+          if (material.cover_image_path) {
+            await this.ossClient.delete(this.extractFileNameFromUrl(material.cover_image_path));
+          }
+        } catch (ossError) {
+          console.warn(`批量删除时从OSS删除文件失败 (id=${material.id}):`, ossError.message);
+        }
+      }
+
       const result = await this.materialModel.batchDelete(ids);
-      
+
       return {
         success: true,
         message: `成功删除 ${result.changes} 个素材`,
