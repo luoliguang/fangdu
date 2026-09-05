@@ -17,9 +17,17 @@ class Material {
       any_tag = '',      // 逗号分隔，匹配其中任意一个 tag（用于特殊领口页）
       exclude_tags = '', // 逗号分隔，排除包含这些 tag 的素材（用于主页）
       media_type = '',
+      sort = 'latest', // latest | popular
       page = 1,
       limit = 20
     } = options;
+
+    // 排序白名单，杜绝 SQL 注入
+    const ORDER_BY_MAP = {
+      latest: 'ORDER BY id DESC',
+      popular: 'ORDER BY view_count DESC, id DESC'
+    };
+    const orderByClause = ORDER_BY_MAP[sort] || ORDER_BY_MAP.latest;
 
     const offset = (page - 1) * limit;
     const keywords = search.split(' ').filter(k => k);
@@ -70,9 +78,9 @@ class Material {
 
     // 获取分页数据
     const dataSql = `
-      SELECT id, name, file_path, tags, media_type, cover_image_path, view_count 
-      FROM materials${whereClause} 
-      ORDER BY id DESC 
+      SELECT id, name, file_path, tags, media_type, cover_image_path, view_count
+      FROM materials${whereClause}
+      ${orderByClause}
       LIMIT ? OFFSET ?
     `;
     

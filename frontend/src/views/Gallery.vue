@@ -23,6 +23,7 @@ const displayMaterials = shallowRef([]);
 const searchTerm = ref('');
 const tags = ref([]);
 const activeTag = ref('');
+const sortBy = ref('latest'); // latest | popular
 const isLoading = ref(false); // 初始为 false
 let debounceTimer = null;
 let requestSerial = 0;
@@ -364,6 +365,7 @@ const fetchMaterials = async (isLoadMore = false) => {
       search: searchTerm.value.trim(),
       tag: activeTag.value,
       exclude_tags: excludeTagsParam.value || undefined,
+      sort: sortBy.value,
       page: currentPage.value,
       limit: 20
     };
@@ -637,6 +639,17 @@ const handleFilterChange = () => {
     displayMaterials.value = [];
     fetchMaterials(false);
     recordSearchKeyword(searchTerm.value);
+};
+
+// 切换排序（最新 / 最多浏览）
+const changeSort = (value) => {
+    if (sortBy.value === value) return;
+    sortBy.value = value;
+    currentPage.value = 1;
+    totalPages.value = 1;
+    isChunkRendering.value = true;
+    displayMaterials.value = [];
+    fetchMaterials(false);
 };
 
 const filterByTag = (tag) => {
@@ -915,6 +928,10 @@ const quickCopyImage = async (material) => {
           {{ isTagsExpanded ? '↑ 收起' : '展开更多 ↓' }}
         </button>
       </div>
+    </div>
+    <div class="sort-toolbar">
+      <button class="sort-tab" :class="{ active: sortBy === 'latest' }" @click="changeSort('latest')">最新上传</button>
+      <button class="sort-tab" :class="{ active: sortBy === 'popular' }" @click="changeSort('popular')">最多浏览</button>
     </div>
     <TransitionGroup :name="isChunkRendering ? '' : 'gallery'" tag="div" class="grid-container">
       <div 
@@ -1557,6 +1574,49 @@ const quickCopyImage = async (material) => {
   gap: 1.5rem; /* 增加间距 */
   padding: 1rem 0;
 }
+/* 排序工具栏 */
+.sort-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 1400px;
+  margin: 0 auto 1rem;
+  padding: 0 1rem;
+}
+.sort-tab {
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.7);
+  font-size: 0.9rem;
+  font-weight: 540;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.sort-tab:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.1);
+}
+.sort-tab.active {
+  color: #fff;
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
+  border-color: rgba(90,143,115,0.6);
+}
+body.theme-light .sort-tab {
+  border-color: #e4e7ed;
+  background: #fff;
+  color: #6b7280;
+}
+body.theme-light .sort-tab:hover {
+  color: #0a3d22;
+  background: #f0fdf4;
+}
+body.theme-light .sort-tab.active {
+  color: #fff;
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
+  border-color: transparent;
+}
+
 .grid-item {
   border: 1px solid rgba(255,255,255,0.09);
   border-radius: 12px;
