@@ -153,9 +153,9 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   z-index: 999; /* 在导航栏之上 */
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0a3d22 0%, #1d6b43 100%);
   color: white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(10, 61, 34, 0.25);
 }
 
 .announcement-content {

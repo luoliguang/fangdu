@@ -242,14 +242,6 @@ const toCdnUrl = (url) => {
   return url.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, CDN_BASE_URL);
 };
 
-// 浏览量数字格式化：1200 → 1.2k，1000000 → 1.0m
-const formatCount = (n) => {
-  const num = Number(n) || 0;
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'm';
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
-  return String(num);
-};
-
 // 检查URL是否跨域
 const isCrossOriginUrl = (url) => {
   try {
@@ -963,12 +955,6 @@ const quickCopyImage = async (material) => {
         <div class="card-body">
           <p class="card-title">{{ material.name }}</p>
           <div class="card-meta">
-            <span class="card-views">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-              {{ formatCount(material.view_count) }}
-            </span>
             <!-- 移动端收藏：放在信息行右侧，不遮挡图片 -->
             <button
               class="card-fav-inline"
@@ -1187,7 +1173,6 @@ const quickCopyImage = async (material) => {
   body.theme-light .grid-item p { color: #343a40; }
   body.theme-light .card-title { color: #1f2937; }
   body.theme-light .card-meta { border-top-color: rgba(0,0,0,0.08); }
-  body.theme-light .card-views { color: #9ca3af; }
   body.theme-light .no-results, body.theme-light .loading-results { color: #6c757d; }
   body.theme-light .search-suggestions { background: white; border: none; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
   body.theme-light .suggestions-header { background: linear-gradient(135deg,#f5f7fa,#c3cfe2); border-bottom: 1px solid #e0e0e0; }
@@ -1215,10 +1200,10 @@ const quickCopyImage = async (material) => {
   body.theme-light .empty-textarea::placeholder { color: #94a3b8; }
   body.theme-light .load-more-container { color: #6c757d; }
   body.theme-light .loader { border-color: #e8f7f0; border-top-color: #5a8f73; }
-  main { 
-    padding: 1rem; 
-    max-width: 1200px; 
-    margin-top: calc(0px + var(--announcement-height, 0px)); /* 导航栏高度 + 公告栏高度 */
+  main {
+    padding: 1rem;
+    max-width: 1200px;
+    margin-top: calc(84px + var(--announcement-height, 0px)); /* 导航栏底部约74px + 10px间距 + 公告栏高度 */
     margin-left: auto;
     margin-right: auto;
     min-height: 50vh;
@@ -1239,7 +1224,7 @@ const quickCopyImage = async (material) => {
     background-size: 400% 400%;
     animation: gradient-animation 18s ease infinite;
     color: white;
-    padding: 2.75rem 1.5rem 1.75rem;
+    padding: 1.75rem 1.5rem;
     border-bottom-left-radius: 25px;
     border-bottom-right-radius: 25px;
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -1732,24 +1717,14 @@ body.theme-light .sort-tab.active {
   overflow: hidden;
 }
 .card-meta {
-  display: flex;
+  /* 浏览量已取消，桌面端此行无内容，隐藏；移动端仅用于放收藏按钮 */
+  display: none;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 0.45rem;
   padding-top: 0.45rem;
   border-top: 1px solid rgba(255,255,255,0.08);
-}
-.card-views {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.8rem;
-  color: rgba(255,255,255,0.55);
-}
-.card-views svg {
-  width: 14px;
-  height: 14px;
 }
 /* 信息行内的收藏按钮：默认隐藏，仅移动端启用 */
 .card-fav-inline {
@@ -2709,9 +2684,6 @@ body.theme-light .req-badge { border-color: #fff; }
     margin-top: 0.3rem;
     padding-top: 0.3rem;
   }
-  .card-views {
-    font-size: 0.68rem;
-  }
 }
 
 /* 标签切换按钮 */
@@ -2883,6 +2855,9 @@ a.router-link-active.router-link-exact-active{
 @media (max-width: 768px) {
   .card-actions {
     display: none;
+  }
+  .card-meta {
+    display: flex;
   }
   .card-fav-inline {
     display: inline-flex;

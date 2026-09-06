@@ -517,9 +517,9 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     margin: 0;
   }
   
-  /* 为main元素添加上边距，避免被固定导航栏遮挡；z-index 确保内容在 Galaxy 画布之上 */
+  /* 为main元素添加上边距，避免被固定导航栏遮挡（导航底部约 74px，留 10px 间距）；z-index 确保内容在 Galaxy 画布之上 */
   main {
-    margin-top: calc(64px + var(--announcement-height, 0px));
+    margin-top: calc(84px + var(--announcement-height, 0px));
     transition: margin-top 0.3s ease;
     position: relative;
     z-index: 1;
