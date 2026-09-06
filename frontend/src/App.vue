@@ -517,17 +517,22 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     margin: 0;
   }
   
-  /* 为main元素添加上边距，避免被固定导航栏遮挡（导航底部约 74px，留 10px 间距）；z-index 确保内容在 Galaxy 画布之上 */
+  /* 全站 main 布局统一在此管理（导航底部约 74px + 10px 间距 + 公告高度）；z-index 确保内容在 Galaxy 画布之上 */
   main {
-    margin-top: calc(84px + var(--announcement-height, 0px));
+    max-width: 1200px;
+    margin: calc(84px + var(--announcement-height, 0px)) auto 0;
+    padding: 1rem;
+    min-height: 50vh;
     transition: margin-top 0.3s ease;
     position: relative;
     z-index: 1;
   }
 
-  /* 管理员后台：admin-topbar 底部约 62px，给 main 更多间距避免视觉重叠 */
+  /* 管理员后台：admin-topbar 底部约 62px，给 main 更多间距；宽度交给 .admin-container 自己管理 */
   .admin-topbar ~ main {
     margin-top: calc(80px + var(--announcement-height, 0px));
+    max-width: none;
+    padding: 0;
   }
 
   .admin-topbar {
@@ -827,7 +832,8 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
   /* --- 移动端适配样式 --- */
   @media (max-width: 768px) {
     main {
-      margin-top: calc(64px + var(--announcement-height, 0px));
+      margin-top: calc(56px + var(--announcement-height, 0px));
+      padding: 0;
     }
 
     /* 桌面 nav 在移动端完全隐藏 */
@@ -989,7 +995,7 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
 
   @media (max-width: 480px) {
     main {
-      margin-top: calc(62px + var(--announcement-height, 0px));
+      margin-top: calc(52px + var(--announcement-height, 0px));
     }
 
     .admin-topbar {

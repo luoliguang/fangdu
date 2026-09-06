@@ -1200,15 +1200,7 @@ const quickCopyImage = async (material) => {
   body.theme-light .empty-textarea::placeholder { color: #94a3b8; }
   body.theme-light .load-more-container { color: #6c757d; }
   body.theme-light .loader { border-color: #e8f7f0; border-top-color: #5a8f73; }
-  main {
-    padding: 1rem;
-    max-width: 1200px;
-    margin-top: calc(84px + var(--announcement-height, 0px)); /* 导航栏底部约74px + 10px间距 + 公告栏高度 */
-    margin-left: auto;
-    margin-right: auto;
-    min-height: 50vh;
-    transition: margin-top 0.3s ease; /* 平滑过渡 */
-  }
+  /* main 布局已统一到 App.vue 全局管理，此处不再重复定义 */
 
   .fade-enter-active, .fade-leave-active {
     transition: opacity 0.3s ease;
@@ -2530,12 +2522,6 @@ body.theme-light .req-badge { border-color: #fff; }
    - 卡片去除外 padding，图片撑满，标题内嵌其下
    ═══════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  main {
-    padding: 0;
-    margin-top: calc(56px + var(--announcement-height, 0px));
-    transition: margin-top 0.3s ease;
-  }
-
   /* ── Hero ── */
   .hero-header {
     padding: 1.6rem 1rem 1.8rem;
@@ -2661,9 +2647,6 @@ body.theme-light .req-badge { border-color: #fff; }
 
 /* ── 窄屏微调（≤ 480px） ── */
 @media (max-width: 480px) {
-  main {
-    margin-top: calc(52px + var(--announcement-height, 0px));
-  }
   /* 手机改 3 列，图片更小、一屏看更多 */
   .grid-container {
     grid-template-columns: repeat(3, 1fr);
