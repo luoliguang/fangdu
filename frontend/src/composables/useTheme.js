@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import apiClient from '../axiosConfig'
 
 const isDark = ref(false)
 
@@ -22,11 +23,9 @@ isDark.value = resolveInitialTheme()
 // 若用户无显式偏好，立即生效
 async function syncServerDefault() {
   try {
-    const baseURL = import.meta.env.VITE_API_BASE_URL || ''
-    const res = await fetch(`${baseURL}/api/v1/drawer-config/site-config/default_theme`)
-    if (!res.ok) return
-    const data = await res.json()
-    const value = data?.data?.value // 'light' | 'dark'
+    // 用 apiClient，复用其 baseURL 规范化，避免生产环境 /api 前缀重复导致 404
+    const res = await apiClient.get('/api/v1/drawer-config/site-config/default_theme')
+    const value = res?.data?.data?.value // 'light' | 'dark'
     if (value !== 'light' && value !== 'dark') return
 
     localStorage.setItem('fangdu-theme-server-default', value)
