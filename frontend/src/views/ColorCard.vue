@@ -695,9 +695,9 @@ const exportFormat = ref('png');
 
 // ========== 当前编辑颜色 ==========
 const currentColor = reactive({
-  hex: '#3498DB',
-  rgb: {r: 52, g: 152, b: 219},
-  lab: {L: 60, a: -7, b: -41},
+  hex: '#5A8F73',
+  rgb: {r: 90, g: 143, b: 115},
+  lab: {L: 55, a: -24, b: 10},
   note: '',
   alpha: 1
 });
@@ -868,9 +868,9 @@ const copyColor = (hex) => {
 // ========== 重置 ==========
 const resetAll = () => {
   colorCards.value = [];
-  currentColor.hex = '#3498DB';
-  currentColor.rgb = {r: 52, g: 152, b: 219};
-  currentColor.lab = {L: 60, a: -7, b: -41};
+  currentColor.hex = '#5A8F73';
+  currentColor.rgb = {r: 90, g: 143, b: 115};
+  currentColor.lab = {L: 55, a: -24, b: 10};
   currentColor.note = '';
   currentColor.alpha = 1;
   globalNote.value = '';
@@ -1367,7 +1367,16 @@ onMounted(() => {
   margin-top: 3%;
   padding: 24px;
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-  color: #2c3e50;
+  color: var(--cc-text);
+  /* ── 主题变量：明亮为默认，暗色在下方覆盖 ── */
+  --cc-surface: #ffffff;
+  --cc-surface-2: #f4f6f5;
+  --cc-border: #e8ebe9;
+  --cc-text: #22312b;
+  --cc-text-muted: #7b8a83;
+  --cc-shadow: 0 6px 22px rgba(15, 40, 26, 0.07);
+  --cc-radius: 16px;
+  --cc-radius-sm: 10px;
   /* 将 Element Plus 主色覆盖为品牌墨绿，让 el-slider/el-switch/el-checkbox 不再用默认蓝 */
   --el-color-primary: #5a8f73;
   --el-color-primary-light-3: #7ba98f;
@@ -1376,6 +1385,23 @@ onMounted(() => {
   --el-color-primary-light-8: #cfe0d7;
   --el-color-primary-light-9: #eef4f0;
   --el-color-primary-dark-2: #4a7a61;
+}
+
+/* 暗色主题（站点暗色 = body 无 theme-light 类） */
+body:not(.theme-light) .color-card-container {
+  --cc-surface: #111a15;
+  --cc-surface-2: #17221b;
+  --cc-border: rgba(255, 255, 255, 0.10);
+  --cc-text: #e7efea;
+  --cc-text-muted: #9db3a8;
+  --cc-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --el-border-color: rgba(255, 255, 255, 0.16);
+  --el-text-color-regular: #cbd5cf;
+}
+
+/* 暗色下滑块未填充轨道用半透明白，避免亮条 */
+body:not(.theme-light) .color-card-container :deep(.el-slider__runway) {
+  background-color: rgba(255, 255, 255, 0.13);
 }
 
 /* ========== 页面头部 ========== */
@@ -1441,14 +1467,16 @@ onMounted(() => {
 
 /* ========== 工具面板 ========== */
 .tool-panel {
-  background: #ffffff;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  box-shadow: var(--cc-shadow);
+  overflow: hidden;
 }
 
 .panel-section {
-  padding: 20px;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 22px;
+  border-bottom: 1px solid var(--cc-border);
 }
 
 .panel-section:last-child {
@@ -1468,7 +1496,21 @@ onMounted(() => {
   margin: 0 0 16px;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--cc-text);
+  position: relative;
+  padding-left: 12px;
+}
+/* 标题前的品牌绿竖条，增加设计感 */
+.panel-section h2::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 1em;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #5a8f73, #0a3d22);
 }
 
 .section-header h2 {
@@ -1484,7 +1526,7 @@ onMounted(() => {
 
 .quick-label {
   font-size: 0.8rem;
-  color: #7f8c8d;
+  color: var(--cc-text-muted);
 }
 
 .quick-color-list {
@@ -1511,9 +1553,9 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
-  background: #f8f9fa;
+  background: var(--cc-surface-2);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--cc-radius-sm);
 }
 
 .tab-btn {
@@ -1521,11 +1563,11 @@ onMounted(() => {
   padding: 10px 12px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #7f8c8d;
+  color: var(--cc-text-muted);
   transition: all 0.2s;
   display: flex;
   align-items: center;
@@ -1534,13 +1576,13 @@ onMounted(() => {
 }
 
 .tab-btn:hover {
-  color: #2c3e50;
+  color: var(--cc-text);
 }
 
 .tab-btn.active {
-  background: #ffffff;
+  background: var(--cc-surface);
   color: #5a8f73;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
 }
 
 .tab-icon {
@@ -1558,7 +1600,7 @@ onMounted(() => {
   margin-bottom: 8px;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #7f8c8d;
+  color: var(--cc-text-muted);
 }
 
 .color-input-wrapper {
@@ -1569,16 +1611,19 @@ onMounted(() => {
 .hex-input {
   flex: 1;
   padding: 10px 14px;
-  border: 2px solid #e0e0e0;
-  border-radius: 6px;
+  border: 2px solid var(--cc-border);
+  border-radius: 8px;
   font-size: 1rem;
   font-family: monospace;
-  transition: border-color 0.2s;
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .hex-input:focus {
   outline: none;
   border-color: #5a8f73;
+  box-shadow: 0 0 0 3px rgba(90, 143, 115, 0.18);
 }
 
 .color-picker-wrapper {
@@ -2059,15 +2104,17 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 16px;
   padding: 16px 20px;
-  background: #ffffff;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius);
+  box-shadow: var(--cc-shadow);
 }
 
 .display-header h3 {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
+  color: var(--cc-text);
 }
 
 .display-stats {
@@ -2081,7 +2128,7 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   font-size: 0.85rem;
-  color: #7f8c8d;
+  color: var(--cc-text-muted);
 }
 
 .value-switch {
@@ -2212,9 +2259,10 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: 48px;
-  background: #ffffff;
-  border-radius: 10px;
-  color: #7f8c8d;
+  background: var(--cc-surface);
+  border: 1px dashed var(--cc-border);
+  border-radius: var(--cc-radius);
+  color: var(--cc-text-muted);
 }
 
 .empty-state svg {
