@@ -153,11 +153,26 @@
 <script>
 import apiClient from '@/axiosConfig'
 import * as echarts from 'echarts'
+import chinaGeoJson from '@/assets/geo/china.json'
+
+// 注册中国省级地图（用于访客地区分布地图）
+echarts.registerMap('china', chinaGeoJson)
 
 // 浅色主题图表通用颜色
 const AXIS_LABEL = '#94a3b8'
 const SPLIT_LINE = 'rgba(226,232,240,0.8)'
 const TOOLTIP_BG = '#1e293b'
+
+// 省名归一化：IP 库返回的简称/全称统一映射到 GeoJSON 全称
+const GEO_NAMES = chinaGeoJson.features.map(f => f.properties.name)
+const shortenProvince = (name) => (name || '')
+  .replace(/特别行政区$/, '')
+  .replace(/(维吾尔|壮族|回族)?自治区$/, '')
+  .replace(/省$/, '')
+  .replace(/市$/, '')
+  .trim()
+const SHORT_TO_FULL = {}
+GEO_NAMES.forEach(full => { SHORT_TO_FULL[shortenProvince(full)] = full })
 
 export default {
   name: 'Statistics',
@@ -577,85 +592,65 @@ export default {
       if (this.regionChart) this.regionChart.dispose()
       this.regionChart = echarts.init(this.$refs.regionChartRef)
 
-      const data = this.regionData.filter(d => d.region !== '未知地区')
-      const unknownRow = this.regionData.find(d => d.region === '未知地区')
-
-      if (data.length === 0 && !unknownRow) {
-        this.regionChart.setOption({
-          backgroundColor: 'transparent',
-          graphic: [{ type: 'text', left: 'center', top: 'middle',
-            style: { text: '暂无地区数据\n访客被记录后将自动解析归属地', fill: '#94a3b8', fontSize: 13, lineHeight: 22 } }]
-        })
-        return
-      }
-
-      // 只展示有明确地区的前15条，未知的汇总显示在最后
-      const items = data.slice(0, 15)
-      const totalKnown = items.reduce((s, d) => s + d.visits, 0)
-      const totalAll = this.regionData.reduce((s, d) => s + d.visits, 0)
-      const maxVal = Math.max(...items.map(d => d.visits), 1)
-
-      const regions = items.map(d => d.region)
-      const visits = items.map(d => d.visits)
-
-      // 动态颜色：访问量越高越深
-      const colors = visits.map(v => {
-        const ratio = v / maxVal
-        if (ratio >= 0.8) return '#0a3d22'
-        if (ratio >= 0.5) return '#1e6b42'
-        if (ratio >= 0.3) return '#5a8f73'
-        return '#93c4a8'
+      // 按省聚合，省名归一化到 GeoJSON 全称；无法匹配的（海外/未知）单独汇总
+      const totalAll = this.regionData.reduce((s, d) => s + (d.visits || 0), 0)
+      const byProvince = {}
+      let overseasOrUnknown = 0
+      ;(this.regionData || []).forEach(d => {
+        const full = SHORT_TO_FULL[shortenProvince(d.region)]
+        if (full) byProvince[full] = (byProvince[full] || 0) + (d.visits || 0)
+        else overseasOrUnknown += (d.visits || 0)
       })
+
+      const mapData = GEO_NAMES.map(name => ({ name, value: byProvince[name] || 0 }))
+      const maxVal = Math.max(...mapData.map(d => d.value), 1)
 
       this.regionChart.setOption({
         backgroundColor: 'transparent',
         tooltip: {
-          trigger: 'axis',
+          trigger: 'item',
           backgroundColor: TOOLTIP_BG,
           borderColor: 'transparent',
           textStyle: { color: '#f1f5f9', fontSize: 13 },
-          axisPointer: { type: 'none' },
           formatter: p => {
-            const item = items[p[0].dataIndex]
-            const pct = totalAll > 0 ? ((item.visits / totalAll) * 100).toFixed(1) : 0
-            return `${item.region}<br/>访问 ${item.visits} 次（${pct}%）<br/>独立IP ${item.unique_ips} 个`
+            const v = p.value || 0
+            const pct = totalAll > 0 ? ((v / totalAll) * 100).toFixed(1) : 0
+            return `${p.name}<br/>访问 ${v} 次（${pct}%）`
           }
         },
-        grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
-        xAxis: {
-          type: 'value',
-          minInterval: 1,
-          axisLine: { show: false },
-          splitLine: { lineStyle: { color: SPLIT_LINE, type: 'dashed' } },
-          axisLabel: { color: AXIS_LABEL, fontSize: 11 }
-        },
-        yAxis: {
-          type: 'category',
-          data: regions,
-          inverse: true,
-          axisLine: { show: false },
-          axisTick: { show: false },
-          axisLabel: { color: '#475569', fontSize: 12 }
+        visualMap: {
+          min: 0,
+          max: maxVal,
+          left: 16,
+          bottom: 16,
+          calculable: true,
+          text: ['多', '少'],
+          textStyle: { color: '#9db3a8', fontSize: 11 },
+          itemWidth: 12,
+          itemHeight: 90,
+          inRange: { color: ['#13251c', '#1e5236', '#3f8560', '#7fd0a6'] }
         },
         series: [{
-          type: 'bar',
-          data: visits.map((v, i) => ({
-            value: v,
-            itemStyle: { color: colors[i], borderRadius: [0, 4, 4, 0] }
-          })),
-          barMaxWidth: 16,
-          label: {
-            show: true,
-            position: 'right',
-            color: '#64748b',
-            fontSize: 12,
-            formatter: p => {
-              const pct = totalAll > 0 ? ((p.value / totalAll) * 100).toFixed(1) : 0
-              return `${p.value}  ${pct}%`
-            }
-          }
+          type: 'map',
+          map: 'china',
+          roam: false,
+          zoom: 1.15,
+          itemStyle: {
+            areaColor: '#132019',
+            borderColor: 'rgba(255,255,255,0.10)',
+            borderWidth: 0.6
+          },
+          emphasis: {
+            itemStyle: { areaColor: '#5a8f73' },
+            label: { show: false }
+          },
+          select: { disabled: true },
+          label: { show: false },
+          data: mapData
         }]
       })
+
+      this._regionOverseas = overseasOrUnknown
     },
 
     normalizeSources(raw) {
@@ -843,8 +838,20 @@ export default {
 .trend-card { margin-bottom: 16px; }
 .chart-lg { width: 100%; height: 300px; }
 .chart-md { width: 100%; height: 240px; }
-.region-card { margin-bottom: 16px; }
-.chart-region { width: 100%; height: 340px; }
+/* 地区分布：深色地图卡片 */
+.region-card {
+  margin-bottom: 16px;
+  background: radial-gradient(130% 130% at 25% -10%, #10241a 0%, #0a130e 62%);
+  border: 1px solid rgba(90, 143, 115, 0.22);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28);
+}
+.region-card .card-title { color: #e7efea; }
+.region-card .card-meta {
+  color: #9db3a8;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.chart-region { width: 100%; height: 460px; }
 
 /* ── 两列 ── */
 .two-col {
@@ -1001,7 +1008,7 @@ export default {
   .stats-header { flex-direction: column; gap: 10px; }
   .chart-lg { height: 240px; }
   .chart-md { height: 200px; }
-  .chart-region { height: auto; min-height: 200px; }
+  .chart-region { height: 320px; }
   .kpi-num { font-size: 1.3rem; }
 }
 </style>
