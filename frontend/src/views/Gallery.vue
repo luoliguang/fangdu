@@ -2591,6 +2591,10 @@ body.theme-light .req-badge { border-color: #fff; }
     gap: 0.5rem;
     padding: 0 0.5rem 0.5rem;
   }
+  /* 移动端排序栏加边距，避免文字贴屏幕边，与网格对齐 */
+  .sort-toolbar {
+    padding: 0 0.5rem;
+  }
   .grid-item {
     padding: 0;
     border-radius: 10px;
@@ -2646,15 +2650,28 @@ body.theme-light .req-badge { border-color: #fff; }
   main {
     margin-top: calc(52px + var(--announcement-height, 0px));
   }
+  /* 手机改 3 列，图片更小、一屏看更多 */
   .grid-container {
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.4rem;
     padding: 0 0.4rem 0.4rem;
   }
   .grid-item {
     border-radius: 8px;
   }
+  .card-body {
+    padding: 0 0.2rem;
+  }
   .card-title {
-    font-size: 0.78rem;
+    font-size: 0.7rem;
+    -webkit-line-clamp: 1;
+  }
+  .card-meta {
+    margin-top: 0.3rem;
+    padding-top: 0.3rem;
+  }
+  .card-views {
+    font-size: 0.68rem;
   }
 }
 

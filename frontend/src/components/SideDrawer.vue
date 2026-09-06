@@ -1391,7 +1391,22 @@ onMounted(() => {
     width: 320px;
     left: -320px;
   }
-  
+
+  /* 移动端缩小左侧菜单触发器，降低突兀感 */
+  .drawer-trigger {
+    padding: 11px 6px;
+    font-size: 11px;
+    gap: 3px;
+    letter-spacing: 1px;
+    border-radius: 0 9px 9px 0;
+    box-shadow: 2px 1px 8px rgba(10, 61, 34, 0.2);
+  }
+  .trigger-icon {
+    width: 15px;
+    height: 15px;
+    margin-bottom: 2px;
+  }
+
   .drawer-content {
     padding: 16px;
   }
