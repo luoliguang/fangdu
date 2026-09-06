@@ -1368,6 +1368,14 @@ onMounted(() => {
   padding: 24px;
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #2c3e50;
+  /* 将 Element Plus 主色覆盖为品牌墨绿，让 el-slider/el-switch/el-checkbox 不再用默认蓝 */
+  --el-color-primary: #5a8f73;
+  --el-color-primary-light-3: #7ba98f;
+  --el-color-primary-light-5: #9cbfab;
+  --el-color-primary-light-7: #bdd4c8;
+  --el-color-primary-light-8: #cfe0d7;
+  --el-color-primary-light-9: #eef4f0;
+  --el-color-primary-dark-2: #4a7a61;
 }
 
 /* ========== 页面头部 ========== */
@@ -1377,7 +1385,7 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 24px;
   padding: 20px 24px;
-  background: linear-gradient(135deg, #1c1917 0%, #3c3330 100%);
+  background: linear-gradient(135deg, #0a3d22 0%, #5a8f73 100%);
   border-radius: 14px;
   color: white;
 }
@@ -1531,7 +1539,7 @@ onMounted(() => {
 
 .tab-btn.active {
   background: #ffffff;
-  color: #3498db;
+  color: #5a8f73;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -1570,7 +1578,7 @@ onMounted(() => {
 
 .hex-input:focus {
   outline: none;
-  border-color: #3498db;
+  border-color: #5a8f73;
 }
 
 .color-picker-wrapper {
@@ -1774,7 +1782,7 @@ onMounted(() => {
 }
 
 .add-button {
-  background: linear-gradient(135deg, #3498db, #2980b9);
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
 }
 
 .add-button:hover {
@@ -1864,7 +1872,7 @@ onMounted(() => {
 
 .count-input:focus {
   outline: none;
-  border-color: #3498db;
+  border-color: #5a8f73;
 }
 
 .count-unit {
@@ -1889,12 +1897,12 @@ onMounted(() => {
 }
 
 .preset-btn:hover {
-  border-color: #3498db;
+  border-color: #5a8f73;
 }
 
 .preset-btn.active {
-  background: #3498db;
-  border-color: #3498db;
+  background: #5a8f73;
+  border-color: #5a8f73;
   color: white;
 }
 
@@ -1915,12 +1923,12 @@ onMounted(() => {
 }
 
 .shade-btn:hover {
-  border-color: #3498db;
+  border-color: #5a8f73;
 }
 
 .shade-btn.active {
-  background: #3498db;
-  border-color: #3498db;
+  background: #5a8f73;
+  border-color: #5a8f73;
   color: white;
 }
 
@@ -1967,7 +1975,7 @@ onMounted(() => {
 
 .toggle-btn.active {
   background: #ffffff;
-  color: #3498db;
+  color: #5a8f73;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -2041,7 +2049,7 @@ onMounted(() => {
 
 .form-group textarea:focus {
   outline: none;
-  border-color: #3498db;
+  border-color: #5a8f73;
 }
 
 /* ========== 色卡展示区域 ========== */
@@ -2116,7 +2124,7 @@ onMounted(() => {
 }
 
 .color-card.current-card {
-  border: 3px solid #3498db;
+  border: 3px solid #5a8f73;
 }
 
 .card-badge {
@@ -2124,7 +2132,7 @@ onMounted(() => {
   top: 10px;
   left: 10px;
   padding: 4px 10px;
-  background: #3498db;
+  background: #5a8f73;
   color: white;
   font-size: 0.7rem;
   font-weight: 600;
@@ -2188,7 +2196,7 @@ onMounted(() => {
 
 .action-btn:hover {
   background: white;
-  color: #3498db;
+  color: #5a8f73;
   transform: scale(1.1);
 }
 
