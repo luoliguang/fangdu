@@ -1392,19 +1392,33 @@ onMounted(() => {
     left: -320px;
   }
 
-  /* 移动端缩小左侧菜单触发器，降低突兀感 */
+  /* 移动端：左侧竖条改为左下圆形 FAB，叠在「教程」上方，不遮挡内容 */
   .drawer-trigger {
-    padding: 11px 6px;
-    font-size: 11px;
-    gap: 3px;
-    letter-spacing: 1px;
-    border-radius: 0 9px 9px 0;
-    box-shadow: 2px 1px 8px rgba(10, 61, 34, 0.2);
+    top: auto;
+    bottom: 66px;
+    left: 16px;
+    transform: none;
+    writing-mode: horizontal-tb;
+    text-orientation: unset;
+    flex-direction: row;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    gap: 0;
+    border-radius: 50%;
+    box-shadow: 0 4px 16px rgba(10, 61, 34, 0.35);
+  }
+  .drawer-trigger:hover,
+  .drawer-trigger.active {
+    transform: translateY(-2px);
+  }
+  .trigger-text {
+    display: none;
   }
   .trigger-icon {
-    width: 15px;
-    height: 15px;
-    margin-bottom: 2px;
+    width: 20px;
+    height: 20px;
+    margin-bottom: 0;
   }
 
   .drawer-content {

@@ -969,6 +969,17 @@ const quickCopyImage = async (material) => {
               </svg>
               {{ formatCount(material.view_count) }}
             </span>
+            <!-- 移动端收藏：放在信息行右侧，不遮挡图片 -->
+            <button
+              class="card-fav-inline"
+              :class="{ favorited: favorites.find(fav => fav.id === material.id) }"
+              @click.stop="addToFavorites(material)"
+              aria-label="收藏"
+            >
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20.84 4.61C20.3292 4.099 19.7228 3.69364 19.0554 3.41708C18.3879 3.14052 17.6725 2.99817 16.95 2.99817C16.2275 2.99817 15.5121 3.14052 14.8446 3.41708C14.1772 3.69364 13.5708 4.099 13.06 4.61L12 5.67L10.94 4.61C9.9083 3.5783 8.50903 2.9987 7.05 2.9987C5.59096 2.9987 4.19169 3.5783 3.16 4.61C2.1283 5.6417 1.5487 7.04097 1.5487 8.5C1.5487 9.95903 2.1283 11.3583 3.16 12.39L4.22 13.45L12 21.23L19.78 13.45L20.84 12.39C21.351 11.8792 21.7563 11.2728 22.0329 10.6053C22.3095 9.93789 22.4518 9.22248 22.4518 8.5C22.4518 7.77752 22.3095 7.06211 22.0329 6.39467C21.7563 5.72723 21.351 5.1208 20.84 4.61V4.61Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
           </div>
         </div>
         <div v-if="material.media_type === 'video'" class="media-icon">▶</div>
@@ -1723,6 +1734,7 @@ body.theme-light .sort-tab.active {
 .card-meta {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
   margin-top: 0.45rem;
   padding-top: 0.45rem;
@@ -1738,6 +1750,33 @@ body.theme-light .sort-tab.active {
 .card-views svg {
   width: 14px;
   height: 14px;
+}
+/* 信息行内的收藏按钮：默认隐藏，仅移动端启用 */
+.card-fav-inline {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255,255,255,0.5);
+  flex-shrink: 0;
+}
+.card-fav-inline svg {
+  width: 17px;
+  height: 17px;
+}
+.card-fav-inline.favorited {
+  color: #f4637e;
+}
+.card-fav-inline.favorited svg path {
+  fill: #f4637e;
+}
+body.theme-light .card-fav-inline {
+  color: #b0b6bf;
 }
 .no-results, .loading-results {
   text-align: center;
@@ -2840,25 +2879,13 @@ a.router-link-active.router-link-exact-active{
   transform: translateY(0);
 }
 
-/* 移动端始终显示按钮，适配无 padding 卡片 */
+/* 移动端：不用顶部浮层按钮（遮挡图片），收藏改到信息行内；复制隐藏（手机长按即可存图） */
 @media (max-width: 768px) {
   .card-actions {
-    opacity: 1;
-    transform: translateY(0);
-    gap: 4px;
-    top: 6px;
-    right: 6px;
+    display: none;
   }
-
-  .action-btn {
-    width: 26px;
-    height: 26px;
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
-  }
-
-  .action-btn svg {
-    width: 12px;
-    height: 12px;
+  .card-fav-inline {
+    display: inline-flex;
   }
 }
 
