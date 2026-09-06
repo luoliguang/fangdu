@@ -931,7 +931,11 @@ const quickCopyImage = async (material) => {
     </div>
     <div class="sort-toolbar">
       <span class="sort-toolbar__count">
-        {{ totalItems > 0 ? `共 ${totalItems} 个素材` : '全部素材' }}
+        <svg class="count-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+        </svg>
+        <template v-if="totalItems > 0">共 <b class="count-num">{{ totalItems }}</b> 个素材</template>
+        <template v-else>全部素材</template>
       </span>
       <div class="sort-tabs">
         <button class="sort-tab" :class="{ active: sortBy === 'latest' }" @click="changeSort('latest')">最新上传</button>
@@ -1518,7 +1522,7 @@ const quickCopyImage = async (material) => {
 .tags-footer {
   display: flex;
   justify-content: center;
-  padding: 0.15rem 0 0.55rem;
+  padding: 0 0 0.35rem;
 }
 
 /* --- 新增：为 TransitionGroup 内的标签按钮添加过渡动画 --- */
@@ -1585,16 +1589,36 @@ const quickCopyImage = async (material) => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin: 0 0 1rem;
+  margin: 1rem 0 0.9rem;
   padding: 0;
 }
 .sort-toolbar__count {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: rgba(255,255,255,0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.02em;
+}
+.sort-toolbar__count .count-icon {
+  width: 15px;
+  height: 15px;
+  color: #7bc49a;
+  opacity: 0.9;
+}
+.sort-toolbar__count .count-num {
+  color: #7bc49a;
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin: 0 1px;
+  font-variant-numeric: tabular-nums;
 }
 body.theme-light .sort-toolbar__count {
-  color: #6b7280;
+  color: #9ca3af;
+}
+body.theme-light .sort-toolbar__count .count-icon,
+body.theme-light .sort-toolbar__count .count-num {
+  color: #5a8f73;
 }
 .sort-tabs {
   display: flex;
@@ -2640,6 +2664,7 @@ body.theme-light .req-badge { border-color: #fff; }
   color: #3d6b52 !important;
   font-weight: 600 !important;
   font-size: 0.85rem !important;
+  padding: 0.35rem 0.9rem !important;
   box-shadow: none !important;
   flex-shrink: 0 !important;
   white-space: nowrap !important;
