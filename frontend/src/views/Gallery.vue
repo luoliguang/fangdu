@@ -36,6 +36,8 @@ let lastSuggestionKeyword = '';
 const isChunkRendering = ref(false);
 const isTagsExpanded = ref(false); //控制标签面板是否展开
 const tagsContainerRef = ref(null); // 标签容器引用
+const heroSearchRef = ref(null); // hero 搜索框引用（用于判断是否滚出视野）
+const showStickySearch = ref(false); // 滚出视野后显示的粘顶精简搜索条
 const visibleTagsCount = ref(20); // 动态计算的可见标签数量
 
 // --- 收藏夹状态（使用全局状态） ---
@@ -671,6 +673,12 @@ watch(searchTerm, () => {
     }, 380);
 });
 
+// hero 搜索框底部滚出视野顶部时，显示粘顶精简搜索条（滚动监听，确定性强）
+const updateStickySearch = () => {
+    if (!heroSearchRef.value) return;
+    showStickySearch.value = heroSearchRef.value.getBoundingClientRect().bottom < 8;
+};
+
 const setupObserver = () => {
     // 清理之前的观察器
     if (observer) {
@@ -711,9 +719,11 @@ onMounted(() => {
     // 使用nextTick确保DOM完全渲染后再设置观察器
     nextTick(() => {
         setupObserver();
+        updateStickySearch();
     });
 
     window.addEventListener('resize', handleWindowResize);
+    window.addEventListener('scroll', updateStickySearch, { passive: true });
     document.addEventListener('click', handleDocumentClick);
 });
 
@@ -722,6 +732,7 @@ onActivated(() => {
     // 重新设置观察器，因为组件可能被缓存
     nextTick(() => {
         setupObserver();
+        updateStickySearch();
     });
 });
 
@@ -736,6 +747,8 @@ onUnmounted(() => {
     if (observer) {
       observer.disconnect();
     }
+
+    window.removeEventListener('scroll', updateStickySearch);
 
     if (appendFrameId) {
       cancelAnimationFrame(appendFrameId);
@@ -834,12 +847,31 @@ const quickCopyImage = async (material) => {
 </script>
 
 <template>
+  <!-- 滚动后从顶部滑下的精简搜索条（hero 搜索框滚出视野时出现） -->
+  <Transition name="sticky-search">
+    <div v-show="showStickySearch" class="sticky-search">
+      <div class="sticky-search__inner">
+        <svg class="sticky-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          type="text"
+          v-model="searchTerm"
+          placeholder="搜索素材 如：圆领短袖 插肩"
+          class="sticky-search__input"
+          @keydown.enter="handleFilterChange"
+        >
+        <button class="sticky-search__btn" @click="handleFilterChange">搜索</button>
+      </div>
+    </div>
+  </Transition>
+
   <header class="hero-header">
     <div class="hero-layout">
       <div class="hero-content">
         <h1 class="hero-title">方度实拍图</h1>
         <p class="hero-subtitle">您可以在这里获取到各种面料、款式、等实拍图素材</p>
-        <div class="search-wrapper">
+        <div class="search-wrapper" ref="heroSearchRef">
           <div class="search-bar-row">
             <input
               type="text"
@@ -1366,6 +1398,78 @@ const quickCopyImage = async (material) => {
 .search-wrapper {
   position: relative;
   width: 100%;
+}
+
+/* ── 滚动后粘顶的精简搜索条 ── */
+.sticky-search {
+  position: fixed;
+  top: calc(var(--announcement-height, 0px) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001; /* 高于导航药丸(1000)，滚动时替代其位置 */
+  width: min(680px, calc(100vw - 32px));
+}
+.sticky-search__inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 52px;
+  padding: 0 0.5rem 0 1rem;
+  border-radius: 999px;
+  background: rgba(9, 15, 12, 0.9);
+  border: 1px solid rgba(90, 143, 115, 0.35);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.sticky-search__icon {
+  width: 18px;
+  height: 18px;
+  color: #7bc49a;
+  flex-shrink: 0;
+}
+.sticky-search__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: #f1f5f9;
+  font-size: 0.95rem;
+}
+.sticky-search__input::placeholder { color: rgba(255, 255, 255, 0.5); }
+.sticky-search__btn {
+  flex-shrink: 0;
+  padding: 0.5rem 1.2rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.2s ease;
+}
+.sticky-search__btn:hover { filter: brightness(1.1); }
+
+body.theme-light .sticky-search__inner {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: #d7e3dc;
+  box-shadow: 0 12px 30px rgba(15, 40, 26, 0.14);
+}
+body.theme-light .sticky-search__input { color: #1f2937; }
+body.theme-light .sticky-search__input::placeholder { color: #9ca3af; }
+
+/* 从顶部滑下 + 淡入的进出场过渡 */
+.sticky-search-enter-active,
+.sticky-search-leave-active {
+  transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.3s ease;
+}
+.sticky-search-enter-from,
+.sticky-search-leave-to {
+  transform: translate(-50%, -120%);
+  opacity: 0;
 }
 
 /* 搜索建议下拉列表 */
