@@ -602,8 +602,22 @@ export default {
         else overseasOrUnknown += (d.visits || 0)
       })
 
-      const mapData = GEO_NAMES.map(name => ({ name, value: byProvince[name] || 0 }))
-      const maxVal = Math.max(...mapData.map(d => d.value), 1)
+      // 每个省一条数据；无数据省用 '-'（落在 visualMap 之外 → 深底色，不被着绿），
+      // 有访问的省才着绿并显示"简称+数值"标签，保证数据省始终清晰跳出
+      const mapData = GEO_NAMES.map(name => {
+        const raw = byProvince[name] || 0
+        return {
+          name,
+          value: raw > 0 ? raw : '-',
+          label: raw > 0
+            ? { show: true, color: '#e9f7ef', fontSize: 10,
+                formatter: p => `${shortenProvince(p.name)}\n${raw}` }
+            : { show: false }
+        }
+      })
+      // 下限设为 1：无数据省(值为 '-')落在 visualMap 之外 → 用深底色；有数据省从明显可见的绿起步
+      const dataMax = Math.max(0, ...Object.values(byProvince))
+      const maxVal = Math.max(dataMax, 2)
 
       this.regionChart.setOption({
         backgroundColor: 'transparent',
@@ -619,7 +633,7 @@ export default {
           }
         },
         visualMap: {
-          min: 0,
+          min: 1,
           max: maxVal,
           left: 16,
           bottom: 16,
@@ -628,7 +642,8 @@ export default {
           textStyle: { color: '#9db3a8', fontSize: 11 },
           itemWidth: 12,
           itemHeight: 90,
-          inRange: { color: ['#13251c', '#1e5236', '#3f8560', '#7fd0a6'] }
+          // 低端就用明显可见的亮绿，避免被单一大值压扁后小数据省看不见
+          inRange: { color: ['#4f9e72', '#6fc094', '#95e0b5', '#c9f7dc'] }
         },
         series: [{
           type: 'map',
@@ -636,13 +651,13 @@ export default {
           roam: false,
           zoom: 1.15,
           itemStyle: {
-            areaColor: '#132019',
-            borderColor: 'rgba(255,255,255,0.10)',
+            areaColor: '#131f19',
+            borderColor: 'rgba(255,255,255,0.12)',
             borderWidth: 0.6
           },
           emphasis: {
-            itemStyle: { areaColor: '#5a8f73' },
-            label: { show: false }
+            itemStyle: { areaColor: '#a8f0c8', borderColor: '#c7f5da', borderWidth: 1.2 },
+            label: { show: true, color: '#0a130e', fontWeight: 700 }
           },
           select: { disabled: true },
           label: { show: false },
