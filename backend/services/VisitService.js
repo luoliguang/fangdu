@@ -321,9 +321,9 @@ class VisitService {
   /**
    * 获取地区访问分布
    */
-  async getRegionStats(limit = 15) {
+  async getRegionStats(limit = 15, days = 30) {
     try {
-      const data = await this.visitModel.getRegionStats(limit);
+      const data = await this.visitModel.getRegionStats(limit, days);
       return { success: true, data };
     } catch (error) {
       console.error('获取地区统计失败:', error);

@@ -283,8 +283,10 @@ class VisitController {
    */
   async getRegionStats(req, res) {
     try {
-      const { limit = 15 } = req.query;
-      const result = await this.visitService.getRegionStats(Math.min(parseInt(limit) || 15, 30));
+      const { limit = 15, days = 30 } = req.query;
+      const safeLimit = Math.min(parseInt(limit) || 15, 30);
+      const safeDays = Math.min(Math.max(parseInt(days) || 30, 1), 365);
+      const result = await this.visitService.getRegionStats(safeLimit, safeDays);
       res.json(result);
     } catch (error) {
       console.error('获取地区统计失败:', error);

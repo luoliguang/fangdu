@@ -320,7 +320,9 @@ class Visit {
   /**
    * 获取地区访问分布（近30天，联表 ip_locations 缓存）
    */
-  async getRegionStats(limit = 15) {
+  async getRegionStats(limit = 15, days = 30) {
+    // days 仅接受经校验的整数（1–365），直接内插到 SQLite 时间修饰符，杜绝注入
+    const safeDays = Math.min(Math.max(parseInt(days) || 30, 1), 365);
     const sql = `
       SELECT
         CASE
@@ -331,7 +333,7 @@ class Visit {
         COUNT(DISTINCT v.ip_address) AS unique_ips
       FROM visits v
       LEFT JOIN ip_locations il ON v.ip_address = il.ip
-      WHERE v.visit_time >= datetime('now', '-30 days')
+      WHERE v.visit_time >= datetime('now', '-${safeDays} days')
         AND v.visit_time IS NOT NULL
       GROUP BY region
       ORDER BY visits DESC

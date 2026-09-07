@@ -91,7 +91,7 @@
     <div class="card region-card reveal" :class="{ 'is-ready': pageReady }" style="--d: 310ms;">
       <div class="card-header">
         <h3 class="card-title">访客地区分布</h3>
-        <span class="card-meta">近30天 · IP归属</span>
+        <span class="card-meta">{{ currentRangeLabel }} · IP归属</span>
       </div>
       <div ref="regionChartRef" class="chart-region"></div>
     </div>
@@ -205,6 +205,11 @@ export default {
       resizeHandler: null
     }
   },
+  computed: {
+    currentRangeLabel() {
+      return this.timeRanges.find(r => r.value === this.selectedRange)?.label || ''
+    }
+  },
   async mounted() {
     await this.loadAllData()
     this.startAutoRefresh()
@@ -294,14 +299,17 @@ export default {
     },
 
     async loadRegionData() {
-      const res = await apiClient.get('/api/v1/visits/regions?limit=15')
+      const res = await apiClient.get(`/api/v1/visits/regions?limit=15&days=${this.selectedRange}`)
       this.regionData = res.data?.data || []
     },
 
     async changeTimeRange(range) {
       this.selectedRange = range
-      await this.loadTrendData()
-      this.$nextTick(() => this.renderTrendChart())
+      await Promise.all([this.loadTrendData(), this.loadRegionData()])
+      this.$nextTick(() => {
+        this.renderTrendChart()
+        this.renderRegionChart()
+      })
     },
 
     async refreshData() {
