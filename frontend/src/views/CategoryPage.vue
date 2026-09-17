@@ -17,6 +17,11 @@ const anyTagsParam = computed(() =>
   (categoryConfig.value?.tags ?? []).join(',')
 );
 
+// 是否处于搜索/标签筛选态（决定计数文案是「共N个」还是「找到N个结果」）
+const isFiltering = computed(() =>
+  searchTerm.value.trim().length > 0 || activeTag.value !== ''
+);
+
 // ── CDN ───────────────────────────────────────────────────────────
 const CDN_BASE_URL = import.meta.env.VITE_CDN_BASE_URL || 'https://assets.fangdutex.cn';
 const toCdnUrl = (url) => {
@@ -353,6 +358,18 @@ onUnmounted(() => {
           {{ isTagsExpanded ? '↑ 收起' : '展开更多 ↓' }}
         </button>
       </div>
+    </div>
+
+    <!-- 数量说明：明确这里只统计本分类 -->
+    <div class="sort-toolbar">
+      <span class="sort-toolbar__count">
+        <svg class="count-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+        </svg>
+        <template v-if="isFiltering">找到 <b class="count-num">{{ totalItems }}</b> 个结果</template>
+        <template v-else-if="totalItems > 0">共 <b class="count-num">{{ totalItems }}</b> 个{{ categoryConfig?.name }}素材</template>
+        <template v-else>全部{{ categoryConfig?.name }}素材</template>
+      </span>
     </div>
 
     <!-- 素材网格 -->

@@ -49,6 +49,9 @@ const galleryCallbacks = inject('galleryCallbacks', ref({}));
 
 // 动态排除标签（由 App.vue 根据 page-categories 配置注入）
 const excludeTagsParam = inject('excludeTagsParam', ref(''));
+// 分类配置就绪信号（App.vue 提供）：首屏必须等它，否则 exclude_tags 为空，
+// 数量和列表会把「杂款领口」等独立分类的素材也算进来
+const categoriesReady = inject('categoriesReady', Promise.resolve());
 
 // 快速筛选处理方法
 const handleQuickFilter = (filterValue) => {
@@ -710,10 +713,17 @@ onMounted(() => {
     
     // 只在首次挂载时加载数据
     if (!isDataLoaded.value) {
-        handleFilterChange();
-        fetchTags();
-        fetchUserFeedbacks(); // 页面加载时获取用户留言
         isDataLoaded.value = true;
+        fetchUserFeedbacks(); // 页面加载时获取用户留言
+        // 等排除标签配置就绪再请求，保证首屏的素材与数量就已排除独立分类；
+        // 配置接口异常时最多等 2s 兜底，不阻塞首屏
+        Promise.race([
+            categoriesReady,
+            new Promise(resolve => setTimeout(resolve, 2000))
+        ]).then(() => {
+            handleFilterChange();
+            fetchTags();
+        });
     }
     
     // 使用nextTick确保DOM完全渲染后再设置观察器
@@ -958,8 +968,9 @@ const quickCopyImage = async (material) => {
         <svg class="count-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
         </svg>
-        <template v-if="totalItems > 0">共 <b class="count-num">{{ totalItems }}</b> 个素材</template>
-        <template v-else>全部素材</template>
+        <template v-if="isSearching">找到 <b class="count-num">{{ totalItems }}</b> 个结果</template>
+        <template v-else-if="totalItems > 0">共 <b class="count-num">{{ totalItems }}</b> 个实拍素材</template>
+        <template v-else>全部实拍素材</template>
       </span>
       <div class="sort-tabs">
         <button class="sort-tab" :class="{ active: sortBy === 'latest' }" @click="changeSort('latest')">最新上传</button>

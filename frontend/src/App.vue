@@ -30,6 +30,11 @@ const excludeTagsParam = computed(() => {
   return [...new Set(allTags)].join(',');
 });
 
+// 分类配置就绪信号：子页面（实拍主页）必须等它 resolve 后再请求素材，
+// 否则首屏会漏掉 exclude_tags，把「杂款领口」的素材和数量一起算进来
+let resolveCategoriesReady;
+const categoriesReady = new Promise(resolve => { resolveCategoriesReady = resolve; });
+
 const fetchPageCategories = async () => {
   try {
     const { data: res } = await apiClient.get('/api/v1/drawer-config/page-categories');
@@ -38,6 +43,8 @@ const fetchPageCategories = async () => {
     updateSlider();
   } catch (err) {
     console.error('加载分类配置失败:', err);
+  } finally {
+    resolveCategoriesReady();
   }
 };
 
@@ -200,6 +207,7 @@ provide('appFavorites', { favorites, addToFavorites });
 provide('galleryCallbacks', galleryCallbacks);
 provide('excludeTagsParam', excludeTagsParam);
 provide('pageCategories', pageCategories);
+provide('categoriesReady', categoriesReady);
 
 // 4. 在组件挂载时，监听整个窗口的滚动事件
 onMounted(() => {
