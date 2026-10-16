@@ -37,8 +37,6 @@ export default defineConfig({
           if (id.includes('jspdf') || id.includes('html2canvas')) return 'pdf-export'
           // Markdown 编辑器 + highlight.js 语言包，只在管理后台用
           if (id.includes('md-editor-v3') || id.includes('highlight.js') || id.includes('@vavt')) return 'md-editor'
-          // video.js 仅在视频弹窗打开时用，单独拆出便于缓存
-          if (id.includes('video.js') || id.includes('videojs')) return 'videojs'
           // OGL WebGL 背景库
           if (id.includes('/ogl/')) return 'ogl'
           // Element Plus UI 库
