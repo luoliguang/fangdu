@@ -44,6 +44,9 @@ function createMaterialRoutes(db) {
   // 批量删除素材（管理员）
   router.post('/batch/delete', requireAuth, materialController.batchDeleteMaterials.bind(materialController));
 
+  // 查询 MOV 转码进度（公开，前端轮询用）
+  router.get('/:id/conversion-status', materialController.getConversionStatus.bind(materialController));
+
   // 记录素材查看次数
   router.post('/:id/view', materialController.trackMaterialView.bind(materialController));
 

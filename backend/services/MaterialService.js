@@ -88,47 +88,58 @@ class MaterialService {
       // 确定媒体类型
       const mediaType = file.mimetype.startsWith('image/') ? 'image' : 'video';
       
-      // 上传到OSS，设置正确的Content-Disposition头部和缓存策略
+      // MOV 格式：先入库（conversion_status=converting），后台异步转 MP4
+      const isMov = file.mimetype === 'video/quicktime' ||
+                    file.originalname.toLowerCase().endsWith('.mov');
+
+      if (mediaType === 'video' && isMov) {
+        const material = await this.materialModel.create({
+          name, filePath: null, tags, mediaType,
+          coverImagePath: null, conversionStatus: 'converting'
+        });
+
+        // 异步转码，不阻塞响应
+        this._convertMovAndStore(material.id, file.buffer, fileName).catch(err => {
+          console.error(`[转码] material ${material.id} 失败:`, err.message);
+        });
+
+        return {
+          success: true,
+          message: '视频正在后台转换为 MP4，请稍候刷新查看',
+          data: { ...material, file_path: null, conversion_status: 'converting' }
+        };
+      }
+
+      // 普通文件：直接上传到 OSS
       const uploadOptions = {
         headers: {
           'Content-Type': file.mimetype,
-          'Content-Disposition': 'inline', // 设置为inline，允许在浏览器中直接显示
-          'Cache-Control': 'public, max-age=2592000' // 缓存30天，减少重复请求
+          'Content-Disposition': 'inline',
+          'Cache-Control': 'public, max-age=2592000'
         }
       };
-      
+
       const uploadResult = await this.ossClient.put(fileName, file.buffer, uploadOptions);
       const fileUrl = this.ensureHttpsUrl(uploadResult.url);
-      
+
       let coverImagePath = null;
-      
-      // 如果是视频，生成封面图
+
       if (mediaType === 'video') {
         try {
           coverImagePath = await this.generateVideoCover(fileName, fileUrl);
         } catch (coverError) {
           console.warn('生成视频封面失败:', coverError.message);
-          // 视频封面生成失败不影响主流程
         }
       }
 
-      // 保存到数据库
       const material = await this.materialModel.create({
-        name,
-        filePath: fileUrl,
-        tags,
-        mediaType,
-        coverImagePath
+        name, filePath: fileUrl, tags, mediaType, coverImagePath
       });
 
       return {
         success: true,
         message: '素材上传成功',
-        data: {
-          ...material,
-          file_path: fileUrl,
-          cover_image_path: coverImagePath
-        }
+        data: { ...material, file_path: fileUrl, cover_image_path: coverImagePath }
       };
     } catch (error) {
       console.error('上传素材失败:', error);
@@ -258,6 +269,50 @@ class MaterialService {
       console.error('获取标签失败:', error);
       throw new Error('获取标签失败');
     }
+  }
+
+  /**
+   * 后台异步：将 MOV buffer 转为 MP4，上传 OSS，更新数据库
+   */
+  async _convertMovAndStore(materialId, inputBuffer, fileNameBase) {
+    const { convertToMp4 } = require('../utils/videoConverter');
+    try {
+      console.log(`[转码] 开始 material ${materialId}`);
+      const mp4Buffer = await convertToMp4(inputBuffer);
+      const mp4FileName = fileNameBase.replace(/\.[^/.]+$/, '') + '.mp4';
+      const uploadResult = await this.ossClient.put(mp4FileName, mp4Buffer, {
+        headers: {
+          'Content-Type': 'video/mp4',
+          'Content-Disposition': 'inline',
+          'Cache-Control': 'public, max-age=2592000'
+        }
+      });
+      const fileUrl = this.ensureHttpsUrl(uploadResult.url);
+      await this.materialModel.updateConversionStatus(materialId, {
+        status: 'done',
+        filePath: fileUrl
+      });
+      console.log(`[转码] material ${materialId} 完成: ${fileUrl}`);
+    } catch (err) {
+      console.error(`[转码] material ${materialId} 失败:`, err.message);
+      await this.materialModel.updateConversionStatus(materialId, { status: 'failed' });
+    }
+  }
+
+  /**
+   * 查询单条素材的转码状态
+   */
+  async getConversionStatus(id) {
+    const material = await this.materialModel.getById(id);
+    if (!material) throw new Error('素材不存在');
+    return {
+      success: true,
+      data: {
+        id: material.id,
+        conversion_status: material.conversion_status || 'done',
+        file_path: material.file_path ? this.ensureHttpsUrl(material.file_path) : null
+      }
+    };
   }
 
   /**

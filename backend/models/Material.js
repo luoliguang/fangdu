@@ -78,7 +78,7 @@ class Material {
 
     // 获取分页数据
     const dataSql = `
-      SELECT id, name, file_path, tags, media_type, cover_image_path, view_count
+      SELECT id, name, file_path, tags, media_type, cover_image_path, view_count, conversion_status
       FROM materials${whereClause}
       ${orderByClause}
       LIMIT ? OFFSET ?
@@ -141,19 +141,28 @@ class Material {
       tags,
       mediaType,
       coverImagePath = null,
-      viewCount = 0
+      viewCount = 0,
+      conversionStatus = null
     } = materialData;
 
-    // 格式化标签
     const formattedTags = this.formatTags(tags);
 
     const sql = `
-      INSERT INTO materials (name, file_path, tags, media_type, cover_image_path, view_count) 
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO materials (name, file_path, tags, media_type, cover_image_path, view_count, conversion_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
-    
-    const result = await this.run(sql, [name, filePath, formattedTags, mediaType, coverImagePath, viewCount]);
+
+    const result = await this.run(sql, [name, filePath, formattedTags, mediaType, coverImagePath, viewCount, conversionStatus]);
     return { id: result.lastID, ...materialData };
+  }
+
+  async updateConversionStatus(id, { status, filePath, coverImagePath } = {}) {
+    const sets = ['conversion_status = ?'];
+    const params = [status];
+    if (filePath !== undefined) { sets.push('file_path = ?'); params.push(filePath); }
+    if (coverImagePath !== undefined) { sets.push('cover_image_path = ?'); params.push(coverImagePath); }
+    params.push(id);
+    return await this.run(`UPDATE materials SET ${sets.join(', ')} WHERE id = ?`, params);
   }
 
   /**

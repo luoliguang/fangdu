@@ -464,6 +464,25 @@ class MaterialController {
   }
 
   /**
+   * 查询单条素材的转码状态
+   */
+  async getConversionStatus(req, res) {
+    try {
+      const { id } = req.params;
+      if (!id || isNaN(id)) {
+        return res.status(400).json({ success: false, message: '无效的素材ID' });
+      }
+      const result = await this.materialService.getConversionStatus(parseInt(id));
+      res.json(result);
+    } catch (error) {
+      res.status(error.message === '素材不存在' ? 404 : 500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
    * 解析文件大小字符串
    */
   parseFileSize(sizeStr) {

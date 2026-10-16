@@ -298,6 +298,7 @@ const showMedia = (material) => {
         lightboxIndex.value = imageIndex;
         lightboxVisible.value = true;
     } else if (material.media_type === 'video') {
+        if (material.conversion_status === 'converting' || !material.file_path) return;
         // 无论 file_path 是什么，都移除可能存在的OSS图片处理参数
         const cleanVideoUrl = material.file_path.split('?')[0];
         currentVideoUrl.value = cleanVideoUrl;
@@ -388,6 +389,10 @@ const fetchMaterials = async (isLoadMore = false) => {
             } else {
                 materials.value = data;
                 applyDisplayMaterials(data, { append: false, chunkSize: 20 });
+            }
+            // 如果有正在转码的视频，启动轮询
+            if (data.some(m => m.conversion_status === 'converting')) {
+                startConversionPolling();
             }
             totalPages.value = meta.totalPages || 1;
             totalItems.value = meta.totalItems || meta.total || meta.count || 0;
@@ -768,10 +773,46 @@ onUnmounted(() => {
 
     clearTimeout(debounceTimer);
     clearTimeout(suggestionsTimer);
+    stopConversionPolling();
 
     window.removeEventListener('resize', handleWindowResize);
     document.removeEventListener('click', handleDocumentClick);
 });
+
+// --- MOV 转码进度轮询 ---
+let conversionPollTimer = null;
+
+function startConversionPolling() {
+  if (conversionPollTimer) return;
+  conversionPollTimer = setInterval(async () => {
+    const converting = displayMaterials.value.filter(m => m.conversion_status === 'converting');
+    if (converting.length === 0) { stopConversionPolling(); return; }
+    for (const m of converting) {
+      try {
+        const { data: res } = await apiClient.get(`/api/v1/materials/${m.id}/conversion-status`);
+        if (res.data.conversion_status !== 'converting') {
+          // 更新 shallowRef 里的对象（shallowRef 只追踪数组引用，需要替换整个数组）
+          const idx = displayMaterials.value.findIndex(x => x.id === m.id);
+          if (idx !== -1) {
+            const updated = [...displayMaterials.value];
+            updated[idx] = { ...updated[idx], ...res.data };
+            displayMaterials.value = updated;
+          }
+          const midx = materials.value.findIndex(x => x.id === m.id);
+          if (midx !== -1) {
+            const updated = [...materials.value];
+            updated[midx] = { ...updated[midx], ...res.data };
+            materials.value = updated;
+          }
+        }
+      } catch (_) {}
+    }
+  }, 5000);
+}
+
+function stopConversionPolling() {
+  if (conversionPollTimer) { clearInterval(conversionPollTimer); conversionPollTimer = null; }
+}
 
 const toggleWidget = () => {
   isWidgetHovered.value = !isWidgetHovered.value;
@@ -986,6 +1027,13 @@ const quickCopyImage = async (material) => {
         @click="showMedia(material)" 
       >
         <img v-if="material.media_type === 'image'" :src="toCdnUrl(material.thumbnail_url || material.file_path)" :alt="material.name" loading="lazy" decoding="async" fetchpriority="low">
+        <div v-else-if="material.media_type === 'video' && material.conversion_status === 'converting'" class="converting-placeholder">
+          <svg class="converting-spinner" viewBox="0 0 50 50"><circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="80 30"/></svg>
+          <span>视频转换中…</span>
+        </div>
+        <div v-else-if="material.media_type === 'video' && material.conversion_status === 'failed'" class="converting-placeholder converting-failed">
+          <span>转换失败</span>
+        </div>
         <video
             v-else-if="material.media_type === 'video'"
             :src="toCdnUrl(material.file_path)"
@@ -1873,7 +1921,28 @@ body.theme-light .card-fav-inline {
 .gallery-enter-from, .gallery-leave-to { opacity: 0; transform: scale(0.9); }
   .gallery-leave-active { position: absolute; }
 
-.media-icon { 
+.converting-placeholder {
+  width: 100%;
+  aspect-ratio: 3/4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.06);
+  color: var(--text-muted, #888);
+  font-size: 12px;
+  cursor: default;
+}
+.converting-placeholder.converting-failed { color: #e05c5c; }
+.converting-spinner {
+  width: 32px;
+  height: 32px;
+  animation: spin 1.2s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.media-icon {
   position: absolute; 
   top: 35%; 
   left: 50%; 
