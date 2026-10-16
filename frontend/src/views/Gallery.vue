@@ -937,10 +937,6 @@ const quickCopyImage = async (material) => {
           </div>
           <!-- 搜索建议下拉列表 -->
           <div v-if="showSuggestions && searchSuggestions.length > 0" class="search-suggestions">
-            <div class="suggestions-header">
-              <span class="suggestions-icon">💡</span>
-              <span class="suggestions-title">为您推荐以下关键词：</span>
-            </div>
             <div class="suggestions-list">
               <button
                 v-for="(suggestion, index) in searchSuggestions"
@@ -1126,7 +1122,7 @@ const quickCopyImage = async (material) => {
           <h3 class="empty-title">
             未找到<span class="empty-keyword">「{{ searchTerm || activeTag }}」</span>的相关素材
           </h3>
-          <p class="empty-subtitle">换个关键词试试，或向我们描述您的需求，我们会及时跟进</p>
+          <p class="empty-subtitle">换个关键词试试</p>
 
           <!-- 搜索建议 chips -->
           <div v-if="searchSuggestions && searchSuggestions.length > 0" class="empty-suggestions">
@@ -1139,19 +1135,6 @@ const quickCopyImage = async (material) => {
             >{{ suggestion }}</button>
           </div>
 
-          <!-- 留言表单 -->
-          <div class="empty-feedback">
-            <textarea
-              v-model="feedbackMessage"
-              class="empty-textarea"
-              placeholder="描述您想要的素材，例如：复合双层拉链风衣…"
-              rows="3"
-            ></textarea>
-            <button class="empty-submit" @click="submitFeedback">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              提交需求
-            </button>
-          </div>
         </div>
         <!-- 无限滚动观察器元素 -->
         <div ref="observerEl" class="observer"></div>
@@ -1265,9 +1248,7 @@ const quickCopyImage = async (material) => {
   body.theme-light .card-title { color: #1f2937; }
   body.theme-light .card-meta { border-top-color: rgba(0,0,0,0.08); }
   body.theme-light .no-results, body.theme-light .loading-results { color: #6c757d; }
-  body.theme-light .search-suggestions { background: white; border: none; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
-  body.theme-light .suggestions-header { background: linear-gradient(135deg,#f5f7fa,#c3cfe2); border-bottom: 1px solid #e0e0e0; }
-  body.theme-light .suggestions-title { color: #555; }
+  body.theme-light .search-suggestions { background: white; }
   body.theme-light .suggestion-item { color: #333; }
   body.theme-light .search-tip-card { background: #f8fafc; border: 1px solid #dfe3e8; box-shadow: 0 6px 16px rgba(15,23,42,0.08); }
   body.theme-light .search-tip-title { color: #1f2937; }
@@ -1534,23 +1515,24 @@ body.theme-light .sticky-search__input::placeholder { color: #9ca3af; }
 /* 搜索建议下拉列表 */
 .search-suggestions {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   z-index: 1000;
   overflow: hidden;
-  animation: slideDown 0.3s ease-out;
-  max-height: 300px;
+  animation: slideDown 0.2s ease-out;
+  max-height: 280px;
   overflow-y: auto;
 }
 
 @keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;
@@ -1558,47 +1540,27 @@ body.theme-light .sticky-search__input::placeholder { color: #9ca3af; }
   }
 }
 
-.suggestions-header {
-  padding: 12px 16px;
-  background: rgba(255,255,255,0.04);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.suggestions-icon {
-  font-size: 1.2em;
-}
-
-.suggestions-title {
-  font-size: 0.9em;
-  color: #555;
-  font-weight: 500;
-}
-
 .suggestions-list {
-  padding: 8px;
+  padding: 6px;
 }
 
 .suggestion-item {
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 14px;
   text-align: left;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  color: #333;
-  font-size: 1em;
+  transition: background 0.15s ease;
+  color: #2c2c2c;
+  font-size: 0.95em;
   margin-bottom: 4px;
 } 
 
 .suggestion-item:hover {
-  background: linear-gradient(135deg, #0a3d22 0%, #5a8f73 100%);
-  color: white;
-  transform: translateX(4px);
+  background: rgba(90, 143, 115, 0.1);
+  color: #0a3d22;
 }
 
 .suggestion-item:last-child {
