@@ -3,8 +3,7 @@ import { ref, shallowRef, computed, onMounted, onUnmounted, watch, onActivated, 
 import apiClient from '../axiosConfig.js';
 import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
-import { defineAsyncComponent } from 'vue';
-const VideoModal = defineAsyncComponent(() => import('../components/VideoModal.vue'));
+import VideoModal from '../components/VideoModal.vue';
 import { useTheme } from '../composables/useTheme.js';
 
 const { isDark } = useTheme();
