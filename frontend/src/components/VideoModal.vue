@@ -585,14 +585,6 @@ const checkNetworkStatus = () => {
     return false;
   }
   
-  // 检测网络速度
-  if (window.performance && window.performance.navigation) {
-    const navTiming = window.performance.timing;
-    const loadTime = navTiming.domContentLoadedEventEnd - navTiming.navigationStart;
-    
-    // 如果页面加载时间过长，可能是网络较慢
-    }
-  }
   
   // 尝试检测是否在企业网络环境
   const isCorpNetwork = checkCorporateNetwork();
