@@ -1,77 +1,63 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import Gallery from '../views/Gallery.vue';
-import Admin from '../views/Admin.vue';
-import Login from '../views/Login.vue'; // 引入登录页
-import UploadMaterial from '../views/UploadMaterial.vue';
-import MaterialManagement from '../views/MaterialManagement.vue';
-import FeedbackManagement from '../views/FeedbackManagement.vue';
-import Statistics from '../views/Statistics.vue';
-import DrawerConfig from '../views/admin/DrawerConfig.vue';
-import PageCategoryConfig from '../views/admin/PageCategoryConfig.vue';
-import FabricDetailConfig from '../views/admin/FabricDetailConfig.vue';
-import ColorCard from '../views/ColorCard.vue';
-import SizeConverter from '../views/SizeConverter.vue';
-import CategoryPage from '../views/CategoryPage.vue';
 
 const routes = [
-    { path: '/', name: 'Gallery', component: Gallery },
-    { path: '/login', name: 'Login', component: Login }, // 添加登录路由
-    { path: '/color-card', name: 'ColorCard', component: ColorCard }, // 添加打色卡路由
-    { path: '/size-converter', name: 'SizeConverter', component: SizeConverter }, // 添加尺码工具路由
-    { path: '/category/:slug', name: 'CategoryPage', component: CategoryPage },
+    { path: '/', name: 'Gallery', component: () => import('../views/Gallery.vue') },
+    { path: '/login', name: 'Login', component: () => import('../views/Login.vue') },
+    { path: '/color-card', name: 'ColorCard', component: () => import('../views/ColorCard.vue') },
+    { path: '/size-converter', name: 'SizeConverter', component: () => import('../views/SizeConverter.vue') },
+    { path: '/category/:slug', name: 'CategoryPage', component: () => import('../views/CategoryPage.vue') },
     {
         path: '/admin',
         name: 'Admin',
-        component: Admin,
-        // 新增：路由守卫
+        component: () => import('../views/Admin.vue'),
         beforeEnter: (to, from, next) => {
-            const token = localStorage.getItem('authToken'); // 修改为authToken以保持一致性
+            const token = localStorage.getItem('authToken');
             if (token) {
-                next(); // 有通行证，放行
+                next();
             } else {
-                next('/login'); // 没有通行证，请去登录
+                next('/login');
             }
         },
         children: [
-            { 
-                path: '', 
+            {
+                path: '',
                 name: 'AdminDefault',
-                redirect: { name: 'UploadMaterial' } 
+                redirect: { name: 'UploadMaterial' }
             },
-            { 
-                path: 'upload', 
-                name: 'UploadMaterial', 
-                component: UploadMaterial 
+            {
+                path: 'upload',
+                name: 'UploadMaterial',
+                component: () => import('../views/UploadMaterial.vue')
             },
-            { 
-                path: 'materials', 
-                name: 'MaterialManagement', 
-                component: MaterialManagement 
+            {
+                path: 'materials',
+                name: 'MaterialManagement',
+                component: () => import('../views/MaterialManagement.vue')
             },
-            { 
-                path: 'feedback', 
-                name: 'FeedbackManagement', 
-                component: FeedbackManagement 
+            {
+                path: 'feedback',
+                name: 'FeedbackManagement',
+                component: () => import('../views/FeedbackManagement.vue')
             },
-            { 
-                path: 'statistics', 
-                name: 'Statistics', 
-                component: Statistics 
+            {
+                path: 'statistics',
+                name: 'Statistics',
+                component: () => import('../views/Statistics.vue')
             },
             {
                 path: 'drawer-config',
                 name: 'DrawerConfig',
-                component: DrawerConfig
+                component: () => import('../views/admin/DrawerConfig.vue')
             },
             {
                 path: 'page-categories',
                 name: 'PageCategoryConfig',
-                component: PageCategoryConfig
+                component: () => import('../views/admin/PageCategoryConfig.vue')
             },
             {
                 path: 'fabric-detail',
                 name: 'FabricDetailConfig',
-                component: FabricDetailConfig
+                component: () => import('../views/admin/FabricDetailConfig.vue')
             }
         ]
     }

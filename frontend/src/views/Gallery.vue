@@ -3,7 +3,8 @@ import { ref, shallowRef, computed, onMounted, onUnmounted, watch, onActivated, 
 import apiClient from '../axiosConfig.js';
 import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
-import VideoModal from '../components/VideoModal.vue';
+import { defineAsyncComponent } from 'vue';
+const VideoModal = defineAsyncComponent(() => import('../components/VideoModal.vue'));
 import { useTheme } from '../composables/useTheme.js';
 
 const { isDark } = useTheme();
@@ -1137,6 +1138,7 @@ const quickCopyImage = async (material) => {
   ></vue-easy-lightbox>
 
   <VideoModal
+    v-if="videoModalVisible"
     :visible="videoModalVisible"
     :src="currentVideoUrl"
     :poster="currentVideoPoster"

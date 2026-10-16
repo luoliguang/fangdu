@@ -23,16 +23,31 @@ export default defineConfig({
     }
   },
   
-  // 构建配置（简化版）
+  // 构建配置
   build: {
-    // 关闭source map
     sourcemap: false,
-    
-    // 调整chunk大小警告限制
-    chunkSizeWarningLimit: 3000,
-    
-    // 清空输出目录
-    emptyOutDir: true
+    chunkSizeWarningLimit: 1000,
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // ECharts 只在统计页用，单独拆出
+          if (id.includes('echarts') || id.includes('zrender')) return 'echarts'
+          // PDF 导出库只在色卡页用，单独拆出
+          if (id.includes('jspdf') || id.includes('html2canvas')) return 'pdf-export'
+          // Markdown 编辑器 + highlight.js 语言包，只在管理后台用
+          if (id.includes('md-editor-v3') || id.includes('highlight.js') || id.includes('@vavt')) return 'md-editor'
+          // video.js 仅在视频弹窗打开时用，单独拆出便于缓存
+          if (id.includes('video.js') || id.includes('videojs')) return 'videojs'
+          // OGL WebGL 背景库
+          if (id.includes('/ogl/')) return 'ogl'
+          // Element Plus UI 库
+          if (id.includes('element-plus') || id.includes('@element-plus')) return 'element-plus'
+          // 其余 node_modules 合并为一个 vendor chunk
+          if (id.includes('node_modules')) return 'vendor'
+        }
+      }
+    }
   },
   
   // 优化依赖预构建
