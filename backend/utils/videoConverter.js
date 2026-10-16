@@ -3,6 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// 优先用 npm 安装的 ffmpeg-static，没有就回退到系统 PATH 里的 ffmpeg
+let FFMPEG_BIN = 'ffmpeg';
+try { FFMPEG_BIN = require('ffmpeg-static'); } catch (_) {}
+
 /**
  * 把视频 buffer（如 MOV）转为 MP4 buffer
  * 依赖服务器已安装 ffmpeg（apt install ffmpeg）
@@ -26,7 +30,7 @@ async function convertToMp4(inputBuffer) {
 
 function runFfmpeg(inputPath, outputPath) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', [
+    const proc = spawn(FFMPEG_BIN, [
       '-i', inputPath,
       '-c:v', 'libx264',
       '-preset', 'fast',

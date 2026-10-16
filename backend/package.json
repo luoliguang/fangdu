@@ -19,9 +19,13 @@
     "dotenv": "^17.2.1",
     "express": "^4.20.0",
     "express-rate-limit": "^8.6.1",
+    "ffmpeg-static": "^5.3.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^1.4.5-lts.1",
     "sequelize": "^6.37.7",
     "sqlite3": "^5.1.7"
+  },
+  "allowScripts": {
+    "ffmpeg-static@5.3.0": true
   }
 }
