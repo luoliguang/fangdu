@@ -1185,7 +1185,6 @@ const quickCopyImage = async (material) => {
   ></vue-easy-lightbox>
 
   <VideoModal
-    v-if="videoModalVisible"
     :visible="videoModalVisible"
     :src="currentVideoUrl"
     :poster="currentVideoPoster"

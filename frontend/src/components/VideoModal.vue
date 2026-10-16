@@ -336,9 +336,6 @@ const initVideoPlayer = async () => {
     }
   }
   
-  // 将元素挂载到容器
-  videoContainer.value.appendChild(videoElement);
-  
   // 检测设备环境并准备播放器配置
   console.log('设备环境检测结果:', deviceInfo.value);
 
@@ -350,21 +347,13 @@ const initVideoPlayer = async () => {
       const normalizedPoster = normalizePath(props.poster);
       const isPosterCrossOrigin = isCrossOrigin(normalizedPoster);
       posterUrl = isPosterCrossOrigin ? toProxyUrl(normalizedPoster) : normalizedPoster;
-      
-      console.log('封面处理结果:', {
-        原始poster: props.poster,
-        是否跨域: isPosterCrossOrigin,
-        最终posterUrl: posterUrl
-      });
     } catch (error) {
       console.warn('封面URL处理失败:', error);
       posterUrl = null;
     }
-  } else {
-    console.log('未提供视频封面，将使用video.js默认行为');
   }
-  
-  // 确保video元素被添加到容器中
+
+  // 将video元素挂载到容器
   videoContainer.value.appendChild(videoElement);
   
   player.value = videojs(videoElement, {
