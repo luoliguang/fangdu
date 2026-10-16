@@ -297,7 +297,7 @@ const showMedia = (material) => {
         lightboxIndex.value = imageIndex;
         lightboxVisible.value = true;
     } else if (material.media_type === 'video') {
-        if (material.conversion_status === 'converting' || !material.file_path) return;
+        if (material.conversion_status === 'converting' || !material.file_path || material.file_path === '_converting_') return;
         // 无论 file_path 是什么，都移除可能存在的OSS图片处理参数
         const cleanVideoUrl = material.file_path.split('?')[0];
         currentVideoUrl.value = cleanVideoUrl;

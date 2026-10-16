@@ -211,12 +211,9 @@ watch(() => props.visible, (newValue) => {
       errorMessage.value = `浏览器兼容性问题: ${browserCompat.issues.join(', ')}`;
       return;
     }
-    
+
     // 检查设备环境
     deviceInfo.value = checkDeviceEnvironment();
-    if (deviceInfo.value.isLowEndDevice) {
-      console.log('检测到低端设备，将应用优化设置');
-    }
     
     // 初始化下载链接（跨域时走代理）
     nextTick(() => {
@@ -280,12 +277,7 @@ const initVideoPlayer = async () => {
       type: getVideoType(props.src)
     });
     
-    // 可达性探测仅用于同源备用策略与日志；跨域不探测，避免CORS报错
-    if (!cross) {
-      if (!(await urlReachable(mainSrcPath))) {
-        console.warn('主视频源可用性探测失败(同源):', mainSrcPath);
-      }
-    }
+    // 可达性探测仅用于同源备用策略；跨域不探测，避免CORS报错
     
     // 仅同源时构造备用源，避免跨域环境下生成404/触发CORS
     if (!cross) {
@@ -337,8 +329,6 @@ const initVideoPlayer = async () => {
   }
   
   // 检测设备环境并准备播放器配置
-  console.log('设备环境检测结果:', deviceInfo.value);
-
   // 初始化video.js播放器，使用多源配置和环境适配
   // 处理封面URL：确保封面图片可以正确加载
   let posterUrl = null;
@@ -456,7 +446,6 @@ const checkDeviceEnvironment = () => {
     deviceInfo.isOldDevice = true;
   }
   
-  console.log('设备环境检测完成:', deviceInfo);
   return deviceInfo;
 };
 
@@ -477,7 +466,6 @@ const applyMobileOptimizations = () => {
       player.value.tech_.vhs.bufferSize = 15; // 15秒缓冲
     }
     
-    console.log('已应用移动设备优化设置');
   }
 };
 
@@ -502,7 +490,6 @@ const applyLowEndDeviceOptimizations = () => {
     // 禁用一些高级功能
     player.value.autoplay(false);
     
-    console.log('已应用低端设备优化设置');
   }
 };
 
@@ -587,7 +574,6 @@ const checkBrowserCompatibility = () => {
     browserInfo.isOutdated = true;
   }
   
-  console.log('浏览器兼容性检查结果:', browserInfo);
   return browserInfo;
 };
 
@@ -605,16 +591,12 @@ const checkNetworkStatus = () => {
     const loadTime = navTiming.domContentLoadedEventEnd - navTiming.navigationStart;
     
     // 如果页面加载时间过长，可能是网络较慢
-    if (loadTime > 5000) {
-      console.warn('网络连接较慢，可能影响视频播放');
     }
   }
   
   // 尝试检测是否在企业网络环境
   const isCorpNetwork = checkCorporateNetwork();
   if (isCorpNetwork) {
-    console.warn('检测到企业网络环境，可能影响视频播放');
-    // 自动应用企业网络环境优化
     applyCorpNetworkOptimizations();
   }
   
@@ -641,7 +623,6 @@ const applyCorpNetworkOptimizations = () => {
       player.value.tech_.vhs.bufferSize = 10; // 10秒缓冲
     }
     
-    console.log('已应用企业网络环境优化设置');
   }
 };
 
@@ -656,22 +637,16 @@ const checkCorporateNetwork = () => {
   const timeoutId = setTimeout(() => {
     isBlocked = true;
     isCorpNetwork = true;
-    console.warn('可能处于受限网络环境，某些资源可能被阻止');
   }, 3000);
   
   // 图像加载成功
   testImage.onload = () => {
     clearTimeout(timeoutId);
-    if (!isBlocked) {
-      console.log('网络环境正常');
-      isCorpNetwork = false;
-    }
+    if (!isBlocked) isCorpNetwork = false;
   };
-  
-  // 图像加载失败
+
   testImage.onerror = () => {
     clearTimeout(timeoutId);
-    console.warn('可能处于受限网络环境，某些资源可能被阻止');
     isCorpNetwork = true;
   };
   
@@ -839,21 +814,11 @@ const handleCanPlay = () => {
   showErrorTip.value = false;
 };
 
-// 视频停滞
-const handleStalled = () => {
-  console.warn('视频播放停滞');
-};
-
-// 视频暂停加载
-const handleSuspend = () => {
-  console.warn('视频加载暂停');
-};
+const handleStalled = () => {};
+const handleSuspend = () => {};
 
 // 处理视频错误
 const handleVideoError = async (event) => {
-  console.log('handleVideoError 被调用:', event);
-  console.log('当前 showErrorTip 状态:', showErrorTip.value);
-  
   clearLoadingTimeout();
   
   // 强制设置错误状态
@@ -865,7 +830,6 @@ const handleVideoError = async (event) => {
     errorMessage.value = event.message || '网络连接问题，请检查您的网络设置。';
   } else if (player.value && player.value.error()) {
     const error = player.value.error();
-    console.log('Video.js 错误详情:', error);
     switch (error.code) {
       case 1: // MEDIA_ERR_ABORTED
         errorMessage.value = '视频播放被中断。';
@@ -901,13 +865,7 @@ const handleVideoError = async (event) => {
     errorMessage.value += ' 您的浏览器版本较旧，建议升级。';
   }
   
-  console.error('视频播放错误:', event, player.value?.error());
-  console.log('设置后 showErrorTip.value:', showErrorTip.value);
-  console.log('设置后 errorMessage.value:', errorMessage.value);
-  
-  // 强制触发Vue的响应式更新
   await nextTick();
-  console.log('nextTick后 showErrorTip.value:', showErrorTip.value);
 };
 
 
@@ -926,8 +884,6 @@ const tryLowResolutionSource = async () => {
     console.warn('低清视频不可达，放弃切换:', lowResSrc);
     return;
   }
-  
-  console.log('尝试切换到低分辨率视频源:', lowResSrc);
   
   // 更新错误提示
   errorMessage.value += ' 正在尝试使用低分辨率版本...';
@@ -968,8 +924,6 @@ const tryAlternativeFormat = async () => {
     // 如果替代也不可达，尝试低清
     return tryLowResolutionSource();
   }
-  
-  console.log('尝试切换到替代格式:', alternativeSrc);
   
   errorMessage.value += ' 正在尝试使用替代格式...';
   
@@ -1052,8 +1006,6 @@ const downloadVideo = async () => {
       dl.searchParams.set('filename', fileName);
       finalDownloadUrl = dl.toString();
     }
-
-    console.log('开始下载视频:', { 原始URL: props.src, 下载URL: finalDownloadUrl, 文件名: fileName });
 
     // 优先使用文件保存对话框（受支持的浏览器：Chrome/Edge等）
     if (typeof window.showSaveFilePicker === 'function') {

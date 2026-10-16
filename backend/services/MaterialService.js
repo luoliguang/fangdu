@@ -94,7 +94,7 @@ class MaterialService {
 
       if (mediaType === 'video' && isMov) {
         const material = await this.materialModel.create({
-          name, filePath: null, tags, mediaType,
+          name, filePath: '_converting_', tags, mediaType,
           coverImagePath: null, conversionStatus: 'converting'
         });
 
