@@ -1040,7 +1040,7 @@ const quickCopyImage = async (material) => {
             @click.prevent
         ></video>
         <div class="card-body">
-          <p class="card-title">{{ material.name }}</p>
+          <p class="card-title" :title="material.name">{{ material.name }}</p>
           <div class="card-meta">
             <!-- 移动端收藏：放在信息行右侧，不遮挡图片 -->
             <button
@@ -1174,6 +1174,13 @@ const quickCopyImage = async (material) => {
     :video-name="currentVideoName"
     @close="videoModalVisible = false"
   />
+
+  <!-- 版权声明 -->
+  <div class="site-footer">
+    本站素材仅供内部参考使用。如您认为某一素材侵犯了您的版权，请联系
+    <a href="mailto:luoyangyang614@gmail.com" class="footer-link">luoyangyang614@gmail.com</a>
+    ，我们将在核实后第一时间下架处理。
+  </div>
 
   <!-- 需求记录浮动 Widget -->
   <div v-if="userFeedbacks && userFeedbacks.length > 0" class="req-widget">
@@ -2193,6 +2200,23 @@ body.theme-light .card-fav-inline {
 }
   @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   .observer { height: 20px; }
+
+.site-footer {
+  text-align: center;
+  padding: 24px 20px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.35);
+  line-height: 1.6;
+}
+.footer-link {
+  color: rgba(90, 143, 115, 0.8);
+  text-decoration: none;
+}
+.footer-link:hover {
+  color: #5a8f73;
+}
+body.theme-light .site-footer { color: #9ca3af; }
+body.theme-light .footer-link { color: #5a8f73; }
 
   /* --- 新增：针对移动端的响应式优化 --- */
 @media (max-width: 768px) {
