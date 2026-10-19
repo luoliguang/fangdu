@@ -40,4 +40,18 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth, getJwtSecret };
+/**
+ * 可选 JWT 中间件：有 token 就解析挂到 req.user，无 token 直接放行
+ * 用于公开接口需要区分管理员/普通用户的场景
+ */
+function optionalAuth(req, res, next) {
+  const secret = getJwtSecret();
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (secret && token) {
+    try { req.user = jwt.verify(token, secret); } catch (_) {}
+  }
+  next();
+}
+
+module.exports = { requireAuth, optionalAuth, getJwtSecret };

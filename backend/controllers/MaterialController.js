@@ -40,7 +40,9 @@ class MaterialController {
    */
   async getMaterials(req, res) {
     try {
-      const result = await this.materialService.getMaterials(req.query);
+      // 管理员（携带有效 JWT）可以看到转换中的视频，普通用户不可见
+      const isAdmin = !!req.user;
+      const result = await this.materialService.getMaterials({ ...req.query, includeConverting: isAdmin });
       res.json(result);
     } catch (error) {
       console.error('获取素材列表失败:', error);

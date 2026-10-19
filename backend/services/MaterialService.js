@@ -19,7 +19,7 @@ class MaterialService {
    */
   async getMaterials(query) {
     try {
-      const { search, tag, any_tag, exclude_tags, media_type, sort, page, limit } = query;
+      const { search, tag, any_tag, exclude_tags, media_type, sort, page, limit, includeConverting } = query;
 
       const options = {
         search: search || '',
@@ -29,7 +29,8 @@ class MaterialService {
         media_type: media_type || '',
         sort: sort || 'latest',
         page: parseInt(page) || 1,
-        limit: Math.min(parseInt(limit) || 20, 100)
+        limit: Math.min(parseInt(limit) || 20, 100),
+        includeConverting: !!includeConverting
       };
 
       const result = await this.materialModel.getAll(options);

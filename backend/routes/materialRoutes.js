@@ -1,6 +1,6 @@
 const express = require('express');
 const MaterialController = require('../controllers/MaterialController');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, optionalAuth } = require('../middleware/auth');
 
 /**
  * 素材相关路由
@@ -9,8 +9,8 @@ function createMaterialRoutes(db) {
   const router = express.Router();
   const materialController = new MaterialController(db);
 
-  // 获取素材列表
-  router.get('/', materialController.getMaterials.bind(materialController));
+  // 获取素材列表（optionalAuth：管理员可见转换中视频，普通用户不可见）
+  router.get('/', optionalAuth, materialController.getMaterials.bind(materialController));
 
   // 获取所有标签（必须在 /:id 之前）
   router.get('/tags/all', materialController.getAllTags.bind(materialController));

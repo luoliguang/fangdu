@@ -19,7 +19,8 @@ class Material {
       media_type = '',
       sort = 'latest', // latest | popular
       page = 1,
-      limit = 20
+      limit = 20,
+      includeConverting = false // 默认隐藏转换中的视频，仅管理员传 true
     } = options;
 
     // 排序白名单，杜绝 SQL 注入
@@ -61,6 +62,11 @@ class Material {
         whereClause += ` AND (${orClauses})`;
         anyTags.forEach(t => params.push(`%${t}%`));
       }
+    }
+
+    // 隐藏转换中的视频（普通用户不可见）
+    if (!includeConverting) {
+      whereClause += ` AND (conversion_status IS NULL OR conversion_status != 'converting')`;
     }
 
     // 排除标签（主页用，隐藏特殊分类素材）
