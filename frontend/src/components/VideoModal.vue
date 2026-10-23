@@ -1409,8 +1409,9 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
-  .video-container { min-width: 320px; min-height: 180px; }
+  .video-container { min-width: 0; min-height: 180px; width: 100%; }
   .modal-container { width: 95vw; max-width: 95vw; max-height: 85vh; }
+  :deep(.video-js) { min-width: 0 !important; min-height: 180px; }
   /* video-header-overlay 在移动端自动适配，无需额外覆盖 */
   .error-content { max-height: 60vh; }
 }

@@ -2251,6 +2251,7 @@ body.theme-light .footer-link { color: #5a8f73; }
   }
   .hero-hot-tags::-webkit-scrollbar { display: none; }
   .hero-hot-tag { flex-shrink: 0; }
+  .hero-hot-label { display: none; }
   .hero-preview {
     display: none;
   }
