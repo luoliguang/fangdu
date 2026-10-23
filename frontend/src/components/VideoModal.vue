@@ -37,21 +37,43 @@
         </div>
       </div>
         
-        <!-- 常规视频控制按钮区域 -->
-        <div v-if="!showErrorTip" class="video-controls" @click.stop>
-          <div class="control-buttons">
-            <button class="btn-download-normal" @click.stop="downloadVideo" title="下载视频" type="button">
-              <span class="download-icon">⬇</span>
-              下载
+        <!-- 顶部操作栏覆层：下载 + 关闭，始终在画面内 -->
+        <div class="video-header-overlay" @click.stop>
+          <div class="header-actions">
+            <button
+              v-if="!showErrorTip && hasAlternativeSource"
+              class="header-icon-btn"
+              @click.stop="tryAlternativeFormat"
+              title="切换格式"
+              type="button"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+                <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+              </svg>
             </button>
-            <button v-if="hasAlternativeSource" class="btn-format" @click.stop="tryAlternativeFormat" title="尝试其他格式" type="button">
-              <span class="format-icon">🔄</span>
-              切换格式
+            <button
+              v-if="!showErrorTip"
+              class="header-icon-btn download-btn"
+              @click.stop="downloadVideo"
+              title="下载视频"
+              type="button"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </button>
+            <button
+              class="header-icon-btn close-btn"
+              @click="$emit('close')"
+              title="关闭"
+              type="button"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
             </button>
           </div>
         </div>
-        
-        <button class="close-button" @click="$emit('close')">&times;</button>
       </div>
     </div>
   </Transition>
@@ -1084,27 +1106,53 @@ onUnmounted(() => {
 .modal-mask { position: fixed; z-index: 9998; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; }
 .modal-container { position: relative; width: 90vw; max-width: 1000px; max-height: 85vh; display: flex; justify-content: center; align-items: center; }
 .video-container { width: 100%; height: 100%; min-width: 640px; min-height: 360px; }
-.close-button { 
-  position: absolute; 
-  top: -40px; 
-  right: -40px; 
-  background: rgba(255, 255, 255, 0.2); /* 半透明背景 */
-  border: none; 
-  border-radius: 50%; 
-  color: white; 
-  font-size: 1.8rem; /* 稍微小一点，更精致 */
-  width: 40px; 
-  height: 40px; 
-  display: flex; 
-  justify-content: center; 
-  align-items: center; 
-  cursor: pointer; 
-  transition: all 0.3s ease; 
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); /* 细微阴影 */
+/* 顶部渐变操作栏 */
+.video-header-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.52) 0%, transparent 100%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 10px 10px 0;
+  z-index: 20;
+  pointer-events: none;
+  border-radius: 8px 8px 0 0;
 }
-.close-button:hover { 
-  background: rgba(255, 255, 255, 0.4); 
-  transform: rotate(90deg); /* 鼠标悬停时旋转 */
+
+.header-actions {
+  display: flex;
+  gap: 6px;
+  pointer-events: all;
+}
+
+.header-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.42);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.18s, transform 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.header-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.65);
+  transform: scale(1.08);
+}
+
+.header-icon-btn:active {
+  transform: scale(0.95);
 }
 
 /* 视频错误提示样式 */
@@ -1323,61 +1371,6 @@ onUnmounted(() => {
   100% { transform: rotate(360deg); }
 }
 
-/* 常规视频控制按钮样式 */
-.video-controls {
-  position: absolute;
-  top: -40px;
-  left: 0;
-  z-index: 15;
-}
-
-.control-buttons {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.btn-download-normal, .btn-format {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.btn-download-normal {
-  background: rgba(76, 175, 80, 0.9);
-  color: white;
-}
-
-.btn-download-normal:hover {
-  background: rgba(76, 175, 80, 1);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.3);
-}
-
-.btn-format {
-  background: rgba(33, 150, 243, 0.9);
-  color: white;
-}
-
-.btn-format:hover {
-  background: rgba(33, 150, 243, 1);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3);
-}
-
-.download-icon, .format-icon {
-  font-size: 16px;
-}
 
 /* Video.js 自定义样式 */
 :deep(.video-js) {
@@ -1418,10 +1411,7 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .video-container { min-width: 320px; min-height: 180px; }
   .modal-container { width: 95vw; max-width: 95vw; max-height: 85vh; }
-  /* 移动端：把按钮移到视频内部，避免超出屏幕 */
-  .close-button { top: 8px; right: 8px; width: 32px; height: 32px; font-size: 1.2rem; z-index: 20; }
-  .video-controls { top: 8px; left: 8px; z-index: 20; }
-  .btn-download-normal, .btn-format { padding: 7px 11px; font-size: 12px; border-radius: 6px; }
+  /* video-header-overlay 在移动端自动适配，无需额外覆盖 */
   .error-content { max-height: 60vh; }
 }
 </style>
