@@ -348,6 +348,7 @@ const initVideoPlayer = async () => {
   
   player.value = videojs(videoElement, {
     controls: true,
+    muted: true,
     autoplay: !deviceInfo.value.isLowEndDevice, // 低端设备不自动播放
     preload: deviceInfo.value.isLowEndDevice ? 'metadata' : 'auto', // 低端设备只预加载元数据
     fluid: true,
