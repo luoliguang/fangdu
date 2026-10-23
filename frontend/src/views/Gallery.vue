@@ -1029,11 +1029,19 @@ const quickCopyImage = async (material) => {
         <div v-else-if="material.media_type === 'video' && material.conversion_status === 'failed'" class="converting-placeholder converting-failed">
           <span>转换失败</span>
         </div>
+        <!-- 有封面图时用 img（iOS Safari 最可靠，不受 video 跨域限制） -->
+        <img
+            v-else-if="material.media_type === 'video' && (material.cover_image_path || material.thumbnail_url)"
+            :src="toCdnUrl(material.cover_image_path || material.thumbnail_url)"
+            :alt="material.name"
+            loading="lazy"
+            decoding="async"
+        >
+        <!-- 无封面图时回退到 video（preload=none 更保守） -->
         <video
             v-else-if="material.media_type === 'video'"
             :src="toCdnUrl(material.file_path)"
-            :poster="toCdnUrl(material.cover_image_path || material.thumbnail_url)"
-            preload="metadata"
+            preload="none"
             muted
             playsinline
             disablePictureInPicture
