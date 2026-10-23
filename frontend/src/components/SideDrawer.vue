@@ -1395,7 +1395,7 @@ onMounted(() => {
   /* 移动端：左侧竖条改为左下圆形 FAB，叠在「教程」上方，不遮挡内容 */
   .drawer-trigger {
     top: auto;
-    bottom: 66px;
+    bottom: 80px;
     left: 16px;
     transform: none;
     writing-mode: horizontal-tb;

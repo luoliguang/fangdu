@@ -999,6 +999,13 @@ const downloadVideo = async () => {
       finalDownloadUrl = dl.toString();
     }
 
+    // 手机端直接新标签打开（iOS/Android 不支持强制下载，用户可长按保存）
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+      window.open(finalDownloadUrl, '_blank');
+      toast.success('视频已在新页面打开，长按可保存');
+      return;
+    }
+
     // 优先使用文件保存对话框（受支持的浏览器：Chrome/Edge等）
     if (typeof window.showSaveFilePicker === 'function') {
       try {
@@ -1318,20 +1325,19 @@ onUnmounted(() => {
 /* 常规视频控制按钮样式 */
 .video-controls {
   position: absolute;
-  bottom: 20px;
-  right: 0px;
+  top: -40px;
+  left: 0;
   z-index: 15;
 }
 
 .control-buttons {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
 }
 
 .btn-download-normal, .btn-format {
   display: flex;
-  margin-bottom: 20px;
   align-items: center;
   gap: 6px;
   padding: 10px 16px;
@@ -1413,5 +1419,7 @@ onUnmounted(() => {
   .modal-container { width: 95vw; max-width: 95vw; max-height: 85vh; }
   .close-button { top: -32px; right: -32px; width: 32px; height: 32px; font-size: 1.2rem; }
   .error-content { max-height: 60vh; }
+  .video-controls { top: -32px; }
+  .btn-download-normal, .btn-format { padding: 7px 12px; font-size: 13px; }
 }
 </style>
