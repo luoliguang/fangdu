@@ -2220,6 +2220,9 @@ body.theme-light .footer-link { color: #5a8f73; }
 
   /* --- 新增：针对移动端的响应式优化 --- */
 @media (max-width: 768px) {
+  .hero-header {
+    padding: 1rem 1rem 1.2rem;
+  }
   .hero-content {
     /* 为内容区增加左右内边距，防止搜索框紧贴边缘 */
     padding-left: 1rem;
@@ -2239,18 +2242,28 @@ body.theme-light .footer-link { color: #5a8f73; }
     text-align: center;
   }
   .hero-hot-tags {
-    justify-content: center;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+    padding-bottom: 2px;
+    margin-top: 0.6rem;
   }
+  .hero-hot-tags::-webkit-scrollbar { display: none; }
+  .hero-hot-tag { flex-shrink: 0; }
   .hero-preview {
     display: none;
   }
 
   .hero-title {
-    font-size: 2rem; /* 在小屏幕上适当缩小标题字号 */
+    font-size: 1.5rem;
   }
 
   .hero-subtitle {
-    font-size: 1.1rem;
+    font-size: 0.85rem;
+    opacity: 0.72;
+    margin-top: 0.25rem;
+    margin-bottom: 0.6rem;
   }
 
 
