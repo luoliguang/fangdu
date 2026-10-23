@@ -1059,7 +1059,6 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
       height: 40px;
     }
   }
-}
 
 /* 移动端底部导航栏 */
 .mobile-bottom-bar {
