@@ -38,11 +38,21 @@ class MaterialService {
       // 处理文件URL，确保使用HTTPS，并生成缩略图URL
       result.data = result.data.map(material => {
         const httpsUrl = this.ensureHttpsUrl(material.file_path);
+        // 视频缩略图：优先用已存的封面，否则用 OSS 视频截帧（取第 1 秒的帧）
+        let thumbnailUrl;
+        if (material.media_type === 'image') {
+          thumbnailUrl = this.generateThumbnailUrl(httpsUrl);
+        } else if (material.media_type === 'video') {
+          thumbnailUrl = material.thumbnail_url
+            ? this.ensureHttpsUrl(material.thumbnail_url)
+            : this.generateVideoSnapshotUrl(httpsUrl);
+        } else {
+          thumbnailUrl = material.thumbnail_url ? this.ensureHttpsUrl(material.thumbnail_url) : null;
+        }
         return {
           ...material,
           file_path: httpsUrl,
-          // 使用OSS图片处理生成缩略图（固定宽高，自动裁剪，宽度300，quality 80）
-          thumbnail_url: material.media_type === 'image' ? this.generateThumbnailUrl(httpsUrl) : (material.thumbnail_url ? this.ensureHttpsUrl(material.thumbnail_url) : null),
+          thumbnail_url: thumbnailUrl,
           cover_image_path: material.cover_image_path ? this.ensureHttpsUrl(material.cover_image_path) : null
         };
       });
@@ -350,6 +360,19 @@ class MaterialService {
     const cdnUrl = url.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, cdnBase);
     const separator = cdnUrl.includes('?') ? '&' : '?';
     return `${cdnUrl}${separator}x-oss-process=image/resize,m_fill,w_${width},quality,q_80`;
+  }
+
+  /**
+   * 生成视频封面缩略图（使用 OSS 视频截帧，取第 1 秒的帧）
+   * iOS Safari/Chrome 对 <video> poster 有限制，用截帧出的 <img> 最可靠
+   */
+  generateVideoSnapshotUrl(url, width = 300) {
+    if (!url || url === '_converting_') return null;
+    if (url.includes('x-oss-process')) return url;
+    const cdnBase = process.env.CDN_BASE_URL || 'https://assets.fangdutex.cn';
+    const cdnUrl = url.replace(/https?:\/\/[^/?#]+\.aliyuncs\.com/, cdnBase);
+    const separator = cdnUrl.includes('?') ? '&' : '?';
+    return `${cdnUrl}${separator}x-oss-process=video/snapshot,t_1000,f_jpg,w_${width},m_fast`;
   }
 
   /**
