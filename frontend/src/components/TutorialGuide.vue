@@ -116,6 +116,8 @@ onMounted(() => {
     setTimeout(startTour, 1800);
   }
 });
+
+defineExpose({ startTour });
 </script>
 
 <style scoped>
@@ -146,12 +148,9 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  /* 移动端由 App.vue 底部导航栏代替 */
   .tutorial-fab {
-    bottom: 20px;
-    left: 16px;
-    height: 34px;
-    padding: 0 12px 0 9px;
-    font-size: 0.78rem;
+    display: none;
   }
 }
 </style>

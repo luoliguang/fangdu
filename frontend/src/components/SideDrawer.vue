@@ -499,12 +499,14 @@ const loadDefaultConfig = () => {
 onMounted(() => {
   loadReadAnnouncements(); // 先加载已读记录
   fetchDrawerConfig(); // 再获取配置数据
-  
+
   // 每隔30秒检查一次公告更新
   setInterval(() => {
     fetchDrawerConfig();
   }, 30000);
 });
+
+defineExpose({ toggleDrawer, isDrawerOpen });
 </script>
 
 <style scoped>
@@ -1392,33 +1394,9 @@ onMounted(() => {
     left: -320px;
   }
 
-  /* 移动端：左侧竖条改为左下圆形 FAB，叠在「教程」上方，不遮挡内容 */
+  /* 移动端：浮动触发按钮由 App.vue 底部导航栏代替 */
   .drawer-trigger {
-    top: auto;
-    bottom: 80px;
-    left: 16px;
-    transform: none;
-    writing-mode: horizontal-tb;
-    text-orientation: unset;
-    flex-direction: row;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    gap: 0;
-    border-radius: 50%;
-    box-shadow: 0 4px 16px rgba(10, 61, 34, 0.35);
-  }
-  .drawer-trigger:hover,
-  .drawer-trigger.active {
-    transform: translateY(-2px);
-  }
-  .trigger-text {
     display: none;
-  }
-  .trigger-icon {
-    width: 20px;
-    height: 20px;
-    margin-bottom: 0;
   }
 
   .drawer-content {

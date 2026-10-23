@@ -1417,9 +1417,10 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .video-container { min-width: 320px; min-height: 180px; }
   .modal-container { width: 95vw; max-width: 95vw; max-height: 85vh; }
-  .close-button { top: -32px; right: -32px; width: 32px; height: 32px; font-size: 1.2rem; }
+  /* 移动端：把按钮移到视频内部，避免超出屏幕 */
+  .close-button { top: 8px; right: 8px; width: 32px; height: 32px; font-size: 1.2rem; z-index: 20; }
+  .video-controls { top: 8px; left: 8px; z-index: 20; }
+  .btn-download-normal, .btn-format { padding: 7px 11px; font-size: 12px; border-radius: 6px; }
   .error-content { max-height: 60vh; }
-  .video-controls { top: -32px; }
-  .btn-download-normal, .btn-format { padding: 7px 12px; font-size: 13px; }
 }
 </style>

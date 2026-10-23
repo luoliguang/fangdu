@@ -52,6 +52,8 @@ const fetchPageCategories = async () => {
 const pendingFeedbacksCount = ref(0);
 const showQRModal = ref(false);
 const fabricGoBtn = ref(null);
+const sideDrawerRef = ref(null);
+const tutorialRef = ref(null);
 
 // --- SideDrawer 全局状态 ---
 // 收藏夹（只在Gallery页面使用）
@@ -371,6 +373,7 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     <!-- 全局左侧抽屉（管理员后台不显示） -->
     <SideDrawer
       v-if="!isAdminRoute"
+      ref="sideDrawerRef"
       :favorites="favorites"
       @showMedia="handleShowMedia"
       @removeFromFavorites="handleRemoveFromFavorites"
@@ -490,7 +493,24 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     <FabricGoQRModal v-model="showQRModal" />
 
     <!-- 新手引导 -->
-    <TutorialGuide v-if="!isAdminRoute" />
+    <TutorialGuide v-if="!isAdminRoute" ref="tutorialRef" />
+
+    <!-- 移动端底部导航栏（替代浮动的菜单/教程按钮） -->
+    <div v-if="!isAdminRoute" class="mobile-bottom-bar">
+      <button class="mobile-bottom-btn" @click="sideDrawerRef?.toggleDrawer()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+          <line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/>
+        </svg>
+        <span>菜单</span>
+        <span v-if="sideDrawerRef?.isDrawerOpen.value === false && false" class="bar-dot"></span>
+      </button>
+      <button class="mobile-bottom-btn" @click="tutorialRef?.startTour()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+          <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <span>教程</span>
+      </button>
+    </div>
 
     <!-- 星空背景：放在 App 根层，路由切换不销毁；进出后台只暂停 RAF，不销毁 WebGL context -->
     <GalaxyBackground v-if="isDark" v-show="!isAdminRoute" :paused="isAdminRoute" />
@@ -993,8 +1013,13 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
       display: none;
     }
 
+    /* 为底部导航栏预留空间 */
+    main {
+      padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    }
+
     .scroll-to-top-btn {
-      bottom: 20px;
+      bottom: 68px;
       right: 20px;
       width: 44px;
       height: 44px;
@@ -1028,10 +1053,54 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     }
 
     .scroll-to-top-btn {
-      bottom: 16px;
+      bottom: 72px;
       right: 16px;
       width: 40px;
       height: 40px;
     }
   }
+}
+
+/* 移动端底部导航栏 */
+.mobile-bottom-bar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: linear-gradient(135deg, #0a3d22 0%, #1a5c38 100%);
+    border-top: 1px solid rgba(90, 143, 115, 0.35);
+    z-index: 1000;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  .mobile-bottom-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: rgba(255, 255, 255, 0.82);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.3px;
+    transition: background 0.15s;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-bottom-btn:active {
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
 </style>
