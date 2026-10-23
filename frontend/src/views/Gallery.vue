@@ -1037,13 +1037,14 @@ const quickCopyImage = async (material) => {
             loading="lazy"
             decoding="async"
         >
-        <!-- 无封面图时回退到 video（preload=none 更保守） -->
+        <!-- 无封面图时回退到 video，用 #t=0.1 强制 iOS 渲染首帧作为预览 -->
         <video
             v-else-if="material.media_type === 'video'"
-            :src="toCdnUrl(material.file_path)"
-            preload="none"
+            :src="toCdnUrl(material.file_path).split('#')[0] + '#t=0.1'"
+            preload="metadata"
             muted
             playsinline
+            webkit-playsinline
             disablePictureInPicture
             @click.prevent
         ></video>
