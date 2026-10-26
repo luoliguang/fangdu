@@ -156,6 +156,13 @@ function createProxyRoutes() {
         method: 'GET',
         headers: requestHeaders
       }, proxyRes => {
+        const status = proxyRes.statusCode || 502;
+        // 上游出错时不能带 attachment 头，否则浏览器会把错误内容存成 .mp4
+        if (status >= 400) {
+          proxyRes.resume();
+          console.error(`下载代理上游返回 ${status}: ${target}`);
+          return res.status(502).json({ success: false, message: `源文件不可用（${status}）` });
+        }
         const headers = {};
         const passthrough = [
           'content-type', 'content-length', 'accept-ranges', 'content-range',
@@ -173,13 +180,21 @@ function createProxyRoutes() {
         // 强制下载
         headers['Content-Disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`;
         headers['Cache-Control'] = 'public, max-age=3600'; // 添加缓存控制
-        res.writeHead(proxyRes.statusCode || 200, headers);
+        res.writeHead(status, headers);
         proxyRes.pipe(res);
+        // 传输中途上游断开：直接断开客户端连接，让浏览器识别为下载失败
+        proxyRes.on('error', () => res.destroy());
       });
 
       proxyReq.on('error', (e) => {
         console.error('下载代理失败:', e.message);
+        if (res.headersSent) return res.destroy();
         res.status(502).json({ success: false, message: '上游请求失败' });
+      });
+
+      // 客户端取消下载时，同时终止对 OSS 的请求
+      res.on('close', () => {
+        if (!res.writableFinished) proxyReq.destroy();
       });
 
       proxyReq.end();

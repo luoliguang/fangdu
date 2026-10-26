@@ -54,11 +54,14 @@
             <button
               v-if="!showErrorTip"
               class="header-icon-btn download-btn"
+              :class="{ downloading: downloadProgress !== null }"
+              :disabled="downloadProgress !== null"
               @click.stop="downloadVideo"
-              title="下载视频"
+              :title="downloadProgress !== null ? '下载中' : '下载视频'"
               type="button"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+              <span v-if="downloadProgress !== null">{{ downloadProgress >= 0 ? `下载中 ${downloadProgress}%` : '下载中…' }}</span>
+              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
             </button>
@@ -984,8 +987,53 @@ const retryVideo = () => {
   }
 };
 
+// 下载进度：null=空闲，-1=下载中但总大小未知，0-99=百分比
+const downloadProgress = ref(null);
+
+// 另存为对话框会先在磁盘建一个空文件，下载失败时必须清掉，否则用户拿到的是 0 字节文件
+const saveToFileHandle = async (fileHandle, url) => {
+  let writable = null;
+  downloadProgress.value = -1;
+  try {
+    const response = await fetch(url, { headers: { Accept: 'video/*,*/*' } });
+    if (!response.ok || !response.body) throw new Error(`服务器返回 ${response.status}`);
+
+    const total = Number(response.headers.get('content-length')) || 0;
+    writable = await fileHandle.createWritable();
+    const reader = response.body.getReader();
+    let received = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      await writable.write(value);
+      received += value.length;
+      if (total) downloadProgress.value = Math.min(99, Math.floor((received / total) * 100));
+    }
+    if (received === 0 || (total && received < total)) throw new Error('下载内容不完整');
+
+    await writable.close();
+    writable = null;
+    toast.success('下载完成');
+  } catch (e) {
+    console.error('视频下载失败:', e);
+    if (writable) {
+      try { await writable.abort(); } catch (_) {}
+    }
+    let removed = false;
+    if (typeof fileHandle.remove === 'function') {
+      try { await fileHandle.remove(); removed = true; } catch (_) {}
+    }
+    toast.error(removed
+      ? '下载失败，请检查网络后重试'
+      : '下载失败，请删除刚才保存位置的空文件后重试');
+  } finally {
+    downloadProgress.value = null;
+  }
+};
+
 // 下载视频到本地
 const downloadVideo = async () => {
+  if (downloadProgress.value !== null) return;
   if (!props.src) {
     toast.error('没有可下载的视频源');
     return;
@@ -1031,8 +1079,9 @@ const downloadVideo = async () => {
 
     // 优先使用文件保存对话框（受支持的浏览器：Chrome/Edge等）
     if (typeof window.showSaveFilePicker === 'function') {
+      let fileHandle = null;
       try {
-        const fileHandle = await window.showSaveFilePicker({
+        fileHandle = await window.showSaveFilePicker({
           suggestedName: fileName,
           types: [
             {
@@ -1043,24 +1092,12 @@ const downloadVideo = async () => {
             }
           ]
         });
-
-        const response = await fetch(finalDownloadUrl, { headers: { Accept: 'video/*,*/*' } });
-        if (!response.ok) throw new Error(`下载失败（${response.status}）`);
-
-        const writable = await fileHandle.createWritable();
-        if (response.body && typeof response.body.pipeTo === 'function') {
-          await response.body.pipeTo(writable);
-        } else {
-          const blob = await response.blob();
-          await writable.write(blob);
-          await writable.close();
-        }
-
-        toast.success('下载完成，已保存到您选择的位置');
-        return; // 已通过文件保存对话框完成下载
       } catch (e) {
-        console.warn('文件保存对话框下载失败，回退到浏览器默认下载:', e);
-        // 继续走下面的回退方案
+        if (e && e.name === 'AbortError') return; // 用户取消了保存对话框
+      }
+      if (fileHandle) {
+        await saveToFileHandle(fileHandle, finalDownloadUrl);
+        return;
       }
     }
 
@@ -1153,6 +1190,16 @@ onUnmounted(() => {
 
 .header-icon-btn:active {
   transform: scale(0.95);
+}
+
+.header-icon-btn.downloading {
+  width: auto;
+  padding: 0 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: default;
+  transform: none;
 }
 
 /* 视频错误提示样式 */
