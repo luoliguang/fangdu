@@ -4,6 +4,9 @@
       :type="type"
       :id="id"
       :value="modelValue"
+      :disabled="disabled"
+      :autocomplete="autocomplete"
+      :aria-invalid="hasError || undefined"
       @input="$emit('update:modelValue', $event.target.value)"
       placeholder=" "
       :class="{ 'has-error': hasError }"
@@ -16,6 +19,8 @@
 import { computed } from 'vue';
 
 const props = defineProps({
+  disabled: Boolean,
+  autocomplete: String,
   modelValue: [String, Number],
   label: String,
   type: {
@@ -52,7 +57,7 @@ defineEmits(['update:modelValue']);
   color: #333; /* 输入文字颜色 */
   box-sizing: border-box;
   outline: none;
-  transition: all 0.2s ease-out; 
+  transition: all 0.2s ease-out;
 }
 
 .input-group input:focus {
@@ -70,19 +75,19 @@ defineEmits(['update:modelValue']);
   transition: all 0.2s ease-out;
   transform-origin: left top;
   background-color: transparent;
-  padding: 0 0.25rem; 
+  padding: 0 0.25rem;
 }
 
 /* 当输入框有内容或聚焦时 */
 .input-group input:focus~label,
 .input-group input:not(:placeholder-shown)~label {
   top: -0.75rem; /* 向上移动更多 */
-  left: 0.75rem; 
+  left: 0.75rem;
   font-size: 0.8rem; /* 缩小更多 */
   color: #007bff; /* 浮动时颜色 */
   background-color: #fff; /* 背景色与输入框一致，覆盖边框 */
   transform: translateY(0);
-  padding: 0 0.5rem; 
+  padding: 0 0.5rem;
 }
 
 /* 错误状态样式 */
@@ -94,4 +99,4 @@ defineEmits(['update:modelValue']);
 .input-group input.has-error ~ label {
   color: #dc3545; /* 红色标签 */
 }
-</style> 
+</style>

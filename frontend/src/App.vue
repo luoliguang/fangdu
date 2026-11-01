@@ -29,7 +29,7 @@ const routeModule = computed(() => {
   return null;
 });
 const blocked = computed(() => !recoveryRoute.value && (site.error || site.stopped || (routeModule.value && !site.moduleEnabled(routeModule.value))));
-const publicVisible = computed(() => site.ready && !site.error && !site.stopped && !isAdminRoute.value);
+const publicVisible = computed(() => site.ready && !site.error && !site.stopped && !isAdminRoute.value && route.path !== '/login');
 const visibleCategories = computed(() => site.moduleEnabled('materials') ? pageCategories.value : []);
 const noticeOpen = ref(false);
 let displayedNoticeKey;
@@ -507,7 +507,7 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     <!-- 顶部公告通知 -->
     <TopAnnouncement v-if="publicVisible && site.moduleEnabled('drawer')" />
     
-    <main :class="{ 'site-status-main': !recoveryRoute && (!site.ready || site.error || site.stopped) }">
+    <main :class="{ 'site-status-main': !recoveryRoute && (!site.ready || site.error || site.stopped), 'site-login-main': route.path === '/login' }">
       <Transition name="fade" mode="out-in">
       <SiteClosed v-if="!site.ready && !recoveryRoute" title="正在读取站点状态" content="请稍候…" />
       <SiteClosed v-else-if="blocked" :stopped="site.stopped && !site.error" :title="site.error ? '暂时无法连接网站' : site.stopped ? site.config.notice.title : '该模块暂未开放'" :content="site.error ? '请稍后重试。管理员仍可登录后台检查配置。' : site.stopped ? site.config.notice.content : '此模块已由管理员关闭，你可以通过上方导航访问其他已开放的模块。'" recovery @retry="site.refresh()" />
@@ -578,6 +578,7 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
 .site-notice-content p { white-space: pre-wrap; margin: 0 0 16px; }
 .site-notice-content p:last-child { margin-bottom: 0; }
 main.site-status-main { margin: 0 auto; padding: 0; max-width: none; min-height: 100vh; }
+main.site-login-main { margin: 0; padding: 0; max-width: none; min-height: 100svh; }
 </style>
 
 <style>

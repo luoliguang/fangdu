@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import FloatingLabelInput from '../components/FloatingLabelInput.vue';
@@ -9,9 +10,10 @@ const passwordInput = ref('');
 const error = ref('');
 const router = useRouter();
 const userStore = useUserStore();
-const { isLoading } = userStore;
+const { isLoading } = storeToRefs(userStore);
 
 const handleLogin = async () => {
+  if (isLoading.value) return;
   if (!usernameInput.value) {
     error.value = '请输入用户名';
     return;
@@ -42,7 +44,7 @@ const handleLogin = async () => {
 
 <template>
   <div class="login-page">
-
+    <div class="login-card">
     <!-- 左侧品牌区 -->
     <aside class="brand-panel">
       <div class="brand-glow brand-glow--top"></div>
@@ -54,7 +56,7 @@ const handleLogin = async () => {
           <span class="brand-logo-text">方度</span>
         </div>
         <h2 class="brand-title">素材管理平台</h2>
-        <p class="brand-desc">专为方度服饰打造的实拍图管理平台</p>
+        <p class="brand-desc">管理实拍素材、维护站点内容，<br>在这里继续你的工作。</p>
 
         <div class="brand-tags">
           <span class="brand-tag">实拍图管理</span>
@@ -69,8 +71,9 @@ const handleLogin = async () => {
     </aside>
 
     <!-- 右侧表单区 -->
-    <main class="form-panel">
+    <section class="form-panel" aria-label="管理员登录">
       <div class="form-wrap">
+        <router-link class="login-back" to="/">← 返回网站</router-link>
         <div class="form-eyebrow">管理员入口</div>
         <h1 class="form-title">欢迎回来</h1>
         <p class="form-subtitle">请验证身份后进入管理后台</p>
@@ -81,6 +84,7 @@ const handleLogin = async () => {
               v-model="usernameInput"
               label="用户名"
               type="text"
+              autocomplete="username"
               :disabled="isLoading"
               :hasError="!!error"
             />
@@ -90,13 +94,14 @@ const handleLogin = async () => {
               v-model="passwordInput"
               label="密码"
               type="password"
+              autocomplete="current-password"
               :disabled="isLoading"
               :hasError="!!error"
             />
           </div>
 
           <transition name="error-fade">
-            <div v-if="error" class="error-bar">
+            <div v-if="error" class="error-bar" role="alert">
               <svg viewBox="0 0 20 20" fill="currentColor" class="error-icon">
                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
               </svg>
@@ -110,28 +115,44 @@ const handleLogin = async () => {
           </button>
         </form>
       </div>
-    </main>
-
+      <p class="form-footnote">方度 · 管理员工作台</p>
+    </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
 /* ── 整页布局 ── */
 .login-page {
-  display: flex;
-  min-height: 100vh;
-  font-family: 'Helvetica Neue', Arial, sans-serif;
+  display: grid;
+  place-items: center;
+  min-height: 100svh;
+  padding: 40px 24px;
+  font-family: inherit;
+  background: #f0f2f5;
 }
+.login-page, .login-page :deep(*) { box-sizing: border-box; }
+.login-card { width: 100%; max-width: 1000px; min-height: 560px; display: grid; grid-template-columns: .95fr 1.05fr; border: 1px solid #e5e7eb; border-radius: 22px; overflow: hidden; box-shadow: 0 20px 60px rgba(10,61,34,.08); }
+.login-back { display: block; width: fit-content; margin-bottom: 24px; color: #64748b; font-size: 13px; text-decoration: none; transition: color .2s; }
+.login-back:hover { color: #0a3d22; }
+.login-back:focus-visible, .login-button:focus-visible { outline: 2px solid #5a8f73; outline-offset: 4px; }
+.form-footnote { margin: 28px 0 0; font-size: 12px; color: #8a8f8c; }
+.input-block :deep(.input-group) { margin-bottom: 0; }
+.input-block :deep(input) { min-height: 52px; border-color: #dbe2dd; border-radius: 10px; }
+.input-block :deep(input:focus) { border-color: #5a8f73; box-shadow: 0 0 0 3px rgba(90,143,115,.12); }
+.input-block :deep(input:focus ~ label), .input-block :deep(input:not(:placeholder-shown) ~ label) { color: #5a8f73; }
+.input-block :deep(input.has-error) { border-color: #c0392b; box-shadow: 0 0 0 3px rgba(192,57,43,.1); }
+.input-block :deep(input.has-error ~ label) { color: #c0392b; }
 
 /* ── 左侧品牌区 ── */
 .brand-panel {
   position: relative;
-  width: 52%;
+  min-width: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 48px;
+  padding: 40px;
   background: linear-gradient(145deg, #061e10 0%, #0a3d22 50%, #2d6644 100%);
 }
 
@@ -179,13 +200,13 @@ const handleLogin = async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 54px;
+  height: 54px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 16px;
   backdrop-filter: blur(8px);
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .brand-logo-text {
@@ -196,7 +217,7 @@ const handleLogin = async () => {
 }
 
 .brand-title {
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 700;
   color: #fff;
   margin: 0 0 14px;
@@ -205,10 +226,10 @@ const handleLogin = async () => {
 }
 
 .brand-desc {
-  font-size: 15px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.68);
   line-height: 1.8;
-  margin: 0 0 36px;
+  margin: 0 0 28px;
 }
 
 .brand-tags {
@@ -238,12 +259,13 @@ const handleLogin = async () => {
 
 /* ── 右侧表单区 ── */
 .form-panel {
-  flex: 1;
+  min-width: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #fafafa;
-  padding: 48px 32px;
+  background: #fff;
+  padding: 36px 48px;
 }
 
 .form-wrap {
@@ -281,12 +303,12 @@ const handleLogin = async () => {
 .form-subtitle {
   font-size: 14px;
   color: #8a8f8c;
-  margin: 0 0 36px;
+  margin: 0 0 28px;
 }
 
 /* 输入块间距 */
 .input-block {
-  margin-bottom: 16px;
+  margin-bottom: 22px;
 }
 
 /* 错误提示条 */
@@ -369,15 +391,25 @@ const handleLogin = async () => {
 }
 
 /* ── 响应式 ── */
+:global(body:not(.theme-light)) .login-page { background: #080f0a; }
+:global(body:not(.theme-light)) .login-card { border-color: rgba(255,255,255,.14); }
+:global(body:not(.theme-light)) .form-panel { background: #0c1912; }
+:global(body:not(.theme-light)) .form-title { color: #f8fafc; }
+:global(body:not(.theme-light)) .form-subtitle,
+:global(body:not(.theme-light)) .login-back { color: #94a3b8; }
+:global(body:not(.theme-light)) .input-block :deep(input) { background: #080f0a; border-color: #2d6644; color: #f8fafc; }
+:global(body:not(.theme-light)) .input-block :deep(input:focus ~ label),
+:global(body:not(.theme-light)) .input-block :deep(input:not(:placeholder-shown) ~ label) { background: #080f0a; }
 @media (max-width: 768px) {
   .login-page {
-    flex-direction: column;
+    padding: 24px 18px;
   }
+  .login-card { grid-template-columns: 1fr; min-height: 0; max-width: 460px; border-radius: 18px; }
 
   .brand-panel {
     width: 100%;
-    padding: 36px 28px 32px;
-    min-height: 220px;
+    padding: 26px 28px;
+    min-height: 0;
   }
 
   .brand-content {
@@ -385,9 +417,9 @@ const handleLogin = async () => {
   }
 
   .brand-logo {
-    width: 52px;
-    height: 52px;
-    margin-bottom: 16px;
+    width: 42px;
+    height: 42px;
+    margin-bottom: 14px;
   }
 
   .brand-logo-text {
@@ -401,16 +433,20 @@ const handleLogin = async () => {
 
   .brand-desc {
     font-size: 14px;
-    margin-bottom: 20px;
+    margin-bottom: 0;
   }
+  .brand-tags { display: none; }
 
   .brand-footer {
     display: none;
   }
 
   .form-panel {
-    padding: 40px 24px;
-    align-items: flex-start;
+    padding: 26px 28px;
+    align-items: center;
   }
+  .login-back { margin-bottom: 24px; }
+  .form-title { font-size: 25px; }
+  .form-footnote { margin-top: 22px; }
 }
 </style>
