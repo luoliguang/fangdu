@@ -8,6 +8,8 @@ import FabricGoQRModal from './components/FabricGoQRModal.vue';
 import TutorialGuide from './components/TutorialGuide.vue';
 import { useTheme } from './composables/useTheme.js';
 import GalaxyBackground from './components/GalaxyBackground.vue';
+import SiteClosed from './components/SiteClosed.vue';
+import { useSiteControlStore } from './stores/siteControl.js';
 
 const { isDark, toggleTheme, initTheme } = useTheme();
 
@@ -18,6 +20,47 @@ const mainNav = ref(null);  // 导航容器的引用
 const route = useRoute();   // 获取当前路由信息
 const router = useRouter(); //获取 router 实例
 const isAdminRoute = computed(() => route.path.startsWith('/admin'));
+const site = useSiteControlStore();
+const recoveryRoute = computed(() => isAdminRoute.value || route.path === '/login');
+const routeModule = computed(() => {
+  if (route.path === '/' || route.path.startsWith('/category/')) return 'materials';
+  if (route.path === '/color-card') return 'colorCard';
+  if (route.path === '/size-converter') return 'sizeConverter';
+  return null;
+});
+const blocked = computed(() => !recoveryRoute.value && (site.error || site.stopped || (routeModule.value && !site.moduleEnabled(routeModule.value))));
+const publicVisible = computed(() => site.ready && !site.error && !site.stopped && !isAdminRoute.value);
+const visibleCategories = computed(() => site.moduleEnabled('materials') ? pageCategories.value : []);
+const noticeOpen = ref(false);
+let displayedNoticeKey;
+let sitePoll;
+const noticeKey = () => `site-notice:${site.config?.revision}`;
+function checkNotice() {
+  noticeOpen.value = false;
+  if (!site.ready || site.error || recoveryRoute.value || site.isAdmin || !site.config?.enabled || !site.config?.notice.enabled) return;
+  try { noticeOpen.value = sessionStorage.getItem(noticeKey()) !== 'read'; }
+  catch (_) { noticeOpen.value = true; }
+  if (noticeOpen.value) displayedNoticeKey = noticeKey();
+}
+function dismissNotice() {
+  try { if (displayedNoticeKey) sessionStorage.setItem(displayedNoticeKey, 'read'); } catch (_) { /* Storage may be disabled. */ }
+}
+watch([() => site.config?.revision, () => site.config?.enabled, () => site.error, () => site.ready, recoveryRoute, () => site.isAdmin], checkNotice);
+const noticeParagraphs = computed(() => (site.config?.notice.content || '').split(/\n\s*\n/).filter(text => text.trim()));
+const refreshSite = () => site.refresh();
+onMounted(() => {
+  site.refresh();
+  sitePoll = setInterval(refreshSite, 15000);
+  window.addEventListener('focus', refreshSite);
+  window.addEventListener('storage', refreshSite);
+  window.addEventListener('siteControlChanged', refreshSite);
+});
+onUnmounted(() => {
+  clearInterval(sitePoll);
+  window.removeEventListener('focus', refreshSite);
+  window.removeEventListener('storage', refreshSite);
+  window.removeEventListener('siteControlChanged', refreshSite);
+});
 
 // 登录状态管理
 const loginState = ref(!!localStorage.getItem('authToken'));
@@ -372,7 +415,7 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
   <div id="app">
     <!-- 全局左侧抽屉（管理员后台不显示） -->
     <SideDrawer
-      v-if="!isAdminRoute"
+      v-if="publicVisible && site.moduleEnabled('drawer')"
       ref="sideDrawerRef"
       :favorites="favorites"
       @showMedia="handleShowMedia"
@@ -396,19 +439,19 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     </div>
 
     <!-- 桌面端导航（>768px） -->
-    <nav v-if="!isAdminRoute" class="main-nav" :class="{ 'is-hidden': !showNavBar }" ref="mainNav">
+    <nav v-if="publicVisible" class="main-nav" :class="{ 'is-hidden': !showNavBar }" ref="mainNav">
       <div class="nav-slider" ref="navSlider"></div>
-      <router-link to="/" @click="handleNavClick">实拍</router-link>
+      <router-link v-if="site.moduleEnabled('materials')" to="/" @click="handleNavClick">实拍</router-link>
       <router-link
-        v-for="cat in pageCategories"
+        v-for="cat in visibleCategories"
         :key="cat.slug"
         :to="`/category/${cat.slug}`"
         @click="handleNavClick"
       >{{ cat.name }}</router-link>
-      <a ref="fabricGoBtn" href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank" @click.prevent="openFabricGoModal">面料细节</a>
-      <a href="https://fangdutex.cn/" target="_blank">官网</a>
-      <router-link to="/color-card" @click="handleNavClick">设计专用</router-link>
-      <router-link to="/size-converter" @click="handleNavClick">尺码转换</router-link>
+      <a v-if="site.moduleEnabled('fabricDetail')" ref="fabricGoBtn" href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank" @click.prevent="openFabricGoModal">面料细节</a>
+      <a v-if="site.moduleEnabled('officialSite')" href="https://fangdutex.cn/" target="_blank">官网</a>
+      <router-link v-if="site.moduleEnabled('colorCard')" to="/color-card" @click="handleNavClick">设计专用</router-link>
+      <router-link v-if="site.moduleEnabled('sizeConverter')" to="/size-converter" @click="handleNavClick">尺码转换</router-link>
       <router-link v-if="!isLoggedIn" to="/login" @click="handleNavClick">登录</router-link>
       <template v-else>
         <router-link to="/admin" @click="handleNavClick">后台管理</router-link>
@@ -424,7 +467,7 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     </nav>
 
     <!-- 移动端折叠导航（≤768px） -->
-    <div v-if="!isAdminRoute" class="mobile-nav" :class="{ 'is-hidden': !showNavBar }">
+    <div v-if="publicVisible" class="mobile-nav" :class="{ 'is-hidden': !showNavBar }">
       <!-- 顶部胶囊：当前页名 + 汉堡按钮 -->
       <div class="mobile-nav-bar" @click.stop>
         <span class="mobile-nav-current">{{ currentPageTitle }}</span>
@@ -441,17 +484,17 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
       <!-- 展开后的菜单下拉 -->
       <Transition name="mobile-menu-drop">
         <div v-if="mobileNavOpen" class="mobile-nav-dropdown" @click.stop>
-          <router-link to="/" @click="closeMobileNav">实拍</router-link>
+          <router-link v-if="site.moduleEnabled('materials')" to="/" @click="closeMobileNav">实拍</router-link>
           <router-link
-            v-for="cat in pageCategories"
+            v-for="cat in visibleCategories"
             :key="cat.slug"
             :to="`/category/${cat.slug}`"
             @click="closeMobileNav"
           >{{ cat.name }}</router-link>
-          <a href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank" @click="closeMobileNav">面料细节</a>
-          <a href="https://fangdutex.cn/welcome" target="_blank" @click="closeMobileNav">知识库</a>
-          <router-link to="/color-card" @click="closeMobileNav">设计专用</router-link>
-          <router-link to="/size-converter" @click="closeMobileNav">尺码转换</router-link>
+          <a v-if="site.moduleEnabled('fabricDetail')" href="https://fangdutex.cn/node/019879ce-3372-7e4b-a98a-d9b243f7ea50" target="_blank" @click="closeMobileNav">面料细节</a>
+          <a v-if="site.moduleEnabled('officialSite')" href="https://fangdutex.cn/welcome" target="_blank" @click="closeMobileNav">知识库</a>
+          <router-link v-if="site.moduleEnabled('colorCard')" to="/color-card" @click="closeMobileNav">设计专用</router-link>
+          <router-link v-if="site.moduleEnabled('sizeConverter')" to="/size-converter" @click="closeMobileNav">尺码转换</router-link>
           <router-link v-if="!isLoggedIn" to="/login" @click="closeMobileNav">登录</router-link>
           <router-link v-else to="/admin" @click="closeMobileNav">后台管理</router-link>
         </div>
@@ -462,14 +505,20 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     </div>
     
     <!-- 顶部公告通知 -->
-    <TopAnnouncement />
+    <TopAnnouncement v-if="publicVisible && site.moduleEnabled('drawer')" />
     
-    <main>
+    <main :class="{ 'site-status-main': !recoveryRoute && (!site.ready || site.error || site.stopped) }">
+      <Transition name="fade" mode="out-in">
+      <SiteClosed v-if="!site.ready && !recoveryRoute" title="正在读取站点状态" content="请稍候…" />
+      <SiteClosed v-else-if="blocked" :stopped="site.stopped && !site.error" :title="site.error ? '暂时无法连接网站' : site.stopped ? site.config.notice.title : '该模块暂未开放'" :content="site.error ? '请稍后重试。管理员仍可登录后台检查配置。' : site.stopped ? site.config.notice.content : '此模块已由管理员关闭，你可以通过上方导航访问其他已开放的模块。'" recovery @retry="site.refresh()" />
+      <div v-else key="site-content">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <component :is="Component" />
         </keep-alive>
       </router-view>
+      </div>
+      </Transition>
     </main>
 
     <!-- 前后台切换遮罩 -->
@@ -490,13 +539,13 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
       </button>
     </Transition>
 
-    <FabricGoQRModal v-model="showQRModal" />
+    <FabricGoQRModal v-if="publicVisible && site.moduleEnabled('fabricDetail')" v-model="showQRModal" />
 
     <!-- 新手引导 -->
-    <TutorialGuide v-if="!isAdminRoute" ref="tutorialRef" />
+    <TutorialGuide v-if="publicVisible && site.moduleEnabled('drawer')" ref="tutorialRef" />
 
     <!-- 移动端底部导航栏（替代浮动的菜单/教程按钮） -->
-    <div v-if="!isAdminRoute" class="mobile-bottom-bar">
+    <div v-if="publicVisible && site.moduleEnabled('drawer')" class="mobile-bottom-bar">
       <button class="mobile-bottom-btn" @click="sideDrawerRef?.toggleDrawer()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
           <line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/>
@@ -514,8 +563,22 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
 
     <!-- 星空背景：放在 App 根层，路由切换不销毁；进出后台只暂停 RAF，不销毁 WebGL context -->
     <GalaxyBackground v-if="isDark" v-show="!isAdminRoute" :paused="isAdminRoute" />
+    <el-dialog v-if="site.config?.enabled && !site.error && !recoveryRoute" v-model="noticeOpen" class="site-entry-notice" :title="site.config?.notice.title" width="min(560px, 92vw)" align-center append-to-body @close="dismissNotice">
+      <div class="site-notice-content"><p v-for="(paragraph, index) in noticeParagraphs" :key="index">{{ paragraph }}</p></div>
+      <template #footer><el-button type="primary" @click="noticeOpen = false">我已了解</el-button></template>
+    </el-dialog>
   </div>
 </template>
+
+<style>
+.site-entry-notice { --el-color-primary: #5a8f73; --el-color-primary-light-3: #7ba58f; --el-color-primary-dark-2: #0a3d22; border-radius: 16px; padding: 24px; }
+.site-entry-notice .el-dialog__body { padding: 12px 0 20px; }
+.site-entry-notice .el-dialog__title { font-weight: 600; }
+.site-notice-content { overflow-wrap: anywhere; line-height: 1.8; font-size: 15px; }
+.site-notice-content p { white-space: pre-wrap; margin: 0 0 16px; }
+.site-notice-content p:last-child { margin-bottom: 0; }
+main.site-status-main { margin: 0 auto; padding: 0; max-width: none; min-height: 100vh; }
+</style>
 
 <style>
   /* ── 前后台切换遮罩动画 ──────────────────────────── */

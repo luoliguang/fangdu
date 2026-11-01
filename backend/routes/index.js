@@ -10,11 +10,12 @@ const createProxyRoutes = require('./proxyRoutes');
  * 主路由配置
  * 整合所有API路由
  */
-function createRoutes(db) {
+function createRoutes(db, siteControlService) {
   const router = express.Router();
 
   // API版本前缀
   const apiV1 = express.Router();
+  apiV1.use('/site-control', require('./siteControlRoutes')(siteControlService));
 
   // 认证相关路由
   apiV1.use('/auth', createAuthRoutes());

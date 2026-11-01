@@ -10,7 +10,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
@@ -66,6 +66,7 @@ const getSteps = () => [
 ];
 
 let driverInstance = null;
+let autoStartTimer;
 
 const lockScroll = () => {
   document.documentElement.style.overflow = 'hidden';
@@ -113,9 +114,17 @@ const startTour = () => {
 
 onMounted(() => {
   if (!localStorage.getItem('tutorial_seen') && route.path === '/') {
-    setTimeout(startTour, 1800);
+    autoStartTimer = setTimeout(() => { if (route.path === '/') startTour(); }, 1800);
   }
 });
+
+const stopTour = () => {
+  clearTimeout(autoStartTimer);
+  driverInstance?.destroy();
+  teardown();
+};
+watch(() => route.path, stopTour);
+onUnmounted(stopTour);
 
 defineExpose({ startTour });
 </script>

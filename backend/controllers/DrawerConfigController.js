@@ -809,6 +809,9 @@ class DrawerConfigController {
   static async updateSiteConfig(req, res) {
     try {
       const { key } = req.params;
+      if (key === 'site_control') {
+        return res.status(400).json({ success: false, message: '请通过站点控制页面修改此配置' });
+      }
       const { value } = req.body;
       if (value === undefined) {
         return res.status(400).json({ success: false, message: '缺少 value 字段' });

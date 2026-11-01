@@ -33,6 +33,7 @@ const showMobileMenu = ref(false);
 const isDesktop = ref(window.innerWidth > DESKTOP_BREAKPOINT);
 
 const navItems = [
+  { name: 'SiteControl', label: '站点控制', icon: SwitchButton },
   { name: 'UploadMaterial', label: '上传素材', icon: Upload },
   { name: 'MaterialManagement', label: '素材管理', icon: PictureRounded },
   { name: 'FeedbackManagement', label: '留言管理', icon: ChatLineSquare },
@@ -149,7 +150,7 @@ onUnmounted(() => {
 
 <template>
   <div class="admin-container">
-    <div class="mobile-nav-toggle">
+    <div class="admin-mobile-nav-toggle">
       <button class="mobile-nav-toggle__btn" @click="toggleMobileMenu">
         <span>{{ mobileMenuTitle }}</span>
         <span class="mobile-nav-toggle__arrow" :class="{ open: showMobileMenu }">▾</span>
@@ -249,6 +250,7 @@ onUnmounted(() => {
 
 <style scoped>
 .admin-container {
+  box-sizing: border-box;
   width: 100%;
   max-width: 1360px;
   margin: 1.25rem auto;
@@ -276,7 +278,7 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.mobile-nav-toggle {
+.admin-mobile-nav-toggle {
   display: none;
 }
 
@@ -631,7 +633,7 @@ onUnmounted(() => {
     min-height: auto;
   }
 
-  .mobile-nav-toggle {
+  .admin-mobile-nav-toggle {
     display: block;
   }
 

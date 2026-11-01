@@ -23,6 +23,11 @@ const routes = [
         },
         children: [
             {
+                path: 'site-control',
+                name: 'SiteControl',
+                component: () => import('../views/admin/SiteControl.vue')
+            },
+            {
                 path: '',
                 name: 'AdminDefault',
                 redirect: { name: 'UploadMaterial' }

@@ -100,6 +100,11 @@ class Server {
     // 解析JSON和URL编码的请求体
     this.app.use(express.json({ limit: this.config.server.upload.maxFileSize }));
     this.app.use(express.urlencoded({ extended: true, limit: this.config.server.upload.maxFileSize }));
+
+    const { SiteControlService } = require('./services/SiteControlService');
+    const { SiteConfig } = require('./models/DrawerConfig');
+    this.siteControlService = new SiteControlService(SiteConfig);
+    this.app.use(require('./middleware/siteControl').createSiteControlMiddleware(this.siteControlService));
     
     // 静态文件服务
     const uploadsDir = path.join(__dirname, 'uploads');
@@ -158,7 +163,7 @@ class Server {
    */
   setupRoutes() {
     // 主路由
-    const routes = createRoutes(this.db);
+    const routes = createRoutes(this.db, this.siteControlService);
     this.app.use('/', routes);
     // 直接在应用层挂载代理路由，防止生产环境路由前缀/反向代理导致的匹配问题
     this.app.use('/api/proxy', createProxyRoutes());
