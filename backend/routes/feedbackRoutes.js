@@ -1,6 +1,6 @@
 const express = require('express');
 const FeedbackController = require('../controllers/FeedbackController');
-const { requireAuth } = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/auth');
 
 /**
  * 反馈留言相关路由
@@ -23,37 +23,37 @@ function createFeedbackRoutes(db) {
   // ── 以下均为管理员接口 ──
 
   // 获取留言列表
-  router.get('/', requireAuth, feedbackController.getFeedbacks.bind(feedbackController));
+  router.get('/', requireAdmin, feedbackController.getFeedbacks.bind(feedbackController));
 
   // 获取未处理留言数量
-  router.get('/stats/unprocessed', requireAuth, feedbackController.getUnprocessedCount.bind(feedbackController));
+  router.get('/stats/unprocessed', requireAdmin, feedbackController.getUnprocessedCount.bind(feedbackController));
 
   // 获取留言统计信息
-  router.get('/stats/overview', requireAuth, feedbackController.getFeedbackStats.bind(feedbackController));
+  router.get('/stats/overview', requireAdmin, feedbackController.getFeedbackStats.bind(feedbackController));
 
   // 批量更新留言状态
-  router.put('/batch/status', requireAuth, feedbackController.batchUpdateStatus.bind(feedbackController));
+  router.put('/batch/status', requireAdmin, feedbackController.batchUpdateStatus.bind(feedbackController));
 
   // 批量删除留言
-  router.post('/batch/delete', requireAuth, feedbackController.batchDeleteFeedbacks.bind(feedbackController));
+  router.post('/batch/delete', requireAdmin, feedbackController.batchDeleteFeedbacks.bind(feedbackController));
 
   // 导出留言数据
-  router.get('/export/data', requireAuth, feedbackController.exportFeedbacks.bind(feedbackController));
+  router.get('/export/data', requireAdmin, feedbackController.exportFeedbacks.bind(feedbackController));
 
   // 搜索留言
-  router.get('/search/query', requireAuth, feedbackController.searchFeedbacks.bind(feedbackController));
+  router.get('/search/query', requireAdmin, feedbackController.searchFeedbacks.bind(feedbackController));
 
   // 获取单个留言详情
-  router.get('/:id', requireAuth, feedbackController.getFeedbackById.bind(feedbackController));
+  router.get('/:id', requireAdmin, feedbackController.getFeedbackById.bind(feedbackController));
 
   // 更新留言状态
-  router.put('/:id/status', requireAuth, feedbackController.updateFeedbackStatus.bind(feedbackController));
+  router.put('/:id/status', requireAdmin, feedbackController.updateFeedbackStatus.bind(feedbackController));
 
   // 回复留言
-  router.post('/:id/reply', requireAuth, feedbackController.replyToFeedback.bind(feedbackController));
+  router.post('/:id/reply', requireAdmin, feedbackController.replyToFeedback.bind(feedbackController));
 
   // 删除留言
-  router.delete('/:id', requireAuth, feedbackController.deleteFeedback.bind(feedbackController));
+  router.delete('/:id', requireAdmin, feedbackController.deleteFeedback.bind(feedbackController));
 
   return router;
 }

@@ -30,7 +30,10 @@ class Material {
     };
     const orderByClause = ORDER_BY_MAP[sort] || ORDER_BY_MAP.latest;
 
-    const offset = (page - 1) * limit;
+    const { positiveInteger } = require('../utils/pagination');
+    const safePage = positiveInteger(page, 1);
+    const safeLimit = positiveInteger(limit, 20, 100);
+    const offset = (safePage - 1) * safeLimit;
     const keywords = search.split(' ').filter(k => k);
 
     let whereClause = ` WHERE 1=1`;
@@ -90,7 +93,7 @@ class Material {
       LIMIT ? OFFSET ?
     `;
     
-    const materials = await this.queryAll(dataSql, [...params, limit, offset]);
+    const materials = await this.queryAll(dataSql, [...params, safeLimit, offset]);
     
     // 处理缩略图URL
     const processedMaterials = materials.map(material => {
@@ -107,9 +110,9 @@ class Material {
       data: processedMaterials,
       meta: {
         total: total.total,
-        page: page,
-        limit: limit,
-        totalPages: Math.ceil(total.total / limit)
+        page: safePage,
+        limit: safeLimit,
+        totalPages: Math.ceil(total.total / safeLimit)
       }
     };
   }
@@ -148,17 +151,18 @@ class Material {
       mediaType,
       coverImagePath = null,
       viewCount = 0,
-      conversionStatus = null
+      conversionStatus = null,
+      conversionSource = null
     } = materialData;
 
     const formattedTags = this.formatTags(tags);
 
     const sql = `
-      INSERT INTO materials (name, file_path, tags, media_type, cover_image_path, view_count, conversion_status)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO materials (name, file_path, tags, media_type, cover_image_path, view_count, conversion_status, conversion_source)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    const result = await this.run(sql, [name, filePath, formattedTags, mediaType, coverImagePath, viewCount, conversionStatus]);
+    const result = await this.run(sql, [name, filePath, formattedTags, mediaType, coverImagePath, viewCount, conversionStatus, conversionSource]);
     return { id: result.lastID, ...materialData };
   }
 

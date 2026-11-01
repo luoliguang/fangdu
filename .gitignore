@@ -69,6 +69,10 @@ coverage/
 # Claude AI 工具缓存
 .claude/
 
+# 本地开发助手文档
+/AGENTS.md
+/PROJECT_CONTEXT.md
+
 # 其他
 *.tgz
 *.tar.gz

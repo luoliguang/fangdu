@@ -43,6 +43,7 @@ class Server {
       
       // 4. 配置路由
       this.setupRoutes();
+      await require('./services/ConversionQueue').getQueue(this.db, this.config.ossClient).recover();
       
       // 5. 配置错误处理
       this.setupErrorHandling();
@@ -175,6 +176,8 @@ class Server {
     this.app.use((error, req, res, next) => {
       console.error('🚨 全局错误:', error);
       
+      if (error.status === 413) return res.status(413).json({ success: false, message: error.message });
+
       // Multer文件上传错误
       if (error.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({

@@ -20,9 +20,11 @@ class MaterialController {
     const serverConf = config.server;
     
     this.upload = multer({
-      storage: multer.memoryStorage(),
+      storage: require('../utils/uploadStorage').createUploadStorage(),
       limits: {
         fileSize: this.parseFileSize(serverConf.upload.maxFileSize),
+        fields: 20,
+        fieldSize: 64 * 1024,
         files: 20 // 最多同时上传20个文件
       },
       fileFilter: (req, file, cb) => {
@@ -41,7 +43,7 @@ class MaterialController {
   async getMaterials(req, res) {
     try {
       // 管理员（携带有效 JWT）可以看到转换中的视频，普通用户不可见
-      const isAdmin = !!req.user;
+      const isAdmin = req.user?.role === 'admin';
       const result = await this.materialService.getMaterials({ ...req.query, includeConverting: isAdmin });
       res.json(result);
     } catch (error) {
@@ -265,7 +267,7 @@ class MaterialController {
         });
       }
 
-      const suggestionLimit = parseInt(limit) || 5;
+      const suggestionLimit = require('../utils/pagination').positiveInteger(limit, 5, 20);
       const result = await this.materialService.getSearchSuggestions(query, suggestionLimit);
       res.json(result);
     } catch (error) {
@@ -283,7 +285,7 @@ class MaterialController {
   async getTopMaterials(req, res) {
     try {
       const { limit = 5 } = req.query;
-      const limitNum = Math.min(parseInt(limit) || 5, 20);
+      const limitNum = require('../utils/pagination').positiveInteger(limit, 5, 20);
 
       const result = await this.materialService.getTopMaterials(limitNum);
       res.json(result);
@@ -495,7 +497,8 @@ class MaterialController {
       'GB': 1024 * 1024 * 1024
     };
     
-    const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)$/i);
+    if (/^\d+$/.test(String(sizeStr))) return Number(sizeStr);
+    const match = String(sizeStr).match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)$/i);
     if (!match) {
       return 50 * 1024 * 1024; // 默认50MB
     }

@@ -1,68 +1,28 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+## 开发约定
 
-## Commands
+- 每次完成优化后，在交付回复中提供一条简短、可直接使用的 commit message；由用户自行提交，不自动执行 git commit。
+- 开工时阅读 `PROJECT_CONTEXT.md`，按任务核对相关源码；文档与代码不一致时，以实际实现为准并更新文档。
+- 前端保持 Vue 3 Composition API、ES modules；后端保持 CommonJS 和 routes → controllers → services → models 分层。
+- 前端请求复用 `src/axiosConfig.js`，交互请求优先使用 `src/composables/useApi.js` 的加载与错误状态处理。
+- 保持现有 API 响应及 `/api/v1`、`/api` 兼容约定；变更接口或数据结构时同步检查调用方。
+- Gallery 的大数组使用 `shallowRef`；更新嵌套对象后需替换数组引用才能触发视图更新。
+- 保持 OSS/CDN 地址转换一致；修改统计时先核对访问去重、心跳及 UTC/CST 日期边界。
+- UI 沿用主绿 `#5a8f73`、深绿 `#0a3d22`，标准渐变 `linear-gradient(135deg, #0a3d22, #5a8f73)`；避免紫色主题。
 
-**Frontend** (in `frontend/`):
-```bash
-npm run dev      # dev server on port 5173
-npm run build    # production build
-npm run preview  # preview production build
-```
+## 安全边界
 
-**Backend** (in `backend/`):
-```bash
-npm run dev   # nodemon watch mode
-npm start     # node server.js
-```
+- 保留工作区已有改动，变更范围限于当前任务。
+- 凭据通过环境变量配置；不提交或输出 `.env` 的秘密值、JWT、OSS 密钥及真实管理员口令。
+- 管理写操作在后端使用管理员鉴权；前端路由守卫不能代替服务端权限检查。保留公开查询与管理查询的权限区分。
+- 上传、分页、转码与代理变更须保留资源上限、路径约束、临时文件清理、代理目标白名单及限速。
+- 数据库变更先区分业务 SQLite 与抽屉配置 Sequelize；业务库使用 `backend/migrations/`。涉及真实数据迁移、重置、删除及 OSS 删除时，先确认目标与备份，禁止为测试操作真实数据。
+- 启动后端会执行数据库迁移、Sequelize 表同步与转码恢复；验证优先使用隔离数据库、临时目录和替代 OSS 客户端。
 
-Backend listens on port 3002. Copy `backend/env.example` to `backend/.env` for local setup.
+## 验证要求
 
-## Architecture
-
-**Frontend**: Vue 3 SPA (Vite, Pinia, Element Plus, Vue Router)  
-**Backend**: Express.js REST API, SQLite via Sequelize ORM, Aliyun OSS for file storage
-
-The production frontend is built and served as static files by the Express backend. In development, Vite proxies API calls to `localhost:3002`.
-
-### Key backend structure
-- `server.js` — Express app entry, class-based `Server`
-- `routes/` — route registration (materials, feedback, visits, auth, drawer-config, proxy)
-- `controllers/` — request handlers
-- `services/MaterialService.js` — OSS upload/delete, CDN URL generation
-- `models/` — Sequelize models (Material, Feedback, Visit, DrawerConfig)
-- `config/sequelize.js` — SQLite at `backend/database/drawer_config.db`
-
-### Key frontend structure
-- `src/views/Gallery.vue` — main product gallery, ~2400 lines; uses `shallowRef` for large arrays for performance
-- `src/views/ColorCard.vue` — color swatch card generator
-- `src/router/index.js` — routes, JWT guard for `/admin/*`, visit tracking in `afterEach`, 30s heartbeat
-- `src/stores/` — Pinia stores (material, feedback, user)
-- `src/axiosConfig.js` — axios instance with base URL from `VITE_API_BASE_URL`
-- `src/composables/useApi.js` — wraps API calls with loading/error state; prefer this over raw axios in components
-
-## Important Patterns
-
-**OSS vs local storage**: `MaterialService` uploads to Aliyun OSS when `ALI_OSS_*` env vars are set; falls back to local `backend/uploads/` otherwise. Both modes return the same API shape.
-
-**CDN URL transformation**: OSS URLs (`*.aliyuncs.com`) are rewritten to the CDN domain `assets.fangdutex.cn`. Backend: `MaterialService.generateThumbnailUrl()` uses `CDN_BASE_URL` env var. Frontend: `toCdnUrl()` in Gallery.vue does the same regex replace. Thumbnail OSS processing params: `?x-oss-process=image/resize,m_fill,w_300,quality,q_80`.
-
-**Auth**: JWT stored in `localStorage` as `authToken`. Admin routes have a `beforeEnter` guard. Backend uses Bearer token middleware.
-
-**Visit deduplication**: Same session within 5 minutes counts as one visit. When debugging stats appearing too low, check `VisitService` dedup logic before suspecting tracking bugs.
-
-**Timezone**: SQLite always stores UTC. CST (UTC+8) range queries use:
-```sql
-datetime('now', '+8 hours', 'start of day', '-8 hours')
-```
-
-**Environment files**:
-- `frontend/.env.development` and `.env.production` — Vite vars (prefix `VITE_`)
-- `backend/.env` — copied from `env.example`; key vars: `CDN_BASE_URL`, `ALI_OSS_*`, `JWT_SECRET`, `ADMIN_USERNAME/PASSWORD`
-
-## Design System
-
-Primary green accent: `#5a8f73` (muted sage), dark base: `#0a3d22`  
-Standard gradient: `linear-gradient(135deg, #0a3d22, #5a8f73)`  
-Avoid purple or AI-generic color schemes anywhere in the UI.
+- 前端变更：在 `frontend/` 执行 `npm run build`，并检查受影响页面的正常、空数据、错误状态及适用的移动端布局。
+- 后端变更：在 `backend/` 执行 `npm test`；新增或修复重要行为时补充相关回归测试，尤其是权限、输入边界与资源清理。
+- 涉及上传或转码时阅读 `docs/UPLOAD_RESOURCE_SAFETY.md`，验证失败、重启恢复与并发上限。
+- 纯文档变更核对源码、链接和差异即可；交付说明实际执行的验证与未验证范围。现有 lint 配置不等于可运行的完整工具链，不能把未执行的检查标记为通过。

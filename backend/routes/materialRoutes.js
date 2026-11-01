@@ -1,6 +1,7 @@
 const express = require('express');
+const { uploadAdmission } = require('../utils/uploadStorage');
 const MaterialController = require('../controllers/MaterialController');
-const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { requireAdmin, optionalAuth } = require('../middleware/auth');
 
 /**
  * 素材相关路由
@@ -29,20 +30,22 @@ function createMaterialRoutes(db) {
 
   // 上传素材（单个）（管理员）
   router.post('/',
-    requireAuth,
+    requireAdmin,
+    uploadAdmission,
     materialController.getUploadMiddleware(),
     materialController.uploadMaterial.bind(materialController)
   );
 
   // 批量上传素材（管理员）
   router.post('/batch/upload',
-    requireAuth,
+    requireAdmin,
+    uploadAdmission,
     materialController.upload.array('files', 20), // 最多20个文件
     materialController.uploadMaterialsBatch.bind(materialController)
   );
 
   // 批量删除素材（管理员）
-  router.post('/batch/delete', requireAuth, materialController.batchDeleteMaterials.bind(materialController));
+  router.post('/batch/delete', requireAdmin, materialController.batchDeleteMaterials.bind(materialController));
 
   // 查询 MOV 转码进度（公开，前端轮询用）
   router.get('/:id/conversion-status', materialController.getConversionStatus.bind(materialController));
@@ -54,10 +57,10 @@ function createMaterialRoutes(db) {
   router.get('/:id', materialController.getMaterialById.bind(materialController));
 
   // 更新素材信息（管理员）
-  router.put('/:id', requireAuth, materialController.updateMaterial.bind(materialController));
+  router.put('/:id', requireAdmin, materialController.updateMaterial.bind(materialController));
 
   // 删除素材（管理员）
-  router.delete('/:id', requireAuth, materialController.deleteMaterial.bind(materialController));
+  router.delete('/:id', requireAdmin, materialController.deleteMaterial.bind(materialController));
 
   return router;
 }

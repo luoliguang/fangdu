@@ -10,12 +10,15 @@ const routes = [
         path: '/admin',
         name: 'Admin',
         component: () => import('../views/Admin.vue'),
-        beforeEnter: (to, from, next) => {
+        beforeEnter: async () => {
             const token = localStorage.getItem('authToken');
-            if (token) {
-                next();
-            } else {
-                next('/login');
+            if (!token) return '/login';
+            try {
+                const { default: apiClient } = await import('../axiosConfig.js');
+                const { data } = await apiClient.get('/api/v1/auth/me');
+                return data.user?.role === 'admin' ? true : '/';
+            } catch (_) {
+                return '/login';
             }
         },
         children: [

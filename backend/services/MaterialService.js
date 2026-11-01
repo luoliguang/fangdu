@@ -28,8 +28,8 @@ class MaterialService {
         exclude_tags: exclude_tags || '',
         media_type: media_type || '',
         sort: sort || 'latest',
-        page: parseInt(page) || 1,
-        limit: Math.min(parseInt(limit) || 20, 100),
+        page: require('../utils/pagination').positiveInteger(page, 1),
+        limit: require('../utils/pagination').positiveInteger(limit, 20, 100),
         includeConverting: !!includeConverting
       };
 
@@ -104,15 +104,8 @@ class MaterialService {
                     file.originalname.toLowerCase().endsWith('.mov');
 
       if (mediaType === 'video' && isMov) {
-        const material = await this.materialModel.create({
-          name, filePath: '_converting_', tags, mediaType,
-          coverImagePath: null, conversionStatus: 'converting'
-        });
-
-        // 异步转码，不阻塞响应
-        this._convertMovAndStore(material.id, file.buffer, fileName).catch(err => {
-          console.error(`[转码] material ${material.id} 失败:`, err.message);
-        });
+        const queue = require('./ConversionQueue').getQueue(this.materialModel.db, this.ossClient);
+        const material = await queue.enqueue(file.path, { name, tags, mediaType });
 
         return {
           success: true,
@@ -130,7 +123,7 @@ class MaterialService {
         }
       };
 
-      const uploadResult = await this.ossClient.put(fileName, file.buffer, uploadOptions);
+      const uploadResult = await this.ossClient.put(fileName, file.path, uploadOptions);
       const fileUrl = this.ensureHttpsUrl(uploadResult.url);
 
       let coverImagePath = null;
@@ -186,6 +179,7 @@ class MaterialService {
 
       // 从数据库删除
       await this.materialModel.delete(id);
+      await require('./ConversionQueue').getQueue(this.materialModel.db, this.ossClient).discard(material);
 
       return {
         success: true,
@@ -242,7 +236,7 @@ class MaterialService {
    */
   async getTopMaterials(limit = 5) {
     try {
-      const materials = await this.materialModel.getTopMaterials(Math.min(limit, 20));
+      const materials = await this.materialModel.getTopMaterials(require('../utils/pagination').positiveInteger(limit, 5, 20));
       const data = materials.map(material => {
         const httpsUrl = this.ensureHttpsUrl(material.file_path);
         return {
@@ -279,34 +273,6 @@ class MaterialService {
     } catch (error) {
       console.error('获取标签失败:', error);
       throw new Error('获取标签失败');
-    }
-  }
-
-  /**
-   * 后台异步：将 MOV buffer 转为 MP4，上传 OSS，更新数据库
-   */
-  async _convertMovAndStore(materialId, inputBuffer, fileNameBase) {
-    const { convertToMp4 } = require('../utils/videoConverter');
-    try {
-      console.log(`[转码] 开始 material ${materialId}`);
-      const mp4Buffer = await convertToMp4(inputBuffer);
-      const mp4FileName = fileNameBase.replace(/\.[^/.]+$/, '') + '.mp4';
-      const uploadResult = await this.ossClient.put(mp4FileName, mp4Buffer, {
-        headers: {
-          'Content-Type': 'video/mp4',
-          'Content-Disposition': 'inline',
-          'Cache-Control': 'public, max-age=2592000'
-        }
-      });
-      const fileUrl = this.ensureHttpsUrl(uploadResult.url);
-      await this.materialModel.updateConversionStatus(materialId, {
-        status: 'done',
-        filePath: fileUrl
-      });
-      console.log(`[转码] material ${materialId} 完成: ${fileUrl}`);
-    } catch (err) {
-      console.error(`[转码] material ${materialId} 失败:`, err.message);
-      await this.materialModel.updateConversionStatus(materialId, { status: 'failed' });
     }
   }
 

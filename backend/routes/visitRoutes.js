@@ -1,7 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const VisitController = require('../controllers/VisitController');
-const { requireAuth } = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/auth');
 
 /**
  * 访问统计相关路由
@@ -38,64 +38,64 @@ function createVisitRoutes(db) {
   // ── 以下均为管理员接口 ──
 
   // 获取当前在线人数
-  router.get('/online', requireAuth, visitController.getCurrentOnlineCount.bind(visitController));
+  router.get('/online', requireAdmin, visitController.getCurrentOnlineCount.bind(visitController));
 
   // 获取访问趋势数据
   router.get('/trends',
-    requireAuth,
+    requireAdmin,
     visitController.validateStatsQuery.bind(visitController),
     visitController.getVisitTrends.bind(visitController)
   );
 
   // 获取页面访问统计
-  router.get('/pages', requireAuth, visitController.getPageStats.bind(visitController));
+  router.get('/pages', requireAdmin, visitController.getPageStats.bind(visitController));
 
   // 获取访问统计总览
-  router.get('/overview', requireAuth, visitController.getOverallStats.bind(visitController));
+  router.get('/overview', requireAdmin, visitController.getOverallStats.bind(visitController));
 
   // 获取热门页面
-  router.get('/popular', requireAuth, visitController.getPopularPages.bind(visitController));
+  router.get('/popular', requireAdmin, visitController.getPopularPages.bind(visitController));
 
   // 获取访问来源统计
-  router.get('/referrers', requireAuth, visitController.getReferrerStats.bind(visitController));
+  router.get('/referrers', requireAdmin, visitController.getReferrerStats.bind(visitController));
 
   // 获取热门搜索关键词
-  router.get('/search/top', requireAuth, visitController.getTopSearchKeywords.bind(visitController));
+  router.get('/search/top', requireAdmin, visitController.getTopSearchKeywords.bind(visitController));
 
   // 获取地区访问分布
-  router.get('/regions', requireAuth, visitController.getRegionStats.bind(visitController));
+  router.get('/regions', requireAdmin, visitController.getRegionStats.bind(visitController));
 
   // 获取访问时段分布
-  router.get('/hourly', requireAuth, visitController.getHourlyDistribution.bind(visitController));
+  router.get('/hourly', requireAdmin, visitController.getHourlyDistribution.bind(visitController));
 
   // 获取访问详情
   router.get('/details',
-    requireAuth,
+    requireAdmin,
     visitController.validateStatsQuery.bind(visitController),
     visitController.getVisitDetails.bind(visitController)
   );
 
   // 获取IP访问频率
-  router.get('/ip/:ip/frequency', requireAuth, visitController.getIPVisitFrequency.bind(visitController));
+  router.get('/ip/:ip/frequency', requireAdmin, visitController.getIPVisitFrequency.bind(visitController));
 
   // 获取实时统计数据
-  router.get('/realtime', requireAuth, visitController.getRealTimeStats.bind(visitController));
+  router.get('/realtime', requireAdmin, visitController.getRealTimeStats.bind(visitController));
 
   // 获取统计仪表板数据
-  router.get('/dashboard', requireAuth, visitController.getDashboardStats.bind(visitController));
+  router.get('/dashboard', requireAdmin, visitController.getDashboardStats.bind(visitController));
 
   // 数据一致性检查和修复
-  router.post('/check-consistency', requireAuth, visitController.checkDataConsistency.bind(visitController));
+  router.post('/check-consistency', requireAdmin, visitController.checkDataConsistency.bind(visitController));
 
   // 导出访问数据
   router.get('/export',
-    requireAuth,
+    requireAdmin,
     visitController.validateStatsQuery.bind(visitController),
     visitController.exportVisitData.bind(visitController)
   );
 
   // 清理过期访问记录
-  router.post('/cleanup', requireAuth, visitController.cleanupOldVisits.bind(visitController));
+  router.post('/cleanup', requireAdmin, visitController.cleanupOldVisits.bind(visitController));
 
   return router;
 }
