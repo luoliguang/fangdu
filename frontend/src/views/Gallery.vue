@@ -227,7 +227,6 @@ const submitFeedback = async () => {
     if (result.success) {
       showCustomToast('留言成功，感谢您的反馈！', 'success');
       feedbackMessage.value = ''; // 清空留言内容
-      fetchUserFeedbacks(); // 提交成功后刷新用户留言列表
     } else {
       showCustomToast(result.message || '提交留言失败，请稍后再试。', 'error');
     }
@@ -237,7 +236,6 @@ const submitFeedback = async () => {
   }
 };
 const showFeedbackForm = ref(false); // 新增：控制留言表单的显示
-const isWidgetHovered = ref(false); // 新增：控制留言时间线小部件的悬停状态
 const feedbackStore = useFeedbackStore(); // 反馈store
 
 // 将OSS URL转换为CDN URL
@@ -553,7 +551,6 @@ const handleFeedbackSubmit = async (feedbackData) => {
     
     if (result.success) {
       showCustomToast('留言成功，感谢您的反馈！', 'success');
-      fetchUserFeedbacks(); // 提交成功后刷新用户留言列表
     } else {
       showCustomToast(result.message || '提交留言失败，请稍后再试。', 'error');
     }
@@ -563,31 +560,6 @@ const handleFeedbackSubmit = async (feedbackData) => {
   }
 };
 
-// 新增：用户留言列表和相关状态
-const userFeedbacks = ref([]);
-const showUserFeedbackTimeline = ref(false);
-const isUserFeedbacksLoading = ref(false);
-
-// 新增：获取用户留言列表
-const fetchUserFeedbacks = async () => {
-  const userId = localStorage.getItem('user_id');
-  if (!userId) return; // 如果没有用户ID，则不加载
-
-  isUserFeedbacksLoading.value = true;
-  try {
-    const response = await apiClient.get(`/api/v1/feedbacks/user/${userId}`);
-    userFeedbacks.value = response.data.data;
-  } catch (error) {
-    console.error('获取用户留言失败:', error);
-  } finally {
-    isUserFeedbacksLoading.value = false;
-  }
-};
-
-// 新增：格式化日期 (复用 Admin.vue 中的函数)
-const formatDateTime = (isoString) => {
-  return new Date(isoString).toLocaleString();
-};
 
 const fetchTags = async () => {
   try {
@@ -719,7 +691,6 @@ onMounted(() => {
     // 只在首次挂载时加载数据
     if (!isDataLoaded.value) {
         isDataLoaded.value = true;
-        fetchUserFeedbacks(); // 页面加载时获取用户留言
         // 等排除标签配置就绪再请求，保证首屏的素材与数量就已排除独立分类；
         // 配置接口异常时最多等 2s 兜底，不阻塞首屏
         Promise.race([
@@ -812,18 +783,6 @@ function startConversionPolling() {
 function stopConversionPolling() {
   if (conversionPollTimer) { clearInterval(conversionPollTimer); conversionPollTimer = null; }
 }
-
-const toggleWidget = () => {
-  isWidgetHovered.value = !isWidgetHovered.value;
-};
-
-const widgetFilter = ref('all'); // 'all' | 'pending' | 'approved'
-const filteredFeedbacks = computed(() => {
-  if (widgetFilter.value === 'all') return userFeedbacks.value;
-  return userFeedbacks.value.filter(f => f.status === widgetFilter.value);
-});
-const pendingFeedbacks = computed(() => userFeedbacks.value.filter(f => f.status === 'pending'));
-const approvedFeedbacks = computed(() => userFeedbacks.value.filter(f => f.status !== 'pending'));
 
 
 // 留言表单始终显示
@@ -1191,63 +1150,6 @@ const quickCopyImage = async (material) => {
     ，我们将在核实后第一时间下架处理。
   </div>
 
-  <!-- 需求记录浮动 Widget -->
-  <div v-if="userFeedbacks && userFeedbacks.length > 0" class="req-widget">
-    <!-- 展开面板 -->
-    <transition name="req-panel">
-      <div v-if="isWidgetHovered" class="req-panel">
-        <div class="req-panel-header">
-          <div class="req-panel-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-            我的需求记录
-          </div>
-          <button class="req-panel-close" @click="isWidgetHovered = false">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-        <div class="req-filter-tabs">
-          <button :class="['req-filter-tab', widgetFilter === 'all' && 'active']" @click="widgetFilter = 'all'">
-            全部 <span class="req-filter-count">{{ userFeedbacks.length }}</span>
-          </button>
-          <button :class="['req-filter-tab', widgetFilter === 'pending' && 'active']" @click="widgetFilter = 'pending'">
-            处理中 <span class="req-filter-count pending">{{ pendingFeedbacks.length }}</span>
-          </button>
-          <button :class="['req-filter-tab', widgetFilter === 'approved' && 'active']" @click="widgetFilter = 'approved'">
-            已完成 <span class="req-filter-count done">{{ approvedFeedbacks.length }}</span>
-          </button>
-        </div>
-        <div class="req-panel-body">
-          <div v-if="isUserFeedbacksLoading" class="req-loading">
-            <div class="req-loading-dot"></div>
-            <div class="req-loading-dot"></div>
-            <div class="req-loading-dot"></div>
-          </div>
-          <div v-else-if="filteredFeedbacks.length === 0" class="req-empty">暂无记录</div>
-          <ul v-else class="req-list">
-            <li v-for="feedback in filteredFeedbacks" :key="feedback.id" class="req-item">
-              <div class="req-item-top">
-                <span :class="['req-status', feedback.status === 'pending' ? 'req-status-pending' : 'req-status-done']">
-                  <span class="req-status-dot"></span>
-                  {{ feedback.status === 'pending' ? '处理中' : '已完成' }}
-                </span>
-                <span class="req-time">{{ formatDateTime(feedback.created_at) }}</span>
-              </div>
-              <p class="req-text">{{ feedback.message }}</p>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </transition>
-
-    <!-- 触发按钮 -->
-    <button class="req-trigger" @click="toggleWidget" :class="{ active: isWidgetHovered }">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-      <span
-        v-if="(userFeedbacks || []).filter(f => f.status === 'pending').length > 0"
-        class="req-badge"
-      >{{ (userFeedbacks || []).filter(f => f.status === 'pending').length }}</span>
-    </button>
-  </div>
 </template>
 
 <style>
@@ -2377,334 +2279,6 @@ body.theme-light .footer-link { color: #5a8f73; }
   transform: translateY(0);
   box-shadow: 0 2px 10px rgba(90, 143, 115, 0.2);
 }
-
-/* ── 需求记录浮动 Widget ── */
-.req-widget {
-  position: fixed;
-  bottom: 90px;
-  right: 24px;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-/* 触发按钮 */
-.req-trigger {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  border: 1px solid rgba(90, 143, 115, 0.4);
-  background: linear-gradient(145deg, #0d4a29, #5a8f73);
-  color: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 20px rgba(10, 61, 34, 0.5), 0 0 0 0 rgba(90, 143, 115, 0.3);
-  position: relative;
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
-  flex-shrink: 0;
-}
-.req-trigger:hover {
-  transform: translateY(-2px) scale(1.04);
-  box-shadow: 0 8px 28px rgba(10, 61, 34, 0.6), 0 0 0 6px rgba(90, 143, 115, 0.12);
-  border-color: rgba(90, 143, 115, 0.7);
-}
-.req-trigger.active {
-  background: linear-gradient(145deg, #07301a, #3d6b52);
-  box-shadow: 0 4px 16px rgba(10, 61, 34, 0.4);
-}
-
-/* 角标 */
-.req-badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border-radius: 99px;
-  background: linear-gradient(135deg, #f87171, #ef4444);
-  color: #fff;
-  font-size: 0.65rem;
-  font-weight: 700;
-  line-height: 17px;
-  text-align: center;
-  box-sizing: border-box;
-  border: 1.5px solid rgba(6, 13, 8, 0.8);
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.45);
-}
-
-/* 面板 */
-.req-panel {
-  width: 308px;
-  background: rgba(10, 17, 13, 0.93);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    0 32px 64px rgba(0, 0, 0, 0.55),
-    0 8px 20px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  overflow: hidden;
-}
-
-/* 面板入场动画 */
-.req-panel-enter-active {
-  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
-}
-.req-panel-leave-active {
-  transition: opacity 0.16s ease, transform 0.16s ease;
-}
-.req-panel-enter-from,
-.req-panel-leave-to {
-  opacity: 0;
-  transform: translateY(12px) scale(0.96);
-}
-
-/* 面板头部 */
-.req-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 13px 15px;
-  background: linear-gradient(135deg, rgba(10, 45, 25, 0.95), rgba(26, 90, 55, 0.9));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  color: #fff;
-}
-.req-panel-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.92);
-}
-.req-panel-close {
-  width: 26px;
-  height: 26px;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 7px;
-  color: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
-.req-panel-close:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-}
-
-/* 筛选 Tabs */
-.req-filter-tabs {
-  display: flex;
-  gap: 3px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-.req-filter-tab {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 5px 0;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.38);
-  font-size: 0.73rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.req-filter-tab:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.65);
-}
-.req-filter-tab.active {
-  background: rgba(90, 143, 115, 0.18);
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 600;
-}
-.req-filter-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.38);
-  font-size: 0.65rem;
-  font-weight: 700;
-}
-.req-filter-count.pending { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
-.req-filter-count.done    { background: rgba(52, 211, 153, 0.2); color: #34d399; }
-.req-filter-tab.active .req-filter-count { background: rgba(90,143,115,0.25); color: rgba(255,255,255,0.7); }
-.req-filter-tab.active .req-filter-count.pending { background: rgba(251,146,60,0.22); color: #fb923c; }
-.req-filter-tab.active .req-filter-count.done    { background: rgba(52,211,153,0.22); color: #34d399; }
-
-/* 空状态 */
-.req-empty {
-  padding: 28px 0;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.25);
-  font-size: 0.82rem;
-}
-
-/* 面板内容区 */
-.req-panel-body {
-  max-height: 320px;
-  overflow-y: auto;
-  padding: 10px 10px 12px;
-}
-.req-panel-body::-webkit-scrollbar { width: 3px; }
-.req-panel-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 2px; }
-
-/* 加载动画 */
-.req-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 28px 0;
-}
-.req-loading-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(90, 143, 115, 0.7);
-  animation: req-bounce 1.2s ease-in-out infinite;
-}
-.req-loading-dot:nth-child(2) { animation-delay: 0.2s; }
-.req-loading-dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes req-bounce {
-  0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
-  40%            { transform: scale(1);   opacity: 1; }
-}
-
-/* 列表 */
-.req-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.req-item {
-  padding: 11px 12px;
-  border-radius: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(255, 255, 255, 0.03);
-  transition: background 0.15s, border-color 0.15s;
-}
-.req-item:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.req-item-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 7px;
-}
-
-/* 状态标签 */
-.req-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 99px;
-  letter-spacing: 0.01em;
-}
-.req-status-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.req-status-pending {
-  background: rgba(251, 146, 60, 0.15);
-  color: #fb923c;
-}
-.req-status-pending .req-status-dot {
-  background: #fb923c;
-  box-shadow: 0 0 5px rgba(251, 146, 60, 0.7);
-  animation: req-pulse 2s ease-in-out infinite;
-}
-@keyframes req-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 4px rgba(251, 146, 60, 0.6); }
-  50%       { opacity: 0.6; box-shadow: 0 0 8px rgba(251, 146, 60, 0.3); }
-}
-.req-status-done {
-  background: rgba(52, 211, 153, 0.13);
-  color: #34d399;
-}
-.req-status-done .req-status-dot { background: #34d399; }
-
-.req-time {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.28);
-  font-variant-numeric: tabular-nums;
-}
-.req-text {
-  margin: 0;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.65);
-  line-height: 1.55;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* ── 亮色主题覆盖 ── */
-body.theme-light .req-panel {
-  background: #fff;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border-color: #e2e8f0;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-body.theme-light .req-panel-header {
-  background: linear-gradient(135deg, #0a3d22, #1e6b42);
-  border-bottom-color: rgba(255,255,255,0.12);
-}
-body.theme-light .req-filter-tabs { border-bottom-color: #f1f5f9; }
-body.theme-light .req-filter-tab { color: #64748b; }
-body.theme-light .req-filter-tab:hover { background: #f1f5f9; color: #475569; }
-body.theme-light .req-filter-tab.active { background: #f0f7f3; color: #1a6640; }
-body.theme-light .req-filter-count { background: #e2e8f0; color: #64748b; }
-body.theme-light .req-filter-count.pending { background: rgba(234,88,12,0.1); color: #ea580c; }
-body.theme-light .req-filter-count.done    { background: rgba(5,150,105,0.1); color: #059669; }
-body.theme-light .req-filter-tab.active .req-filter-count { background: rgba(26,102,64,0.12); color: #1a6640; }
-body.theme-light .req-empty { color: #94a3b8; }
-body.theme-light .req-panel-body::-webkit-scrollbar-thumb { background: #e2e8f0; }
-body.theme-light .req-item { background: transparent; border-color: transparent; }
-body.theme-light .req-item:hover { background: #f8fafc; border-color: transparent; }
-body.theme-light .req-status-pending { background: rgba(234,88,12,0.08); color: #ea580c; }
-body.theme-light .req-status-pending .req-status-dot { background: #ea580c; box-shadow: none; }
-body.theme-light .req-status-done { background: rgba(5,150,105,0.08); color: #059669; }
-body.theme-light .req-status-done .req-status-dot { background: #059669; }
-body.theme-light .req-time { color: #94a3b8; }
-body.theme-light .req-text { color: #374151; }
-body.theme-light .req-badge { border-color: #fff; }
 
 /* ═══════════════════════════════════════════════════
    移动端响应式设计（≤ 768px）
