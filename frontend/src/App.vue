@@ -6,6 +6,7 @@ import SideDrawer from './components/SideDrawer.vue';
 import TopAnnouncement from './components/TopAnnouncement.vue';
 import FabricGoQRModal from './components/FabricGoQRModal.vue';
 import TutorialGuide from './components/TutorialGuide.vue';
+import FeedbackBot from './components/FeedbackBot.vue';
 import { useTheme } from './composables/useTheme.js';
 import GalaxyBackground from './components/GalaxyBackground.vue';
 import SiteClosed from './components/SiteClosed.vue';
@@ -540,6 +541,9 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
     </Transition>
 
     <FabricGoQRModal v-if="publicVisible && site.moduleEnabled('fabricDetail')" v-model="showQRModal" />
+
+    <!-- 反馈小助手（与侧栏反馈同属 drawer 模块，后端同样按此模块拦截） -->
+    <FeedbackBot v-if="publicVisible && site.moduleEnabled('drawer')" />
 
     <!-- 新手引导 -->
     <TutorialGuide v-if="publicVisible && site.moduleEnabled('drawer')" ref="tutorialRef" />
