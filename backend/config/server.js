@@ -62,7 +62,9 @@ class ServerConfig {
       secretToken: process.env.SECRET_TOKEN,
       cors: {
         origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? false : '*'),
-        credentials: true
+        credentials: true,
+        // 让跨域的前端能读到限流等待时间，机器人按钮上的倒计时依赖它
+        exposedHeaders: ['Retry-After']
       },
       upload: {
         maxFileSize: process.env.MAX_FILE_SIZE || '50MB',

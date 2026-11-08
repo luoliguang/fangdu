@@ -27,15 +27,37 @@ const open = ref(false);
 const text = ref('');
 const topic = ref(null);
 const sending = ref(false);
-const lastSentAt = ref(0);
 const bodyRef = ref(null);
+const inputRef = ref(null);
+
+// 发送冷却：按钮上显示倒计时，不再往聊天里追加提示；刷新页面后仍然有效
+const COOLDOWN_KEY = 'fbot-cooldown-until';
+const readCooldown = () => { try { return Number(sessionStorage.getItem(COOLDOWN_KEY)) || 0; } catch (_) { return 0; } };
+const cooldownUntil = ref(readCooldown());
+const nowTick = ref(Date.now());
+let tickTimer;
+const cooldownLeft = computed(() => Math.max(0, Math.ceil((cooldownUntil.value - nowTick.value) / 1000)));
+const cooldownLabel = computed(() => cooldownLeft.value >= 60 ? `稍等 ${Math.ceil(cooldownLeft.value / 60)} 分钟` : `稍等 ${cooldownLeft.value}s`);
+function runTicker() {
+  clearInterval(tickTimer);
+  nowTick.value = Date.now();
+  tickTimer = setInterval(() => {
+    nowTick.value = Date.now();
+    if (cooldownUntil.value <= nowTick.value) clearInterval(tickTimer);
+  }, 500);
+}
+function startCooldown(ms) {
+  cooldownUntil.value = Date.now() + ms;
+  try { sessionStorage.setItem(COOLDOWN_KEY, String(cooldownUntil.value)); } catch (_) { /* Storage may be disabled. */ }
+  runTicker();
+}
 const messages = ref([
   { id: 1, from: 'bot', text: '嗨，我是小度，想要什么素材，或者遇到了什么问题，都可以告诉我，我会帮你转达给团队~' }
 ]);
 let nextId = 2;
 
 const remaining = computed(() => MAX_LEN - text.value.length);
-const canSend = computed(() => text.value.trim().length > 0 && !sending.value && remaining.value >= 0);
+const canSend = computed(() => text.value.trim().length > 0 && !sending.value && remaining.value >= 0 && cooldownLeft.value === 0);
 
 // 眼睛跟随鼠标
 const eye = ref({ x: 0, y: 0 });
@@ -50,13 +72,22 @@ function onPointerMove(e) {
   const k = Math.min(1, d / 160) * 3;
   eye.value = { x: (dx / d) * k, y: (dy / d) * k };
 }
-onMounted(() => window.addEventListener('pointermove', onPointerMove, { passive: true }));
-onUnmounted(() => window.removeEventListener('pointermove', onPointerMove));
+onMounted(() => {
+  window.addEventListener('pointermove', onPointerMove, { passive: true });
+  if (cooldownLeft.value > 0) runTicker();
+});
+onUnmounted(() => {
+  window.removeEventListener('pointermove', onPointerMove);
+  clearInterval(tickTimer);
+});
 
 function scrollBottom() {
   nextTick(() => { if (bodyRef.value) bodyRef.value.scrollTop = bodyRef.value.scrollHeight; });
 }
 function pushBot(t, tone) {
+  // 机器人连续两条一模一样的话没有意义，直接忽略，避免刷屏
+  const last = messages.value[messages.value.length - 1];
+  if (last && last.from === 'bot' && last.text === t) return;
   messages.value.push({ id: nextId++, from: 'bot', text: t, tone });
   scrollBottom();
 }
@@ -67,7 +98,11 @@ function pushUser(t) {
 
 function toggle() {
   open.value = !open.value;
-  if (open.value) scrollBottom();
+  if (open.value) {
+    scrollBottom();
+    // 仅在有鼠标的设备上自动聚焦，避免手机上一打开就弹出键盘遮住面板
+    if (window.matchMedia?.('(pointer: fine)').matches) nextTick(() => inputRef.value?.focus());
+  }
 }
 
 function pickTopic(t) {
@@ -90,11 +125,6 @@ function getUserId() {
 
 async function send() {
   if (!canSend.value) return;
-  const wait = COOLDOWN_MS - (Date.now() - lastSentAt.value);
-  if (wait > 0) {
-    pushBot(`别急别急，${Math.ceil(wait / 1000)} 秒后再发下一条哦~`);
-    return;
-  }
   const content = text.value.trim();
   const message = topic.value ? `【${topic.value.label}】${content}` : content;
   pushUser(content);
@@ -102,16 +132,23 @@ async function send() {
   sending.value = true;
   try {
     await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
-    lastSentAt.value = Date.now();
+    startCooldown(COOLDOWN_MS);
     topic.value = null;
     pushBot('收到啦！已经帮你转给团队了，谢谢你', 'ok');
   } catch (err) {
     const status = err?.response?.status;
-    if (status === 429) pushBot('发得有点频繁，稍等一会儿再试试~');
-    else if (status === 503) pushBot('留言功能暂时关闭了，晚点再来找我吧~');
-    else if (status === 400) pushBot(err.response?.data?.message || '内容好像不太对，换个说法试试？');
+    const serverMsg = err?.response?.data?.message;
+    let restore = status !== 400;
+    if (status === 429) {
+      // 服务端限流时按它给的等待时间走，没有就用默认冷却
+      const retry = Number(err.response?.headers?.['retry-after']);
+      startCooldown((Number.isFinite(retry) && retry > 0 ? Math.min(retry, 3600) : COOLDOWN_MS / 1000) * 1000);
+      pushBot(serverMsg || '发得有点频繁，稍等一会儿再试试~');
+      if (/已经收到/.test(serverMsg || '')) restore = false; // 重复内容不用放回输入框
+    } else if (status === 503) pushBot('留言功能暂时关闭了，晚点再来找我吧~');
+    else if (status === 400) pushBot(serverMsg || '内容好像不太对，换个说法试试？');
     else pushBot('网络开小差了，你的话还在输入框里，再点一次发送吧');
-    if (status !== 400) text.value = content;
+    if (restore) text.value = content;
   } finally {
     sending.value = false;
   }
@@ -128,7 +165,7 @@ function onKeydown(e) {
 <template>
   <div class="fbot" :class="{ 'is-dark': isDark, 'is-open': open }">
     <Transition name="fbot-panel">
-      <section v-if="open" class="fbot-panel" role="dialog" aria-label="反馈小助手">
+      <section v-if="open" class="fbot-panel" role="dialog" aria-label="反馈小助手" @keydown.esc="open = false">
         <header class="fbot-head">
           <span class="fbot-head-dot"></span>
           <strong>小度</strong>
@@ -136,7 +173,7 @@ function onKeydown(e) {
           <button class="fbot-close" aria-label="关闭" @click="open = false">×</button>
         </header>
 
-        <div ref="bodyRef" class="fbot-body">
+        <div ref="bodyRef" class="fbot-body" role="log" aria-live="polite">
           <div v-for="m in messages" :key="m.id" class="fbot-msg" :class="`from-${m.from}`">
             <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok' }"><svg v-if="m.tone === 'ok'" class="fbot-ok" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.8 12.4l3 3 5.4-6"/></svg>{{ m.text }}</div>
           </div>
@@ -151,14 +188,20 @@ function onKeydown(e) {
 
         <footer class="fbot-foot">
           <textarea
+            ref="inputRef"
             v-model="text"
             rows="2"
             :maxlength="MAX_LEN"
-            placeholder="想说点什么…（Enter 发送，Shift+Enter 换行）"
+            placeholder="想说点什么…"
+            aria-label="反馈内容"
             @keydown="onKeydown"
           ></textarea>
-          <button class="fbot-send" :disabled="!canSend" @click="send">发送</button>
+          <button class="fbot-send" :disabled="!canSend" @click="send">{{ cooldownLeft > 0 ? cooldownLabel : '发送' }}</button>
         </footer>
+        <div class="fbot-hint">
+          <span>Enter 发送 · Shift+Enter 换行</span>
+          <span v-if="text.length > MAX_LEN * 0.8" :class="{ 'is-warn': remaining < 50 }">{{ text.length }}/{{ MAX_LEN }}</span>
+        </div>
       </section>
     </Transition>
 
@@ -288,7 +331,11 @@ function onKeydown(e) {
   color: #fff;
   background: linear-gradient(135deg, #0a3d22, #5a8f73);
 }
-.fbot-head-dot { width: 8px; height: 8px; border-radius: 50%; background: #9ef0c0; box-shadow: 0 0 8px #9ef0c0; }
+.fbot-head-dot { width: 8px; height: 8px; border-radius: 50%; background: #9ef0c0; box-shadow: 0 0 8px #9ef0c0; animation: fbot-pulse 1.6s ease-in-out infinite; }
+@keyframes fbot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px #9ef0c0, 0 0 0 0 rgba(158, 240, 192, 0.55); }
+  50% { opacity: 0.35; transform: scale(0.8); box-shadow: 0 0 3px #9ef0c0, 0 0 0 5px rgba(158, 240, 192, 0); }
+}
 .fbot-head-sub { font-size: 12px; opacity: 0.8; }
 .fbot-close {
   margin-left: auto;
@@ -348,10 +395,16 @@ function onKeydown(e) {
 }
 .fbot-chips button:hover { background: var(--fb-bot-bubble); border-color: #5a8f73; }
 
-.fbot-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 12px; border-top: 1px solid var(--fb-line); }
+.fbot-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 4px; border-top: 1px solid var(--fb-line); }
+.fbot-hint { display: flex; justify-content: space-between; gap: 8px; padding: 0 14px 10px; font-size: 11px; color: var(--fb-sub); }
+.fbot-hint .is-warn { color: #d9534f; }
 .fbot-foot textarea {
   flex: 1;
+  min-width: 0;
+  width: 0;
+  height: 56px;
   resize: none;
+  box-sizing: border-box;
   padding: 8px 10px;
   font: inherit;
   font-size: 14px;
@@ -363,6 +416,9 @@ function onKeydown(e) {
 }
 .fbot-foot textarea:focus { border-color: #5a8f73; }
 .fbot-send {
+  flex-shrink: 0;
+  min-width: 68px;
+  white-space: nowrap;
   padding: 9px 16px;
   font-size: 14px;
   font-weight: 600;
@@ -387,6 +443,6 @@ function onKeydown(e) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fbot-float, .fbot-shadow, .fbot-light, .fbot-eyes, .fbot-typing i { animation: none; }
+  .fbot-float, .fbot-shadow, .fbot-light, .fbot-eyes, .fbot-typing i, .fbot-head-dot { animation: none; }
 }
 </style>
