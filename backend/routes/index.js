@@ -26,6 +26,9 @@ function createRoutes(db, siteControlService) {
   // 反馈留言相关路由
   apiV1.use('/feedbacks', createFeedbackRoutes(db));
 
+  // 飞书通知配置（仅管理员）
+  apiV1.use('/lark-config', require('./larkConfigRoutes')(require('../services/LarkNotifyService').getShared()));
+
   // 访问统计相关路由
   apiV1.use('/visits', createVisitRoutes(db));
 

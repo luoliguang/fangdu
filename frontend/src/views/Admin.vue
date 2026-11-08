@@ -13,6 +13,7 @@ import {
   Setting,
   Tickets,
   Picture,
+  Bell,
   SwitchButton
 } from '@element-plus/icons-vue';
 
@@ -37,6 +38,7 @@ const navItems = [
   { name: 'UploadMaterial', label: '上传素材', icon: Upload },
   { name: 'MaterialManagement', label: '素材管理', icon: PictureRounded },
   { name: 'FeedbackManagement', label: '留言管理', icon: ChatLineSquare },
+  { name: 'LarkConfig', label: '飞书通知', icon: Bell },
   { name: 'Statistics', label: '访问统计', icon: DataAnalysis },
   { name: 'DrawerConfig', label: '抽屉配置', icon: Setting },
   { name: 'PageCategoryConfig', label: '页面分类', icon: Tickets },

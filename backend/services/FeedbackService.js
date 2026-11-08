@@ -38,6 +38,13 @@ class FeedbackService {
         status: 'pending'
       });
 
+      // 异步推送飞书：不 await，失败只打日志，不影响用户提交
+      require('./LarkNotifyService').getShared().notifyFeedback({
+        id: feedback.id,
+        message: feedback.message,
+        user_id: feedback.user_id
+      });
+
       return {
         success: true,
         message: '留言提交成功，我们会尽快回复您',

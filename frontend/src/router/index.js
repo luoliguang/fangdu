@@ -28,6 +28,11 @@ const routes = [
                 component: () => import('../views/admin/SiteControl.vue')
             },
             {
+                path: 'lark-config',
+                name: 'LarkConfig',
+                component: () => import('../views/admin/LarkConfig.vue')
+            },
+            {
                 path: '',
                 name: 'AdminDefault',
                 redirect: { name: 'UploadMaterial' }

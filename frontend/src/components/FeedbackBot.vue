@@ -9,11 +9,19 @@ const MAX_LEN = 1000;
 const COOLDOWN_MS = 10000;
 
 const quickTopics = [
-  { key: 'material', label: '想要新素材', emoji: '🧵', hint: '告诉我你想要的款式、面料或颜色吧~' },
-  { key: 'notfound', label: '没找到想要的', emoji: '🔍', hint: '你在找什么呢？说说关键词，我帮你记下来~' },
-  { key: 'bug', label: '网站有问题', emoji: '🐞', hint: '哪里不对劲啦？描述一下，我马上转告~' },
-  { key: 'other', label: '其他想说的', emoji: '💬', hint: '想说什么都可以，我在听~' }
+  { key: 'material', label: '想要新素材', icon: 'sparkle', hint: '告诉我你想要的款式、面料或颜色吧~' },
+  { key: 'notfound', label: '没找到想要的', icon: 'search', hint: '你在找什么呢？说说关键词，我帮你记下来~' },
+  { key: 'bug', label: '网站有问题', icon: 'bug', hint: '哪里不对劲啦？描述一下，我马上转告~' },
+  { key: 'other', label: '其他想说的', icon: 'chat', hint: '想说什么都可以，我在听~' }
 ];
+
+// 线性图标（Lucide 风格路径），随文字颜色走，亮/暗色都协调
+const topicIcons = {
+  sparkle: ['M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z', 'M19 3v4M17 5h4'],
+  search: ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z', 'M20 20l-4-4'],
+  bug: ['M9 7.5a3 3 0 0 1 6 0V9H9z', 'M8 9h8v6a4 4 0 0 1-8 0z', 'M4 13h4M16 13h4M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2'],
+  chat: ['M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z']
+};
 
 const open = ref(false);
 const text = ref('');
@@ -22,7 +30,7 @@ const sending = ref(false);
 const lastSentAt = ref(0);
 const bodyRef = ref(null);
 const messages = ref([
-  { id: 1, from: 'bot', text: '嗨，我是小度 👋 想要什么素材，或者遇到了什么问题，都可以告诉我，我会帮你转达给团队~' }
+  { id: 1, from: 'bot', text: '嗨，我是小度，想要什么素材，或者遇到了什么问题，都可以告诉我，我会帮你转达给团队~' }
 ]);
 let nextId = 2;
 
@@ -48,8 +56,8 @@ onUnmounted(() => window.removeEventListener('pointermove', onPointerMove));
 function scrollBottom() {
   nextTick(() => { if (bodyRef.value) bodyRef.value.scrollTop = bodyRef.value.scrollHeight; });
 }
-function pushBot(t) {
-  messages.value.push({ id: nextId++, from: 'bot', text: t });
+function pushBot(t, tone) {
+  messages.value.push({ id: nextId++, from: 'bot', text: t, tone });
   scrollBottom();
 }
 function pushUser(t) {
@@ -64,7 +72,7 @@ function toggle() {
 
 function pickTopic(t) {
   topic.value = t;
-  pushUser(`${t.emoji} ${t.label}`);
+  pushUser(t.label);
   setTimeout(() => pushBot(t.hint), 350);
 }
 
@@ -96,7 +104,7 @@ async function send() {
     await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
     lastSentAt.value = Date.now();
     topic.value = null;
-    pushBot('收到啦！已经帮你转给团队了，谢谢你 💚');
+    pushBot('收到啦！已经帮你转给团队了，谢谢你', 'ok');
   } catch (err) {
     const status = err?.response?.status;
     if (status === 429) pushBot('发得有点频繁，稍等一会儿再试试~');
@@ -130,7 +138,7 @@ function onKeydown(e) {
 
         <div ref="bodyRef" class="fbot-body">
           <div v-for="m in messages" :key="m.id" class="fbot-msg" :class="`from-${m.from}`">
-            <div class="fbot-bubble">{{ m.text }}</div>
+            <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok' }"><svg v-if="m.tone === 'ok'" class="fbot-ok" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.8 12.4l3 3 5.4-6"/></svg>{{ m.text }}</div>
           </div>
           <div v-if="sending" class="fbot-msg from-bot">
             <div class="fbot-bubble fbot-typing"><i></i><i></i><i></i></div>
@@ -138,7 +146,7 @@ function onKeydown(e) {
         </div>
 
         <div v-if="!topic && messages.length <= 2" class="fbot-chips">
-          <button v-for="t in quickTopics" :key="t.key" @click="pickTopic(t)">{{ t.emoji }} {{ t.label }}</button>
+          <button v-for="t in quickTopics" :key="t.key" @click="pickTopic(t)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="(d, i) in topicIcons[t.icon]" :key="i" :d="d"/></svg>{{ t.label }}</button>
         </div>
 
         <footer class="fbot-foot">
@@ -316,6 +324,8 @@ function onKeydown(e) {
   border-bottom-left-radius: 16px;
   border-bottom-right-radius: 4px;
 }
+.fbot-bubble.is-ok { display: flex; align-items: flex-start; gap: 6px; }
+.fbot-ok { flex-shrink: 0; margin-top: 3px; color: #3f9a6b; }
 .fbot-typing { display: inline-flex; gap: 4px; padding: 12px 14px; }
 .fbot-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--fb-sub); animation: fbot-dot 1s infinite; }
 .fbot-typing i:nth-child(2) { animation-delay: 0.15s; }
@@ -324,6 +334,9 @@ function onKeydown(e) {
 
 .fbot-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 8px; }
 .fbot-chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 6px 12px;
   font-size: 13px;
   color: var(--fb-text);

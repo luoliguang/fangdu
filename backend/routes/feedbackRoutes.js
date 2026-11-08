@@ -1,6 +1,7 @@
 const express = require('express');
 const FeedbackController = require('../controllers/FeedbackController');
 const { requireAdmin } = require('../middleware/auth');
+const { createFeedbackGuard } = require('../middleware/feedbackGuard');
 
 /**
  * 反馈留言相关路由
@@ -11,9 +12,9 @@ function createFeedbackRoutes(db) {
   const router = express.Router();
   const feedbackController = new FeedbackController(db);
 
-  // 提交留言（公开，自带提交频率限制）
+  // 提交留言（公开，多层防刷：IP 限流 + 全站熔断 + 冷却/去重 + 入参校验）
   router.post('/',
-    feedbackController.rateLimitMiddleware.bind(feedbackController),
+    ...createFeedbackGuard(),
     feedbackController.submitFeedback.bind(feedbackController)
   );
 
