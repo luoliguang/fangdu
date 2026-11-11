@@ -470,6 +470,12 @@ const fetchSearchSuggestions = async () => {
 };
 
 // 点击建议项，使用建议的关键词进行搜索
+const askXiaodu = () => {
+  window.dispatchEvent(new CustomEvent('fbot:open', {
+    detail: { topic: 'notfound', text: searchTerm.value || activeTag.value || '' }
+  }));
+};
+
 const useSuggestion = (suggestion) => {
     searchTerm.value = suggestion;
     showSuggestions.value = false;
@@ -1090,7 +1096,8 @@ const quickCopyImage = async (material) => {
           <h3 class="empty-title">
             未找到<span class="empty-keyword">「{{ searchTerm || activeTag }}」</span>的相关素材
           </h3>
-          <p class="empty-subtitle">换个关键词试试</p>
+          <p class="empty-subtitle">换个关键词试试，或者告诉小度你想要什么，我们会帮你记下来</p>
+          <button class="suggestion-chip" @click="askXiaodu">告诉小度</button>
 
           <!-- 搜索建议 chips -->
           <div v-if="searchSuggestions && searchSuggestions.length > 0" class="empty-suggestions">

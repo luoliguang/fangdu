@@ -72,12 +72,22 @@ function onPointerMove(e) {
   const k = Math.min(1, d / 160) * 3;
   eye.value = { x: (dx / d) * k, y: (dy / d) * k };
 }
+// 外部唤起：window.dispatchEvent(new CustomEvent('fbot:open', { detail: { topic: 'notfound', text: '关键词' } }))
+function onExternalOpen(e) {
+  const { topic: key, text: prefill } = e.detail || {};
+  const t = quickTopics.find(q => q.key === key);
+  if (!open.value) toggle();
+  if (t && topic.value?.key !== t.key) pickTopic(t);
+  if (prefill && !text.value.trim()) text.value = String(prefill).slice(0, MAX_LEN);
+}
 onMounted(() => {
   window.addEventListener('pointermove', onPointerMove, { passive: true });
+  window.addEventListener('fbot:open', onExternalOpen);
   if (cooldownLeft.value > 0) runTicker();
 });
 onUnmounted(() => {
   window.removeEventListener('pointermove', onPointerMove);
+  window.removeEventListener('fbot:open', onExternalOpen);
   clearInterval(tickTimer);
 });
 
