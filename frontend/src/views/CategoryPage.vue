@@ -143,6 +143,7 @@ const fetchMaterials = async (isLoadMore = false) => {
   if (!anyTagsParam.value || isLoading.value) return;
   const page = isLoadMore ? currentPage.value + 1 : 1;
   const serial = ++requestSerial;
+  if (!isLoadMore) lastSearch = searchTerm.value.trim();
   isLoading.value = true;
   try {
     const { data: res } = await apiClient.get('/api/v1/materials', {
@@ -189,17 +190,21 @@ const fetchTags = async () => {
 };
 
 // ── 加载分类配置 ─────────────────────────────────────────────────
+const findCategory = async (slug) => {
+  // 优先复用 App 已拉取的分类，避免重复请求
+  let found = injectedCategories.value.find(c => c.slug === slug && c.is_active);
+  if (!found) {
+    const { data: res } = await apiClient.get('/api/v1/drawer-config/page-categories');
+    found = (res?.data ?? []).find(c => c.slug === slug && c.is_active);
+  }
+  return found;
+};
+
 const loadConfig = async () => {
   configLoading.value = true;
   configError.value = false;
   try {
-    const slug = route.params.slug;
-    // 优先复用 App 已拉取的分类，避免重复请求
-    let found = injectedCategories.value.find(c => c.slug === slug && c.is_active);
-    if (!found) {
-      const { data: res } = await apiClient.get('/api/v1/drawer-config/page-categories');
-      found = (res?.data ?? []).find(c => c.slug === slug && c.is_active);
-    }
+    const found = await findCategory(route.params.slug);
     if (!found) { configError.value = true; return; }
     categoryConfig.value = found;
     await Promise.all([fetchMaterials(), fetchTags()]);
@@ -211,6 +216,49 @@ const loadConfig = async () => {
     // v-else 渲染完再绑定 observer（之前在 onMounted 时 observerEl 还是 null）
     await nextTick();
     if (observerEl.value && !observer) setupObserver();
+  }
+};
+
+// 分类间切换：旧内容保持不动，新数据全部就绪后一次性替换，避免 loader/空态闪烁
+let switchToken = 0;
+const switchCategory = async () => {
+  const token = ++switchToken;
+  const slug = route.params.slug;
+  try {
+    const found = await findCategory(slug);
+    if (token !== switchToken) return;
+    if (!found) { configError.value = true; categoryConfig.value = null; return; }
+    const anyTag = (found.tags ?? []).join(',');
+    const [matRes, tagRes] = await Promise.all([
+      apiClient.get('/api/v1/materials', { params: { any_tag: anyTag, tag: '', search: '', page: 1, limit: 20 } }),
+      apiClient.get('/api/v1/materials/tags/all', { params: { any_tag: anyTag } })
+    ]);
+    if (token !== switchToken) return;
+    // 作废进行中的旧请求，并一次性提交所有状态
+    latestSerial = ++requestSerial;
+    clearTimeout(debounceTimer);
+    lastSearch = '';
+    const res = matRes.data;
+    const list = res?.data ?? [];
+    categoryConfig.value = found;
+    configError.value = false;
+    activeTag.value = '';
+    searchTerm.value = '';
+    materials.value = list;
+    applyDisplayMaterials(list, { append: false, chunkSize: 20 });
+    tags.value = tagRes.data?.data ?? [];
+    currentPage.value = 1;
+    totalPages.value = res?.meta?.totalPages ?? 1;
+    totalItems.value = res?.meta?.total ?? 0;
+    hasMore.value = 1 < totalPages.value;
+    isLoading.value = false;
+    isTagsExpanded.value = false;
+    visibleTagsCount.value = Math.max(visibleTagsCount.value, tags.value.length);
+    setTimeout(calculateVisibleTags, 100);
+  } catch (err) {
+    if (token !== switchToken) return;
+    console.error('切换分类失败:', err);
+    configError.value = true;
   }
 };
 
@@ -268,22 +316,22 @@ const quickCopyImage = async (material) => {
 };
 
 // ── 搜索防抖 ─────────────────────────────────────────────────────
-watch(searchTerm, () => {
+let lastSearch = '';
+watch(searchTerm, (v) => {
   clearTimeout(debounceTimer);
+  if (v.trim() === lastSearch) return;
   debounceTimer = setTimeout(() => fetchMaterials(), 400);
 });
 
-// ── 路由变化重新加载 ──────────────────────────────────────────────
+// ── 路由变化：已有内容时静默切换，否则走完整加载 ──────────────────
 watch(() => route.params.slug, () => {
-  categoryConfig.value = null;
-  materials.value = [];
-  displayMaterials.value = [];
-  tags.value = [];
-  activeTag.value = '';
-  searchTerm.value = '';
-  observer?.disconnect();
-  observer = null;
-  loadConfig();
+  if (categoryConfig.value) {
+    switchCategory();
+  } else {
+    observer?.disconnect();
+    observer = null;
+    loadConfig();
+  }
 });
 
 // ── 无限滚动 ─────────────────────────────────────────────────────
