@@ -1084,11 +1084,12 @@ const quickCopyImage = async (material) => {
         <div v-if="(!materials || materials.length === 0) && !isLoading && ((searchTerm && searchTerm.trim().length > 0) || (activeTag && activeTag !== ''))" class="empty-state">
           <!-- 图标 -->
           <div class="empty-icon-wrap">
-            <svg class="empty-svg" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="34" cy="34" r="22" class="empty-svg-ring" stroke-width="3.5" stroke-linecap="round"/>
-              <line x1="50" y1="50" x2="66" y2="66" class="empty-svg-ring" stroke-width="3.5" stroke-linecap="round"/>
-              <line x1="27" y1="27" x2="41" y2="41" class="empty-svg-cross" stroke-width="2.5" stroke-linecap="round"/>
-              <line x1="41" y1="27" x2="27" y2="41" class="empty-svg-cross" stroke-width="2.5" stroke-linecap="round"/>
+            <svg class="empty-svg" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="21" cy="21" r="12" class="empty-svg-ring" stroke-width="2.4"/>
+              <path d="M30 30l9 9" class="empty-svg-ring" stroke-width="2.4" stroke-linecap="round"/>
+              <path d="M16.5 21h9" class="empty-svg-cross" stroke-width="2.4" stroke-linecap="round"/>
+              <circle cx="38" cy="10" r="2" class="empty-svg-dot"/>
+              <circle cx="9" cy="38" r="1.5" class="empty-svg-dot"/>
             </svg>
           </div>
 
@@ -1096,8 +1097,7 @@ const quickCopyImage = async (material) => {
           <h3 class="empty-title">
             未找到<span class="empty-keyword">「{{ searchTerm || activeTag }}」</span>的相关素材
           </h3>
-          <p class="empty-subtitle">换个关键词试试，或者告诉小度你想要什么，我们会帮你记下来</p>
-          <button class="suggestion-chip" @click="askXiaodu">告诉小度</button>
+          <p class="empty-subtitle">换个关键词试试</p>
 
           <!-- 搜索建议 chips -->
           <div v-if="searchSuggestions && searchSuggestions.length > 0" class="empty-suggestions">
@@ -1108,6 +1108,15 @@ const quickCopyImage = async (material) => {
               class="suggestion-chip"
               @click="useSuggestion(suggestion)"
             >{{ suggestion }}</button>
+          </div>
+
+          <!-- 小度反馈入口 -->
+          <div class="empty-cta">
+            <div class="empty-cta-text">
+              <strong>还是没找到？告诉小度</strong>
+              <span>说说你想要的款式，团队会帮你记下来</span>
+            </div>
+            <button class="empty-cta-btn" @click="askXiaodu">告诉小度</button>
           </div>
 
         </div>
@@ -1184,8 +1193,12 @@ const quickCopyImage = async (material) => {
   body.theme-light .btn-icon { color: #374151; }
   body.theme-light .browse-load-count { color: #9ca3af; }
   body.theme-light .browse-load-count strong { color: #3d6b52; }
+  body.theme-light .empty-icon-wrap { background: linear-gradient(135deg, rgba(90,143,115,0.12), rgba(90,143,115,0.22)); border-color: rgba(10,61,34,0.18); }
   body.theme-light .empty-svg-ring  { stroke: #0a3d22; }
   body.theme-light .empty-svg-cross { stroke: #5a8f73; }
+  body.theme-light .empty-cta { background: linear-gradient(135deg, rgba(90,143,115,0.12), rgba(90,143,115,0.2)); border-color: rgba(10,61,34,0.25); }
+  body.theme-light .empty-cta-text strong { color: #0a3d22; }
+  body.theme-light .empty-cta-text span { color: #64748b; }
   body.theme-light .empty-title { color: #1a2332; }
   body.theme-light .empty-subtitle { color: #64748b; }
   body.theme-light .empty-keyword { color: #0a3d22; }
@@ -1960,23 +1973,57 @@ body.theme-light .card-fav-inline {
 }
 
 .empty-icon-wrap {
-  width: 80px;
-  height: 80px;
-  background: linear-gradient(135deg, rgba(90,143,115,0.18), rgba(90,143,115,0.28));
-  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, rgba(10,61,34,0.55), rgba(90,143,115,0.25));
+  border: 1px solid rgba(90,143,115,0.35);
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .empty-svg {
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
 }
 
-.empty-svg-ring  { stroke: rgba(255,255,255,0.35); }
-.empty-svg-cross { stroke: #5a8f73; }
+.empty-svg-ring  { stroke: rgba(255,255,255,0.7); }
+.empty-svg-cross { stroke: #9ed4b5; }
+.empty-svg-dot   { fill: #5a8f73; }
+
+.empty-cta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 460px;
+  padding: 14px 16px 14px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(90,143,115,0.4);
+  background: linear-gradient(135deg, rgba(10,61,34,0.6), rgba(90,143,115,0.22));
+  text-align: left;
+}
+.empty-cta-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.empty-cta-text strong { font-size: 0.95rem; color: #fff; font-weight: 600; }
+.empty-cta-text span { font-size: 0.8rem; color: rgba(255,255,255,0.6); line-height: 1.4; }
+.empty-cta-btn {
+  flex-shrink: 0;
+  padding: 9px 20px;
+  border: none;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #0a3d22, #5a8f73);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(90,143,115,0.35);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.empty-cta-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(90,143,115,0.5); }
+@media (max-width: 520px) {
+  .empty-cta { flex-direction: column; align-items: stretch; text-align: center; }
+}
 
 .empty-title {
   font-size: 1.15rem;
