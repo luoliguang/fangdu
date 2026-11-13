@@ -22,6 +22,14 @@ const quickTopics = [
   { key: 'other', label: '其他想说的', icon: 'chat', hint: '想说什么都可以，我在听~' }
 ];
 
+// 猜你想问：点一下直接作为问题发出，帮助新用户快速进入对话
+const quickQuestions = [
+  '你能做什么？',
+  '怎么搜索素材？',
+  '帮我找点棉麻面料',
+  '网站怎么用？'
+];
+
 // 线性图标（Lucide 风格路径），随文字颜色走，亮/暗色都协调
 const topicIcons = {
   sparkle: ['M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z', 'M19 3v4M17 5h4'],
@@ -34,6 +42,7 @@ const open = ref(false);
 const text = ref('');
 const topic = ref(null);
 const sending = ref(false);
+const streaming = ref(false);
 const bodyRef = ref(null);
 const inputRef = ref(null);
 
@@ -183,11 +192,107 @@ function onMdClick(e) {
   ElMessage.success('已复制');
 }
 
+function pushStreaming() {
+  const m = { id: nextId++, from: 'bot', text: '', md: true, streaming: true };
+  messages.value.push(m);
+  scrollBottom();
+  return m;
+}
+function updateStreaming(m, text) {
+  m.text = text;
+  scrollBottom();
+}
+function finalizeStreaming(m) {
+  m.streaming = false;
+}
+function removeStreaming(m) {
+  const i = messages.value.findIndex(x => x.id === m.id);
+  if (i >= 0) messages.value.splice(i, 1);
+}
+function askQuick(q) {
+  if (sending.value || cooldownLeft.value > 0) return;
+  text.value = q;
+  send();
+}
+function fallbackAck(content) {
+  const t = String(content || '');
+  if (/你能做什么|你会做什么|你能干啥|你会啥|你是谁|介绍一下/.test(t)) {
+    return '我现在是「留言模式」，还没接入 AI～ 不过你照样可以在顶部搜索栏输入关键词找素材，或者点下面的话题把需求告诉掌柜的。';
+  }
+  if (/价格|报价|多少钱|收费|便宜/.test(t)) {
+    return '这里不报价哦～ 我们主要帮你找素材和反馈素材，报价请微信联系掌柜的。';
+  }
+  return '收到啦，掌柜的会尽快看～ 想找素材的话，也可以直接去顶部搜索栏输入关键词试试。';
+}
+// 流式：用原生 fetch 读 SSE，边返回边渲染到气泡；AI 不可用时返回 null 由 send() 回退留言
+async function streamAiReply(content, history, topicLabel) {
+  const base = String(apiClient.defaults.baseURL || '').replace(/\/+$/, '');
+  const token = localStorage.getItem('authToken') || '';
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${base}/api/v1/bot/chat/stream`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ message: content, userId: getUserId(), history, topicLabel })
+  });
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) {
+    const j = await res.json();
+    if (!res.ok) {
+      const e = new Error(j?.message || 'AI 服务暂时不可用，请稍后再试');
+      e.status = res.status;
+      e.retryAfter = res.headers.get('retry-after');
+      throw e;
+    }
+    return j?.data?.ai === true ? j.data.reply : null;
+  }
+  if (!res.ok) throw new Error('AI 服务暂时不可用，请稍后再试');
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const m = pushStreaming();
+  streaming.value = true;
+  let buffer = '';
+  let full = '';
+  let completed = false;
+  try {
+    while (!completed) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, idx).replace(/\r$/, '');
+        buffer = buffer.slice(idx + 1);
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        let ev;
+        try { ev = JSON.parse(payload); } catch (_) { continue; }
+        if (ev.delta) { full += ev.delta; updateStreaming(m, full); }
+        else if (ev.disabled) { completed = true; removeStreaming(m); full = null; break; }
+        else if (ev.error) {
+          completed = true;
+          removeStreaming(m);
+          const e = new Error(ev.error || 'AI 服务暂时不可用，请稍后再试');
+          e.status = ev.status;
+          throw e;
+        } else if (ev.done) { completed = true; break; }
+      }
+    }
+  } finally {
+    streaming.value = false;
+  }
+  if (full === null) return null;
+  if (!full) { removeStreaming(m); throw new Error('AI 没返回内容，请稍后再试'); }
+  finalizeStreaming(m);
+  return full;
+}
+
 async function send() {
   if (!canSend.value) return;
   const content = text.value.trim();
-  const message = topic.value ? `【${topic.value.label}】${content}` : content;
-  // 取历史要在把本条消息放进列表之前，服务端会单独追加当前消息
+  // 取历史要在把本条消息放进列表之前，服务端会单独追加当前消息；话题卡片不带历史，避免上下文干扰
   const history = topic.value ? [] : messages.value
     .filter(m => m.from === 'bot' || m.from === 'user')
     .slice(-8)
@@ -196,38 +301,39 @@ async function send() {
   text.value = '';
   sending.value = true;
   try {
-    let answered = false;
-    if (!topic.value) {
-      const res = await apiClient.post('/api/v1/bot/chat', { message: content, userId: getUserId(), history });
-      if (res.data?.data?.ai === true) {
+    if (aiEnabled.value) {
+      const topicLabel = topic.value?.label || null;
+      const reply = await streamAiReply(content, history, topicLabel);
+      if (reply) {
         startCooldown(COOLDOWN_MS);
-        pushBot(res.data.data.reply, undefined, { md: true });
-        answered = true;
+        topic.value = null;
+        return;
       }
+      // AI 中途变为不可用 → 落到下方普通留言
     }
-    if (!answered) {
-      await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
-      startCooldown(COOLDOWN_MS);
-      topic.value = null;
-      pushBot('收到啦！已经帮你转给掌柜的啦，谢谢你', 'ok');
-    }
+    // 回退：普通留言（AI 未启用 / 临时不可用）
+    const message = topic.value ? `【${topic.value.label}】${content}` : content;
+    await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
+    startCooldown(COOLDOWN_MS);
+    topic.value = null;
+    pushBot(fallbackAck(content), undefined, { md: true });
   } catch (err) {
-    const status = err?.response?.status;
-    const serverMsg = err?.response?.data?.message;
+    const status = err?.response?.status || err?.status;
+    const serverMsg = err?.response?.data?.message || err?.message;
     let restore = status !== 400;
     if (status === 429) {
-      // 服务端限流时按它给的等待时间走，没有就用默认冷却
-      const retry = Number(err.response?.headers?.['retry-after']);
+      const retry = Number(err.retryAfter || err?.response?.headers?.['retry-after']);
       startCooldown((Number.isFinite(retry) && retry > 0 ? Math.min(retry, 3600) : COOLDOWN_MS / 1000) * 1000);
       pushBot(serverMsg || '发得有点频繁，稍等一会儿再试试~');
-      if (/已经收到/.test(serverMsg || '')) restore = false; // 重复内容不用放回输入框
+      if (/已经收到/.test(serverMsg || '')) restore = false;
     } else if (status === 503) pushBot('留言功能暂时关闭了，晚点再来找我吧~');
     else if (status === 400) pushBot(serverMsg || '内容好像不太对，换个说法试试？');
-    else if (status === 502 && serverMsg) pushBot(serverMsg);
-    else pushBot('网络开小差了，你的话还在输入框里，再点一次发送吧');
+    else if (status === 502 && serverMsg) pushBot(serverMsg, undefined, { md: true });
+    else pushBot(serverMsg || '网络开小差了，你的话还在输入框里，再点一次发送吧');
     if (restore) text.value = content;
   } finally {
     sending.value = false;
+    streaming.value = false;
   }
 }
 
@@ -257,16 +363,21 @@ function onKeydown(e) {
 
         <div ref="bodyRef" class="fbot-body" role="log" aria-live="polite">
           <div v-for="m in messages" :key="m.id" class="fbot-msg" :class="`from-${m.from}`">
-            <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok', 'is-ai': m.md }">
+            <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok', 'is-ai': m.md, 'is-streaming': m.streaming }">
               <svg v-if="m.tone === 'ok'" class="fbot-ok" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.8 12.4l3 3 5.4-6"/></svg>
               <div v-if="m.md" class="fbot-md" v-html="renderMarkdown(m.text)" @click="onMdClick"></div>
               <template v-else>{{ m.text }}</template>
-              <button v-if="m.md" class="fbot-copy" type="button" @click="copyMessage(m.text, m.id)">{{ copiedId === m.id ? '✓ 已复制' : '复制' }}</button>
+              <button v-if="m.md && !m.streaming" class="fbot-copy" type="button" @click="copyMessage(m.text, m.id)">{{ copiedId === m.id ? '✓ 已复制' : '复制' }}</button>
             </div>
           </div>
-          <div v-if="sending" class="fbot-msg from-bot">
+          <div v-if="sending && !streaming" class="fbot-msg from-bot">
             <div class="fbot-bubble fbot-typing"><i></i><i></i><i></i></div>
           </div>
+        </div>
+
+        <div v-if="aiEnabled && !topic && messages.length <= 2" class="fbot-asks">
+          <span class="fbot-asks-label">猜你想问</span>
+          <button v-for="(q, i) in quickQuestions" :key="i" @click="askQuick(q)">{{ q }}</button>
         </div>
 
         <div v-if="!topic && messages.length <= 2" class="fbot-chips">
@@ -503,6 +614,13 @@ function onKeydown(e) {
 .fbot-bubble.is-ok { display: flex; align-items: flex-start; gap: 6px; }
 .fbot-ok { flex-shrink: 0; margin-top: 3px; color: #3f9a6b; }
 .fbot-bubble.is-ai { display: flex; flex-direction: column; align-items: stretch; }
+.fbot-bubble.is-streaming .fbot-md::after {
+  content: '▍';
+  margin-left: 1px;
+  color: var(--fb-accent);
+  animation: fbot-caret 0.8s steps(2, start) infinite;
+}
+@keyframes fbot-caret { 50% { opacity: 0; } }
 .fbot-md { white-space: normal; overflow-wrap: break-word; }
 .fbot-md > :first-child { margin-top: 0; }
 .fbot-md > :last-child { margin-bottom: 0; }
@@ -584,6 +702,20 @@ function onKeydown(e) {
   transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 .fbot-chips button:hover { border-color: var(--fb-accent); transform: translateY(-1px); box-shadow: 0 3px 8px rgba(10, 61, 34, 0.1); }
+.fbot-asks { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 2px 12px 8px; }
+.fbot-asks-label { font-size: 11px; color: var(--fb-sub); letter-spacing: 0.02em; }
+.fbot-asks button {
+  padding: 7px 13px;
+  font-size: 13px;
+  color: var(--fb-text);
+  background: transparent;
+  border: 1px dashed var(--fb-line);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.fbot-asks button:hover { border-color: var(--fb-accent); background: var(--fb-bot-bubble); transform: translateY(-1px); }
 
 .fbot-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px dashed var(--fb-line); background: var(--fb-bg); }
 .fbot-hint { display: flex; justify-content: space-between; gap: 8px; padding: 0 14px 10px; font-size: 11px; color: var(--fb-sub); }

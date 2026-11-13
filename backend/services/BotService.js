@@ -1,15 +1,17 @@
+const { Readable } = require('stream');
+
 const KEY = 'chat_bot';
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'; // 固定地址，不允许配置，避免 SSRF
 const DEFAULT_MODEL = 'deepseek-chat';
 const ALLOWED_MODELS = ['deepseek-chat', 'deepseek-reasoner'];
 const API_KEY_MASK = '••••';
-const PROMPT_VERSION = 3; // 提示词文案版本：升级后迁移「掌柜的」称谓与更清晰的排版/可复制搜索词要求
+const PROMPT_VERSION = 4; // 提示词版本：迁移到「分场景智能回复」（拒绝无信息量的“收到”式回复）
 const REQUEST_TIMEOUT_MS = 30000;
 const MAX_HISTORY = 20;
 const MAX_MESSAGE_LEN = 1000;
 const MAX_HISTORY_CONTENT_LEN = 2000;
 
-const DEFAULT_SYSTEM_PROMPT = '你是「小度」，方度素材库的驻店小助手。这家素材库是「掌柜的」一个人开的，你提到他时就叫「掌柜的」。你的职责：1) 帮用户查找素材，了解想要的款式、面料、颜色、类别并给出查找建议；2) 解答网站使用问题（色卡、尺码、分类浏览等）；3) 收集用户对素材的反馈，引导用户把需求说清楚。回答规则：- 用简体中文口语，友好简洁，整段一般不超过 120 字；- 只输出正文，排版用「-」列表和「**重点**」，不要用表格、标题、代码块、引用；- 先一两句话直接回答，再按需用「-」列出要点；- 给搜索建议时，最后单独一行列出可直接复制的搜索关键词，每个词用反引号包起来；- 不确定的事不要编造，建议用户找掌柜的确认；- 严格遵守下方报价政策。';
+const DEFAULT_SYSTEM_PROMPT = '你是「小度」，方度素材库的驻店小助手。这家素材库是「掌柜的」一个人开的，提到他就叫「掌柜的」。你的职责：帮用户找素材、解答网站使用问题、收集反馈。【回复总原则】先判断用户到底想干什么，再给有用、自然的回答；禁止只说「收到」「好的」「已记录」这类没信息量的话，每次都要给一点实际帮助或明确指引。【分场景】1) 问你能做什么或自我介绍：列出能力（找素材、教搜索、答疑、转达反馈），语气轻松；2) 找素材：先确认款式、面料、颜色、类别，再给出可直接复制的搜索关键词和搜索建议（比如去顶部搜索栏输入）；3) 反馈（找不到素材、网站 bug、建议）：表示理解并追问关键细节，说明会把问题转达给「掌柜的」，若用户消息带【反馈类别】就先针对该类别回应；4) 报价或价格：严格按下方报价政策回答；5) 闲聊或问候：简短友好回应并引回找素材或提问。【排版】用简体中文口语，友好简洁，整段一般不超过 120 字；只输出正文，用「-」列表和「**重点**」，不要用表格、标题、代码块、引用；先一两句话直接回答，再按需用「-」列要点；给搜索建议时最后单独一行列出可直接复制的搜索关键词，每个词用反引号包起来。不确定的事不要编造，建议找掌柜的确认。严格遵守下方报价政策。';
 const DEFAULT_QUOTE_POLICY = '本站不提供任何报价、价格咨询、接单或收费说明。当用户询问价格、报价、多少钱、费用、收费、能不能便宜点等，必须明确友好地说明：我们这里不报价，主要提供找素材和素材反馈服务；如需报价，请通过微信或其他渠道联系掌柜的。不要猜测或给出任何价格数字，不要答应报价。';
 const DEFAULT_WELCOME = '嗨，我是小度，方度素材库的驻店小助手～ 这家店是掌柜的一个人搭起来的，找素材、答疑、传话都可以交给我。想找点什么？';
 
@@ -91,6 +93,12 @@ function friendlyHttpError(status) {
   return fail('AI 服务暂时不可用，请稍后再试', 502);
 }
 
+function normalizeTopicLabel(value) {
+  if (typeof value !== 'string') return null;
+  const t = value.replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 20);
+  return t || null;
+}
+
 class BotService {
   constructor(repository, { fetchImpl } = {}) {
     this.repository = repository;
@@ -154,12 +162,18 @@ class BotService {
     return quotePolicy ? `${systemPrompt}\n\n【报价政策，必须严格遵守】\n${quotePolicy}` : systemPrompt;
   }
 
-  async _complete(config, message, history) {
-    const messages = [
+  _buildMessages(config, message, history, topicLabel) {
+    const label = normalizeTopicLabel(topicLabel);
+    const userContent = label ? `【反馈类别：${label}】${message}` : message;
+    return [
       { role: 'system', content: this.buildSystemMessage(config) },
       ...history,
-      { role: 'user', content: message }
+      { role: 'user', content: userContent }
     ];
+  }
+
+  async _complete(config, message, history, topicLabel) {
+    const messages = this._buildMessages(config, message, history, topicLabel);
     let res;
     try {
       res = await this.fetch(DEEPSEEK_URL, {
@@ -197,12 +211,79 @@ class BotService {
   }
 
   // 未启用时返回 { enabled: false }，由前端回退到普通留言
-  async chat({ userId, message, history } = {}) {
+  async chat({ userId, message, history, topicLabel } = {}) {
     const config = await this.get();
     if (!config.enabled || !config.apiKey) return { enabled: false, reply: null };
     const input = normalizeChatInput(message, history);
-    const reply = await this._complete(config, input.message, input.history);
+    const reply = await this._complete(config, input.message, input.history, topicLabel);
     return { enabled: true, reply };
+  }
+
+  // 流式：逐段产出 delta / done / disabled / error 事件，供 SSE 透传
+  async *streamChat({ message, history, topicLabel } = {}) {
+    const config = await this.get();
+    if (!config.enabled || !config.apiKey) {
+      yield { type: 'disabled' };
+      return;
+    }
+    let input;
+    try { input = normalizeChatInput(message, history); }
+    catch (error) {
+      yield { type: 'error', status: error.status || 400, message: error.message || '消息内容无效' };
+      return;
+    }
+    const messages = this._buildMessages(config, input.message, input.history, topicLabel);
+    let res;
+    try {
+      res = await this.fetch(DEEPSEEK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
+        body: JSON.stringify({
+          model: config.model,
+          messages,
+          temperature: config.temperature,
+          max_tokens: config.maxTokens,
+          stream: true
+        }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS * 2)
+      });
+    } catch (error) {
+      console.error('[bot] 请求 DeepSeek 失败:', error?.name, error?.message);
+      const timedOut = error?.name === 'TimeoutError' || error?.name === 'AbortError';
+      yield { type: 'error', status: 502, message: timedOut ? 'AI 响应超时，请稍后再试' : 'AI 服务暂时不可用，请稍后再试' };
+      return;
+    }
+    if (!res.ok) {
+      console.error('[bot] DeepSeek 返回错误状态:', res.status);
+      const err = friendlyHttpError(res.status);
+      yield { type: 'error', status: err.status, message: err.message };
+      return;
+    }
+    let nodeStream;
+    try { nodeStream = Readable.fromWeb(res.body); }
+    catch (error) {
+      console.error('[bot] 读取流式响应失败:', error?.message);
+      yield { type: 'error', status: 502, message: 'AI 服务暂时不可用，请稍后再试' };
+      return;
+    }
+    let buffer = '';
+    for await (const chunk of nodeStream) {
+      buffer += chunk.toString('utf8');
+      let idx;
+      while ((idx = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, idx).replace(/\r$/, '');
+        buffer = buffer.slice(idx + 1);
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === '[DONE]') continue;
+        try {
+          const json = JSON.parse(payload);
+          const delta = json?.choices?.[0]?.delta?.content;
+          if (typeof delta === 'string' && delta) yield { type: 'delta', content: delta };
+        } catch (_) { /* 忽略不完整/异常行 */ }
+      }
+    }
+    yield { type: 'done' };
   }
 
   // 管理员「测试对话」：可使用尚未保存的草稿

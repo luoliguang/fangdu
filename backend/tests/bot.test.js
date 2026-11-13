@@ -12,18 +12,20 @@ async function setup(t, fetchImpl) {
   const repository = db.define('SiteConfig', { key: { type: DataTypes.STRING, unique: true }, value: DataTypes.TEXT });
   await db.sync();
   const calls = [];
+  const feedbacks = [];
   const fake = fetchImpl || (async () => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: ' 你好呀 ' } }] }) }));
   const service = new BotService(repository, { fetchImpl: async (url, init) => { calls.push({ url, init }); return fake(url, init); } });
+  const fakeFeedback = { async submitFeedback(data) { feedbacks.push(data); return { success: true }; } };
   process.env.JWT_SECRET = 'bot-isolated-test-secret';
   const app = express();
   app.use(express.json());
   app.use('/api/v1/bot-config', createBotConfigRoutes(service));
-  app.use('/api/v1/bot', createBotChatRoutes(service));
+  app.use('/api/v1/bot', createBotChatRoutes(service, { feedbackService: fakeFeedback }));
   const server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
   t.after(async () => { await new Promise(resolve => server.close(resolve)); await db.close(); });
   const url = `http://127.0.0.1:${server.address().port}`;
   const adminHeaders = { Authorization: `Bearer ${jwt.sign({ role: 'admin' }, process.env.JWT_SECRET)}`, 'Content-Type': 'application/json' };
-  return { service, repository, calls, url, adminHeaders };
+  return { service, repository, calls, feedbacks, url, adminHeaders };
 }
 
 const enabledInput = (extra = {}) => ({ enabled: true, apiKey: 'sk-secret-key', ...extra });
@@ -136,6 +138,48 @@ test('test() uses draft overrides and requires an api key', async t => {
   assert.equal(calls[0].init.headers.Authorization, 'Bearer sk-draft');
   assert.equal(JSON.parse(calls[0].init.body).model, 'deepseek-reasoner');
   assert.equal((await service.get()).apiKey, '', 'draft key must not be persisted');
+});
+
+test('streamChat yields deltas and done from a streamed response', async t => {
+  const encoder = new TextEncoder();
+  const chunks = [
+    'data: {"choices":[{"delta":{"content":"你"}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"好"}}]}\n\ndata: [DONE]\n\n'
+  ];
+  const streamFetch = async () => {
+    const rs = new ReadableStream({
+      start(controller) {
+        for (const c of chunks) controller.enqueue(encoder.encode(c));
+        controller.close();
+      }
+    });
+    return { ok: true, status: 200, body: rs };
+  };
+  const { service, calls } = await setup(t, streamFetch);
+  await service.save(enabledInput());
+  const events = [];
+  for await (const ev of service.streamChat({ message: '你好', history: [] })) events.push(ev);
+  assert.deepEqual(events.filter(e => e.type === 'delta').map(e => e.content), ['你', '好']);
+  assert.equal(events[events.length - 1].type, 'done');
+  assert.equal(JSON.parse(calls[0].init.body).stream, true);
+});
+
+test('chat with topicLabel logs a feedback record via the route', async t => {
+  const { url, adminHeaders, feedbacks } = await setup(t);
+  await fetch(`${url}/api/v1/bot-config`, { method: 'PUT', headers: adminHeaders, body: JSON.stringify(enabledInput()) });
+  const res = await fetch(`${url}/api/v1/bot/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: '碎花真丝', userId: 'u1', topicLabel: '没找到想要的' }) });
+  const body = await res.json();
+  assert.equal(body.data.ai, true);
+  assert.equal(feedbacks.length, 1);
+  assert.equal(feedbacks[0].message, '【没找到想要的】碎花真丝');
+  assert.equal(feedbacks[0].user_id, 'u1');
+});
+
+test('chat without topicLabel does not log feedback', async t => {
+  const { url, adminHeaders, feedbacks } = await setup(t);
+  await fetch(`${url}/api/v1/bot-config`, { method: 'PUT', headers: adminHeaders, body: JSON.stringify(enabledInput()) });
+  await fetch(`${url}/api/v1/bot/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: '你能做什么', userId: 'u1' }) });
+  assert.equal(feedbacks.length, 0);
 });
 
 test('bot-config routes require an admin token', async t => {
