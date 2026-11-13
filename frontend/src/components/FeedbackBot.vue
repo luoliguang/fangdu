@@ -76,6 +76,19 @@ const messages = ref([
 ]);
 let nextId = 2;
 
+function newSessionId() {
+  if (!globalThis.crypto?.getRandomValues) return null;
+  if (globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID();
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+const sessionId = ref(newSessionId());
+const sessionHasAiMessages = ref(false);
+let pendingFinishId = null;
+
 const remaining = computed(() => MAX_LEN - text.value.length);
 const canSend = computed(() => text.value.trim().length > 0 && !sending.value && remaining.value >= 0 && cooldownLeft.value === 0);
 
@@ -118,6 +131,7 @@ onUnmounted(() => {
   window.removeEventListener('pointermove', onPointerMove);
   window.removeEventListener('fbot:open', onExternalOpen);
   clearInterval(tickTimer);
+  if (open.value) finishConversation();
 });
 
 function scrollBottom() {
@@ -127,7 +141,7 @@ function pushBot(t, tone, opts = {}) {
   // 机器人连续两条一模一样的话没有意义，直接忽略，避免刷屏
   const last = messages.value[messages.value.length - 1];
   if (last && last.from === 'bot' && last.text === t) return;
-  messages.value.push({ id: nextId++, from: 'bot', text: t, tone, md: opts.md === true, animate: opts.animate === true });
+  messages.value.push({ id: nextId++, from: 'bot', text: t, tone, md: opts.md === true, aiReply: opts.aiReply === true, animate: opts.animate === true });
   scrollBottom();
 }
 function pushUser(t) {
@@ -135,13 +149,26 @@ function pushUser(t) {
   scrollBottom();
 }
 
-function toggle() {
-  open.value = !open.value;
-  if (open.value) {
-    scrollBottom();
-    // 仅在有鼠标的设备上自动聚焦，避免手机上一打开就弹出键盘遮住面板
-    if (window.matchMedia?.('(pointer: fine)').matches) nextTick(() => inputRef.value?.focus());
+function finishConversation() {
+  const closingId = sessionId.value;
+  if (closingId && (sessionHasAiMessages.value || sending.value)) {
+    // 正在流式回复时等这次请求完成，避免一段对话被拆成两条总结。
+    if (sending.value) pendingFinishId = closingId;
+    else apiClient.post('/api/v1/bot/chat/end', { sessionId: closingId }).catch(() => {});
   }
+  sessionId.value = newSessionId();
+  sessionHasAiMessages.value = false;
+}
+function closePanel() {
+  open.value = false;
+  finishConversation();
+}
+function toggle() {
+  if (open.value) return closePanel();
+  open.value = true;
+  scrollBottom();
+  // 仅在有鼠标的设备上自动聚焦，避免手机上一打开就弹出键盘遮住面板
+  if (window.matchMedia?.('(pointer: fine)').matches) nextTick(() => inputRef.value?.focus());
 }
 
 function pickTopic(t) {
@@ -165,6 +192,18 @@ function getUserId() {
 // —— AI 回复的 Markdown 渲染与复制 ——
 function renderMarkdown(text) {
   return md.render(String(text ?? ''));
+}
+function getKeywords(text) {
+  const words = md.parse(String(text ?? ''), {}).flatMap(token =>
+    token.type === 'inline' ? (token.children || []).filter(child => child.type === 'code_inline').map(child => child.content.trim()) : []
+  );
+  return [...new Set(words.filter(word => word.length > 0 && word.length <= 40))].slice(0, 4);
+}
+async function copyRecommendations(text) {
+  const words = getKeywords(text);
+  if (words.length < 2) return;
+  if (await copyText(words.join('\n'))) ElMessage.success('推荐词已复制');
+  else ElMessage.error('复制失败，请手动选中关键词');
 }
 async function copyText(t) {
   const s = String(t ?? '');
@@ -198,7 +237,7 @@ function onReplyAnimationEnd(e, m) {
 }
 
 function pushStreaming() {
-  const m = { id: nextId++, from: 'bot', text: '', md: true, streaming: true, animate: true };
+  const m = { id: nextId++, from: 'bot', text: '', md: true, aiReply: true, streaming: true, animate: true };
   messages.value.push(m);
   scrollBottom();
   return m;
@@ -233,8 +272,8 @@ function fallbackAck(content) {
   return '收到啦，掌柜的会尽快看～ 想找素材的话，也可以直接去顶部搜索栏输入关键词试试。';
 }
 // 流式：用原生 fetch 读 SSE，边返回边渲染到气泡；AI 不可用时返回 null 由 send() 回退留言
-async function streamAiReply(content, history, topicLabel) {
-  const payload = { message: content, userId: getUserId(), history, topicLabel };
+async function streamAiReply(content, history, topicLabel, currentSessionId) {
+  const payload = { message: content, userId: getUserId(), history, topicLabel, sessionId: currentSessionId };
   const token = localStorage.getItem('authToken') || '';
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -314,6 +353,7 @@ async function streamAiReply(content, history, topicLabel) {
 async function send() {
   if (!canSend.value) return;
   const content = text.value.trim();
+  const currentSessionId = sessionId.value;
   // 取历史要在把本条消息放进列表之前，服务端会单独追加当前消息；话题卡片不带历史，避免上下文干扰
   const history = topic.value ? [] : messages.value
     .filter(m => m.from === 'bot' || m.from === 'user')
@@ -326,11 +366,12 @@ async function send() {
     if (aiEnabled.value) {
       const topicLabel = topic.value?.label || null;
       const beforeReplyCount = messages.value.length;
-      const reply = await streamAiReply(content, history, topicLabel);
+      const reply = await streamAiReply(content, history, topicLabel, currentSessionId);
       if (reply) {
         // 流式气泡由 streamAiReply 更新；旧接口一次性返回时需显式展示。
-        if (messages.value.length === beforeReplyCount) pushBot(reply, undefined, { md: true, animate: true });
+        if (messages.value.length === beforeReplyCount) pushBot(reply, undefined, { md: true, aiReply: true, animate: true });
         startCooldown(COOLDOWN_MS);
+        if (currentSessionId === sessionId.value) sessionHasAiMessages.value = true;
         topic.value = null;
         return;
       }
@@ -338,7 +379,13 @@ async function send() {
     }
     // 回退：普通留言（AI 未启用 / 临时不可用）
     const message = topic.value ? `【${topic.value.label}】${content}` : content;
-    await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
+    try {
+      await apiClient.post('/api/v1/bot/feedback', { message, user_id: getUserId() });
+    } catch (error) {
+      // 旧后端未提供静默留言接口时保留原有普通留言能力。
+      if (error?.response?.status !== 404) throw error;
+      await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
+    }
     startCooldown(COOLDOWN_MS);
     topic.value = null;
     pushBot(fallbackAck(content), undefined, { md: true });
@@ -360,6 +407,10 @@ async function send() {
   } finally {
     sending.value = false;
     streaming.value = false;
+    if (pendingFinishId === currentSessionId) {
+      pendingFinishId = null;
+      apiClient.post('/api/v1/bot/chat/end', { sessionId: currentSessionId }).catch(() => {});
+    }
   }
 }
 
@@ -374,7 +425,7 @@ function onKeydown(e) {
 <template>
   <div class="fbot" :class="{ 'is-dark': isDark, 'is-open': open }">
     <Transition name="fbot-panel">
-      <section v-if="open" class="fbot-panel" role="dialog" aria-label="反馈小助手" @keydown.esc="open = false">
+      <section v-if="open" class="fbot-panel" role="dialog" aria-label="反馈小助手" @keydown.esc="closePanel">
         <header class="fbot-head">
           <span class="fbot-head-avatar" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.7 5 5 1.7-5 1.7L12 16.4l-1.7-5-5-1.7 5-1.7z"/><path d="M19 15v4M17 17h4"/></svg>
@@ -385,7 +436,7 @@ function onKeydown(e) {
             <span class="fbot-head-process">主营涤纶工艺 · 不做含棉/纯棉</span>
           </span>
           <span class="fbot-head-dot" :class="{ 'is-off': !aiEnabled }"></span>
-          <button class="fbot-close" aria-label="关闭" @click="open = false">×</button>
+          <button class="fbot-close" aria-label="关闭" @click="closePanel">×</button>
         </header>
 
         <div ref="bodyRef" class="fbot-body" role="log" aria-live="polite">
@@ -395,6 +446,7 @@ function onKeydown(e) {
               <span v-if="m.streaming && !m.text" class="fbot-stream-wait" role="status"><span class="fbot-wait-pulse"></span>正在生成回复…</span>
               <div v-if="m.md && m.text" class="fbot-md" v-html="renderMarkdown(m.text)" @click="copyKeyword" @keydown="onMdKeydown"></div>
               <template v-else-if="!m.md">{{ m.text }}</template>
+              <button v-if="m.aiReply && !m.streaming && getKeywords(m.text).length > 1" class="fbot-copy-terms" type="button" title="每行一个；也可点上方关键词单独复制" @click="copyRecommendations(m.text)">复制全部推荐词</button>
             </div>
           </div>
           <div v-if="sending && !streaming" class="fbot-msg from-bot" role="status">
@@ -709,6 +761,8 @@ function onKeydown(e) {
   font-size: .92em;
   cursor: pointer;
 }
+.fbot-copy-terms { align-self: flex-end; margin-top: 6px; padding: 3px 10px; border: 1px solid var(--fb-line); border-radius: 999px; background: transparent; color: var(--fb-accent); font-size: 11px; cursor: pointer; }
+.fbot-copy-terms:hover, .fbot-copy-terms:focus-visible { border-color: var(--fb-accent); outline: 2px solid var(--fb-accent); outline-offset: 2px; }
 .fbot-md :deep(.fbot-keyword:hover), .fbot-md :deep(.fbot-keyword:focus-visible) {
   background: rgba(90, 143, 115, 0.28);
   outline: 2px solid var(--fb-accent);

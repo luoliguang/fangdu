@@ -12,7 +12,7 @@ class FeedbackService {
   /**
    * 提交留言
    */
-  async submitFeedback(feedbackData, clientInfo = {}) {
+  async submitFeedback(feedbackData, clientInfo = {}, { notify = true } = {}) {
     try {
       const { message, user_id } = feedbackData;
 
@@ -38,8 +38,8 @@ class FeedbackService {
         status: 'pending'
       });
 
-      // 异步推送飞书：不 await，失败只打日志，不影响用户提交
-      require('./LarkNotifyService').getShared().notifyFeedback({
+      // AI 分类失败时仅保留原始留言供后台查看，不向飞书推送。
+      if (notify) require('./LarkNotifyService').getShared().notifyFeedback({
         id: feedback.id,
         message: feedback.message,
         user_id: feedback.user_id

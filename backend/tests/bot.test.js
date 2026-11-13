@@ -2,30 +2,32 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const { randomUUID } = require('node:crypto');
 const { Sequelize, DataTypes } = require('sequelize');
 const { BotService, DEEPSEEK_URL, DEFAULT_QUOTE_POLICY } = require('../services/BotService');
 const createBotConfigRoutes = require('../routes/botConfigRoutes');
 const createBotChatRoutes = require('../routes/botChatRoutes');
 
-async function setup(t, fetchImpl) {
+async function setup(t, fetchImpl, conversations) {
   const db = new Sequelize({ dialect: 'sqlite', storage: ':memory:', logging: false });
   const repository = db.define('SiteConfig', { key: { type: DataTypes.STRING, unique: true }, value: DataTypes.TEXT });
   await db.sync();
   const calls = [];
   const feedbacks = [];
+  const feedbackOptions = [];
   const fake = fetchImpl || (async () => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: ' 你好呀 ' } }] }) }));
   const service = new BotService(repository, { fetchImpl: async (url, init) => { calls.push({ url, init }); return fake(url, init); } });
-  const fakeFeedback = { async submitFeedback(data) { feedbacks.push(data); return { success: true }; } };
+  const fakeFeedback = { async submitFeedback(data, _info, options) { feedbacks.push(data); feedbackOptions.push(options); return { success: true }; } };
   process.env.JWT_SECRET = 'bot-isolated-test-secret';
   const app = express();
   app.use(express.json());
   app.use('/api/v1/bot-config', createBotConfigRoutes(service));
-  app.use('/api/v1/bot', createBotChatRoutes(service, { feedbackService: fakeFeedback }));
+  app.use('/api/v1/bot', createBotChatRoutes(service, { feedbackService: fakeFeedback, conversations }));
   const server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
   t.after(async () => { await new Promise(resolve => server.close(resolve)); await db.close(); });
   const url = `http://127.0.0.1:${server.address().port}`;
   const adminHeaders = { Authorization: `Bearer ${jwt.sign({ role: 'admin' }, process.env.JWT_SECRET)}`, 'Content-Type': 'application/json' };
-  return { service, repository, calls, feedbacks, url, adminHeaders };
+  return { service, repository, calls, feedbacks, feedbackOptions, url, adminHeaders };
 }
 
 const enabledInput = (extra = {}) => ({ enabled: true, apiKey: 'sk-secret-key', ...extra });
@@ -179,6 +181,34 @@ test('custom admin prompt keeps the polyester process boundary and does not over
   assert.match(system, /主要做涤纶.*做不了含棉或纯棉/);
 });
 
+test('truncated DeepSeek stream cannot be marked complete or recorded as feedback', async t => {
+  const { service } = await setup(t, async () => ({ ok: true, body: new ReadableStream({ start(controller) {
+    controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"一半"}}]}\n\n'));
+    controller.close();
+  } }) }));
+  await service.save(enabledInput());
+  const events = [];
+  for await (const ev of service.streamChat({ message: '你好' })) events.push(ev);
+  assert.deepEqual(events.map(ev => ev.type), ['delta', 'error']);
+});
+
+test('AI classifies feedback from user messages only and rejects malformed decisions', async t => {
+  let reply = { notify: true, topic: '素材需求', summary: '希望添加涤纶提花面料' };
+  const { service, calls } = await setup(t, async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(reply) } }] }) }));
+  await service.save(enabledInput({ model: 'deepseek-reasoner', systemPrompt: '自定义聊天提示' }));
+  const items = [{ topic: '想要新素材', message: '想找涤纶提花' }];
+  assert.deepEqual(await service.summarizeFeedback(items), reply);
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.model, 'deepseek-chat');
+  assert.equal(body.response_format.type, 'json_object');
+  assert.match(body.messages[1].content, /想找涤纶提花/);
+  assert.doesNotMatch(body.messages[1].content, /自定义聊天提示/);
+  reply = { notify: false, topic: '', summary: '' };
+  assert.deepEqual(await service.summarizeFeedback([{ message: '你好', topic: '' }]), { notify: false });
+  reply = { notify: true, topic: '其他', summary: '不应该通过' };
+  await assert.rejects(service.summarizeFeedback(items), { status: 502 });
+});
+
 test('chat with topicLabel logs a feedback record via the route', async t => {
   const { url, adminHeaders, feedbacks } = await setup(t);
   await fetch(`${url}/api/v1/bot-config`, { method: 'PUT', headers: adminHeaders, body: JSON.stringify(enabledInput()) });
@@ -188,6 +218,70 @@ test('chat with topicLabel logs a feedback record via the route', async t => {
   assert.equal(feedbacks.length, 1);
   assert.equal(feedbacks[0].message, '【没找到想要的】碎花真丝');
   assert.equal(feedbacks[0].user_id, 'u1');
+});
+
+test('session chat is collected without immediate feedback and end is idempotent', async t => {
+  const collected = [];
+  const finished = [];
+  const conversations = {
+    record(item) { collected.push(item); },
+    async finish(id) { finished.push(id); }
+  };
+  const { url, adminHeaders, feedbacks } = await setup(t, undefined, conversations);
+  await fetch(`${url}/api/v1/bot-config`, { method: 'PUT', headers: adminHeaders, body: JSON.stringify(enabledInput()) });
+  const sessionId = randomUUID();
+  const chat = await fetch(`${url}/api/v1/bot/chat`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: '要涤纶提花', userId: randomUUID(), topicLabel: '想要新素材', sessionId })
+  });
+  assert.equal(chat.status, 200);
+  assert.equal(collected.length, 1);
+  assert.equal(feedbacks.length, 0);
+  const end = await fetch(`${url}/api/v1/bot/chat/end`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) });
+  assert.equal(end.status, 200);
+  assert.deepEqual(finished, [sessionId]);
+  const invalid = await fetch(`${url}/api/v1/bot/chat/end`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'bad' }) });
+  assert.equal(invalid.status, 400);
+});
+
+test('stream records completed sessions but skips failed responses', async t => {
+  const recorded = [];
+  let upstreamOk = true;
+  const upstream = async () => upstreamOk ? {
+    ok: true, body: new ReadableStream({ start(controller) {
+      controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"可以找涤纶"}}]}\n\ndata: [DONE]\n\n'));
+      controller.close();
+    } })
+  } : { ok: false, status: 500 };
+  const { url, adminHeaders, feedbacks } = await setup(t, upstream, { record: item => recorded.push(item), finish: async () => {} });
+  await fetch(`${url}/api/v1/bot-config`, { method: 'PUT', headers: adminHeaders, body: JSON.stringify(enabledInput()) });
+  const sessionId = randomUUID();
+  const payload = { message: '想找涤纶', topicLabel: '想要新素材', sessionId };
+  const send = () => fetch(`${url}/api/v1/bot/chat/stream`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const ok = await send();
+  assert.match(await ok.text(), /"done":true/);
+  assert.equal(recorded.length, 1);
+  assert.equal(feedbacks.length, 0);
+  upstreamOk = false;
+  const failed = await send();
+  assert.match(await failed.text(), /"error":/);
+  assert.equal(recorded.length, 1);
+});
+
+test('AI-disabled bot feedback is rate-limited and does not notify Lark', async t => {
+  const { url, feedbacks, feedbackOptions } = await setup(t);
+  const user_id = randomUUID();
+  const response = await fetch(`${url}/api/v1/bot/feedback`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: '想要新的涤纶面料', user_id })
+  });
+  assert.equal(response.status, 201);
+  assert.deepEqual(feedbackOptions, [{ notify: false }]);
+  assert.equal(feedbacks[0].user_id, user_id);
+  const invalid = await fetch(`${url}/api/v1/bot/feedback`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: '', user_id })
+  });
+  assert.equal(invalid.status, 400);
 });
 
 test('chat without topicLabel does not log feedback', async t => {

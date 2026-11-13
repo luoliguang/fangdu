@@ -1,18 +1,23 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { BotConversationService, validSessionId } = require('../services/BotConversationService');
+const { createFeedbackGuard } = require('../middleware/feedbackGuard');
 
 /**
  * 前台机器人「小度」（公开）
  * GET  /status        是否启用 AI 及欢迎语
  * POST /chat          一次性 AI 对话；未启用时返回 ai:false，由前端回退到普通留言
  * POST /chat/stream   流式 AI 对话（SSE）；未启用时返回 ai:false
+ * POST /chat/end      结束本次会话并异步整理反馈
+ * POST /feedback      AI 未启用时的普通留言，仅保留到后台、不直接推飞书
  *
- * deps.feedbackService：可选，传入后话题卡片（topicLabel）内容会同步落库为留言，
- * 保证「反馈素材」在 AI 接管回复后仍然可达掌柜的。
+ * 新客户端传随机 sessionId：收集成功的 AI 对话，关闭或空闲后只落一条值得处理的总结。
+ * 未传 sessionId 的旧客户端仍按原有话题留言方式工作。
  */
 module.exports = function createBotChatRoutes(service, deps = {}) {
   const router = express.Router();
   const feedbackService = deps.feedbackService || null;
+  const conversations = deps.conversations || (feedbackService ? new BotConversationService(service, feedbackService) : null);
 
   const chatLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -43,10 +48,12 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
 
   router.post('/chat', chatLimiter, async (req, res) => {
     try {
-      const { message, userId, history, topicLabel } = req.body || {};
+      const { message, userId, history, topicLabel, sessionId } = req.body || {};
+      if (sessionId != null && !validSessionId(sessionId)) return res.status(400).json({ success: false, message: '会话标识无效' });
       const result = await service.chat({ message, userId, history, topicLabel });
       if (!result.enabled) return res.json({ success: true, data: { ai: false, reply: null } });
-      await logFeedback({ message, userId, topicLabel });
+      if (sessionId && conversations) conversations.record({ sessionId, message, userId, topicLabel });
+      else await logFeedback({ message, userId, topicLabel });
       res.json({ success: true, data: { ai: true, reply: result.reply } });
     } catch (error) {
       const known = error.status === 400 || error.status === 429;
@@ -55,15 +62,14 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
   });
 
   router.post('/chat/stream', chatLimiter, async (req, res) => {
-    const { message, userId, history, topicLabel } = req.body || {};
-
-    const config = await service.get();
+    const { message, userId, history, topicLabel, sessionId } = req.body || {};
+    if (sessionId != null && !validSessionId(sessionId)) return res.status(400).json({ success: false, message: '会话标识无效' });
+    let config;
+    try { config = await service.get(); }
+    catch (_) { return res.status(502).json({ success: false, message: 'AI 服务暂时不可用，请稍后再试' }); }
     if (!config.enabled || !config.apiKey) {
       return res.json({ success: true, data: { ai: false, reply: null } });
     }
-
-    // 反馈落库放在流式开始前，保证失败也能留存
-    await logFeedback({ message, userId, topicLabel });
 
     res.set({
       'Content-Type': 'text/event-stream; charset=utf-8',
@@ -74,27 +80,57 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
     res.flushHeaders();
 
     let full = '';
+    let completed = false;
+    let failed = false;
     try {
       for await (const ev of service.streamChat({ message, history, topicLabel })) {
         if (ev.type === 'delta') {
           full += ev.content;
           res.write(`data: ${JSON.stringify({ delta: ev.content })}\n\n`);
         } else if (ev.type === 'done') {
+          completed = true;
           break;
         } else if (ev.type === 'disabled') {
+          failed = true;
           res.write(`data: ${JSON.stringify({ disabled: true })}\n\n`);
           break;
         } else if (ev.type === 'error') {
+          failed = true;
           res.write(`data: ${JSON.stringify({ error: ev.message, status: ev.status })}\n\n`);
           break;
         }
       }
-      if (full) res.write(`data: ${JSON.stringify({ done: true, full })}\n\n`);
+      if (completed && full.trim()) {
+        if (sessionId && conversations) conversations.record({ sessionId, message, userId, topicLabel });
+        else await logFeedback({ message, userId, topicLabel });
+        res.write(`data: ${JSON.stringify({ done: true, full })}\n\n`);
+      } else if (!failed && !completed) {
+        res.write(`data: ${JSON.stringify({ error: '回复中断了，请稍后重试' })}\n\n`);
+      }
     } catch (error) {
       console.error('[bot] 流式响应失败:', error?.message);
       res.write(`data: ${JSON.stringify({ error: 'AI 服务暂时不可用，请稍后再试' })}\n\n`);
     }
     res.end();
+  });
+
+  router.post('/feedback', ...createFeedbackGuard(), async (req, res) => {
+    if (!feedbackService) return res.status(503).json({ success: false, message: '留言暂不可用' });
+    try {
+      const result = await feedbackService.submitFeedback(
+        { message: req.body.message, user_id: req.body.user_id }, {}, { notify: false }
+      );
+      return res.status(201).json(result);
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message || '留言提交失败' });
+    }
+  });
+
+  router.post('/chat/end', chatLimiter, (req, res) => {
+    const sessionId = req.body?.sessionId;
+    if (!validSessionId(sessionId)) return res.status(400).json({ success: false, message: '会话标识无效' });
+    if (conversations) conversations.finish(sessionId).catch(error => console.error('[bot] 整理会话失败:', error?.message));
+    return res.json({ success: true, data: { queued: true } });
   });
 
   return router;
