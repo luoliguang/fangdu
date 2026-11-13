@@ -26,8 +26,8 @@ const quickTopics = [
 const quickQuestions = [
   '你能做什么？',
   '怎么搜索素材？',
-  '帮我找点棉麻面料',
-  '网站怎么用？'
+  '找涤纶素材',
+  '支持哪些工艺？'
 ];
 
 // 线性图标（Lucide 风格路径），随文字颜色走，亮/暗色都协调
@@ -68,7 +68,7 @@ function startCooldown(ms) {
   runTicker();
 }
 const aiEnabled = ref(false);
-const welcomeText = ref('嗨，我是小度，方度素材库的驻店小助手～ 这家店是掌柜的一个人搭起来的，找素材、答疑、传话都可以交给我。想找点什么？');
+const welcomeText = ref('嗨，我是小度，方度素材库的驻店小助手～ 这里主要做涤纶工艺，不做含棉或纯棉的。找素材、答疑、传话都可以交给我。想找点什么？');
 const messages = ref([
   { id: 1, from: 'bot', text: welcomeText.value }
 ]);
@@ -217,10 +217,13 @@ function askQuick(q) {
 function fallbackAck(content) {
   const t = String(content || '');
   if (/你能做什么|你会做什么|你能干啥|你会啥|你是谁|介绍一下/.test(t)) {
-    return '我现在是「留言模式」，还没接入 AI～ 不过你照样可以在顶部搜索栏输入关键词找素材，或者点下面的话题把需求告诉掌柜的。';
+    return '我现在是「留言模式」，可以帮你把需求转给掌柜的，也可以在顶部搜索栏找素材。工艺主要做涤纶，含棉或纯棉的做不了。';
   }
   if (/价格|报价|多少钱|收费|便宜/.test(t)) {
     return '这里不报价哦～ 我们主要帮你找素材和反馈素材，报价请微信联系掌柜的。';
+  }
+  if (/含棉|纯棉|棉麻|棉布|棉质/.test(t)) {
+    return '这边主要做涤纶工艺，含棉和纯棉的做不了。如果你想找涤纶相关素材，可以告诉我款式或颜色；其他需求也可以留言给掌柜的。';
   }
   return '收到啦，掌柜的会尽快看～ 想找素材的话，也可以直接去顶部搜索栏输入关键词试试。';
 }
@@ -375,6 +378,7 @@ function onKeydown(e) {
           <span class="fbot-head-meta">
             <strong>小度</strong>
             <span class="fbot-head-sub">{{ aiEnabled ? 'AI 助手在线' : '反馈小助手' }}</span>
+            <span class="fbot-head-process">主营涤纶工艺 · 不做含棉/纯棉</span>
           </span>
           <span class="fbot-head-dot" :class="{ 'is-off': !aiEnabled }"></span>
           <button class="fbot-close" aria-label="关闭" @click="open = false">×</button>
@@ -396,7 +400,9 @@ function onKeydown(e) {
           <div v-if="!sending && !topic && messages.length === 1" class="fbot-suggestions">
             <div v-if="aiEnabled" class="fbot-asks">
               <span class="fbot-asks-label">猜你想问</span>
-              <button v-for="(q, i) in quickQuestions" :key="i" type="button" @click="askQuick(q)">{{ q }}</button>
+              <div class="fbot-asks-grid">
+                <button v-for="(q, i) in quickQuestions" :key="i" type="button" @click="askQuick(q)">{{ q }}</button>
+              </div>
             </div>
             <div class="fbot-chips">
               <button v-for="t in quickTopics" :key="t.key" type="button" @click="pickTopic(t)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="(d, i) in topicIcons[t.icon]" :key="i" :d="d"/></svg>{{ t.label }}</button>
@@ -577,6 +583,7 @@ function onKeydown(e) {
 .fbot-head-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
 .fbot-head-meta strong { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
 .fbot-head-sub { font-size: 11px; opacity: 0.85; font-weight: 500; }
+.fbot-head-process { font-size: 11px; opacity: 0.95; font-weight: 500; line-height: 1.4; }
 .fbot-head-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: #9ef0c0; box-shadow: 0 0 0 0 rgba(158, 240, 192, 0.6); animation: fbot-pulse 2s ease-in-out infinite; }
 .fbot-head-dot.is-off { background: rgba(255, 255, 255, 0.5); box-shadow: none; animation: none; }
 @keyframes fbot-pulse {
@@ -727,19 +734,22 @@ function onKeydown(e) {
   transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 .fbot-chips button:hover { border-color: var(--fb-accent); transform: translateY(-1px); box-shadow: 0 3px 8px rgba(10, 61, 34, 0.1); }
-.fbot-asks { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 2px 0 8px; }
+.fbot-asks { display: flex; flex-direction: column; gap: 6px; padding: 2px 0 8px; }
 .fbot-asks-label { font-size: 11px; color: var(--fb-sub); letter-spacing: 0.02em; }
+.fbot-asks-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .fbot-asks button {
-  padding: 7px 13px;
+  min-width: 0;
+  padding: 7px 8px;
   font-size: 13px;
   color: var(--fb-text);
   background: transparent;
   border: 1px dashed var(--fb-line);
   border-radius: 12px;
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   transition: border-color 0.15s, background 0.15s, transform 0.15s;
 }
+.fbot-asks button:focus-visible { outline: 2px solid var(--fb-accent); outline-offset: 2px; }
 .fbot-asks button:hover { border-color: var(--fb-accent); background: var(--fb-bot-bubble); transform: translateY(-1px); }
 
 .fbot-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px dashed var(--fb-line); background: var(--fb-bg); }

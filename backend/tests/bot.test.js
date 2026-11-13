@@ -89,6 +89,7 @@ test('chat sends the expected DeepSeek request with quote policy in the system m
   assert.equal(body.stream, false);
   assert.equal(body.messages[0].role, 'system');
   assert.ok(body.messages[0].content.includes(DEFAULT_QUOTE_POLICY));
+  assert.match(body.messages[0].content, /主要做涤纶.*做不了含棉或纯棉/);
   assert.deepEqual(body.messages.slice(1), [...history, { role: 'user', content: '多少钱？' }]);
 });
 
@@ -162,6 +163,20 @@ test('streamChat yields deltas and done from a streamed response', async t => {
   assert.deepEqual(events.filter(e => e.type === 'delta').map(e => e.content), ['你', '好']);
   assert.equal(events[events.length - 1].type, 'done');
   assert.equal(JSON.parse(calls[0].init.body).stream, true);
+  assert.match(JSON.parse(calls[0].init.body).messages[0].content, /主要做涤纶.*做不了含棉或纯棉/);
+});
+
+test('custom admin prompt keeps the polyester process boundary and does not overwrite stored text', async t => {
+  const { service, calls } = await setup(t);
+  await service.save(enabledInput({ systemPrompt: '我自己的助手说明', welcomeMessage: '自定义欢迎语' }));
+  const result = await service.chat({ message: '纯棉工艺能做吗？' });
+  assert.equal(result.enabled, true);
+  const config = await service.get();
+  assert.equal(config.systemPrompt, '我自己的助手说明');
+  assert.equal(config.welcomeMessage, '自定义欢迎语');
+  const system = JSON.parse(calls[0].init.body).messages[0].content;
+  assert.ok(system.startsWith('我自己的助手说明'));
+  assert.match(system, /主要做涤纶.*做不了含棉或纯棉/);
 });
 
 test('chat with topicLabel logs a feedback record via the route', async t => {
