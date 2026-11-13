@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import apiClient from '../axiosConfig.js';
+import { ElMessage } from 'element-plus';
 import { useTheme } from '../composables/useTheme.js';
 
 const { isDark } = useTheme();
@@ -52,7 +53,7 @@ function startCooldown(ms) {
   runTicker();
 }
 const aiEnabled = ref(false);
-const welcomeText = ref('嗨，我是小度，想要什么素材，或者遇到了什么问题，都可以告诉我，我会帮你转达给团队~');
+const welcomeText = ref('嗨，我是小度～ 这个网站是洋洋大王（罗洋洋）一个人折腾出来的，我可以帮你找素材、解答使用问题，也能把你的反馈转达给站长。想了解什么？');
 const messages = ref([
   { id: 1, from: 'bot', text: welcomeText.value }
 ]);
@@ -105,11 +106,11 @@ onUnmounted(() => {
 function scrollBottom() {
   nextTick(() => { if (bodyRef.value) bodyRef.value.scrollTop = bodyRef.value.scrollHeight; });
 }
-function pushBot(t, tone) {
+function pushBot(t, tone, opts = {}) {
   // 机器人连续两条一模一样的话没有意义，直接忽略，避免刷屏
   const last = messages.value[messages.value.length - 1];
   if (last && last.from === 'bot' && last.text === t) return;
-  messages.value.push({ id: nextId++, from: 'bot', text: t, tone });
+  messages.value.push({ id: nextId++, from: 'bot', text: t, tone, md: opts.md === true });
   scrollBottom();
 }
 function pushUser(t) {
@@ -144,6 +145,67 @@ function getUserId() {
   return id;
 }
 
+// —— AI 回复的 Markdown 渲染与复制 ——
+const copiedId = ref(null);
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function renderInline(s) {
+  return s
+    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>');
+}
+function renderMarkdown(text) {
+  const src = String(text ?? '').replace(/\r\n?/g, '\n');
+  const out = [];
+  let list = null;
+  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  for (const raw of src.split('\n')) {
+    const t = raw.trim();
+    if (!t) { closeList(); continue; }
+    const h = t.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { closeList(); out.push(`<p><strong>${renderInline(escapeHtml(h[2]))}</strong></p>`); continue; }
+    const ul = t.match(/^[-*•]\s+(.*)$/);
+    const ol = t.match(/^\d+[.)]\s+(.*)$/);
+    if (ul || ol) {
+      const tag = ul ? 'ul' : 'ol';
+      if (list !== tag) { closeList(); out.push(`<${tag}>`); list = tag; }
+      out.push(`<li>${renderInline(escapeHtml(ul ? ul[1] : ol[1]))}</li>`);
+      continue;
+    }
+    closeList();
+    out.push(`<p>${renderInline(escapeHtml(t))}</p>`);
+  }
+  closeList();
+  return out.join('');
+}
+async function copyText(t) {
+  const s = String(t ?? '');
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(s); return; } catch (_) {}
+  }
+  const ta = document.createElement('textarea');
+  ta.value = s;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (_) {}
+  document.body.removeChild(ta);
+}
+async function copyMessage(text, id) {
+  await copyText(text);
+  copiedId.value = id;
+  setTimeout(() => { if (copiedId.value === id) copiedId.value = null; }, 1500);
+}
+function onMdClick(e) {
+  const code = e.target?.closest?.('.fbot-md code');
+  if (!code) return;
+  copyText(code.textContent);
+  ElMessage.success('已复制');
+}
+
 async function send() {
   if (!canSend.value) return;
   const content = text.value.trim();
@@ -162,7 +224,7 @@ async function send() {
       const res = await apiClient.post('/api/v1/bot/chat', { message: content, userId: getUserId(), history });
       if (res.data?.data?.ai === true) {
         startCooldown(COOLDOWN_MS);
-        pushBot(res.data.data.reply);
+        pushBot(res.data.data.reply, undefined, { md: true });
         answered = true;
       }
     }
@@ -170,7 +232,7 @@ async function send() {
       await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
       startCooldown(COOLDOWN_MS);
       topic.value = null;
-      pushBot('收到啦！已经帮你转给团队了，谢谢你', 'ok');
+      pushBot('收到啦！已经帮你转给罗洋洋（洋洋大王）啦，谢谢你', 'ok');
     }
   } catch (err) {
     const status = err?.response?.status;
@@ -213,7 +275,12 @@ function onKeydown(e) {
 
         <div ref="bodyRef" class="fbot-body" role="log" aria-live="polite">
           <div v-for="m in messages" :key="m.id" class="fbot-msg" :class="`from-${m.from}`">
-            <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok' }"><svg v-if="m.tone === 'ok'" class="fbot-ok" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.8 12.4l3 3 5.4-6"/></svg>{{ m.text }}</div>
+            <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok', 'is-ai': m.md }">
+              <svg v-if="m.tone === 'ok'" class="fbot-ok" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.8 12.4l3 3 5.4-6"/></svg>
+              <div v-if="m.md" class="fbot-md" v-html="renderMarkdown(m.text)" @click="onMdClick"></div>
+              <template v-else>{{ m.text }}</template>
+              <button v-if="m.md" class="fbot-copy" type="button" @click="copyMessage(m.text, m.id)">{{ copiedId === m.id ? '✓ 已复制' : '复制' }}</button>
+            </div>
           </div>
           <div v-if="sending" class="fbot-msg from-bot">
             <div class="fbot-bubble fbot-typing"><i></i><i></i><i></i></div>
@@ -411,6 +478,39 @@ function onKeydown(e) {
 }
 .fbot-bubble.is-ok { display: flex; align-items: flex-start; gap: 6px; }
 .fbot-ok { flex-shrink: 0; margin-top: 3px; color: #3f9a6b; }
+.fbot-bubble.is-ai { display: flex; flex-direction: column; align-items: stretch; }
+.fbot-md { white-space: normal; overflow-wrap: break-word; }
+.fbot-md p { margin: 0 0 6px; }
+.fbot-md p:last-child { margin-bottom: 0; }
+.fbot-md ul, .fbot-md ol { margin: 2px 0 6px; padding-left: 18px; }
+.fbot-md li { margin: 2px 0; }
+.fbot-md strong { font-weight: 700; }
+.fbot-md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(90, 143, 115, 0.16);
+  color: #0a3d22;
+  border: 1px solid rgba(90, 143, 115, 0.28);
+  cursor: pointer;
+}
+.fbot-md code:hover { background: rgba(90, 143, 115, 0.28); }
+.is-dark .fbot-md code { color: #b7e6c9; background: rgba(90, 143, 115, 0.22); border-color: rgba(90, 143, 115, 0.4); }
+.fbot-copy {
+  align-self: flex-end;
+  margin-top: 6px;
+  padding: 2px 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--fb-sub);
+  background: transparent;
+  border: 1px solid var(--fb-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.fbot-copy:hover { color: #5a8f73; border-color: #5a8f73; }
 .fbot-typing { display: inline-flex; gap: 4px; padding: 12px 14px; }
 .fbot-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--fb-sub); animation: fbot-dot 1s infinite; }
 .fbot-typing i:nth-child(2) { animation-delay: 0.15s; }
