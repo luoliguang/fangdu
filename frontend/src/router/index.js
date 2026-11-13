@@ -33,6 +33,11 @@ const routes = [
                 component: () => import('../views/admin/LarkConfig.vue')
             },
             {
+                path: 'bot-config',
+                name: 'BotConfig',
+                component: () => import('../views/admin/BotConfig.vue')
+            },
+            {
                 path: '',
                 name: 'AdminDefault',
                 redirect: { name: 'UploadMaterial' }

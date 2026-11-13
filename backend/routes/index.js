@@ -29,6 +29,10 @@ function createRoutes(db, siteControlService) {
   // 飞书通知配置（仅管理员）
   apiV1.use('/lark-config', require('./larkConfigRoutes')(require('../services/LarkNotifyService').getShared()));
 
+  // 机器人（DeepSeek AI 助手）：后台配置仅管理员，前台状态与对话公开
+  apiV1.use('/bot-config', require('./botConfigRoutes')(require('../services/BotService').getShared()));
+  apiV1.use('/bot', require('./botChatRoutes')(require('../services/BotService').getShared()));
+
   // 访问统计相关路由
   apiV1.use('/visits', createVisitRoutes(db));
 

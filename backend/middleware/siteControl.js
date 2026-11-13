@@ -11,7 +11,7 @@ function createSiteControlMiddleware(service) {
       let code;
       if (!config.enabled) code = 'SITE_DISABLED';
       else if (!config.modules.materials && /^\/(materials|proxy|uploads)(\/|$)/.test(route)) code = 'MODULE_DISABLED';
-      else if (!config.modules.drawer && /^\/feedbacks(\/|$)/.test(route)) code = 'MODULE_DISABLED';
+      else if (!config.modules.drawer && /^\/(feedbacks|bot)(\/|$)/.test(route)) code = 'MODULE_DISABLED';
       if (!code) return next();
       res.set('Cache-Control', 'no-store');
       return res.status(503).json({ success: false, code, message: code === 'SITE_DISABLED' ? '网站已停止服务' : '该模块已关闭' });

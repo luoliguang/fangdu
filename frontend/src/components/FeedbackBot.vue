@@ -51,8 +51,10 @@ function startCooldown(ms) {
   try { sessionStorage.setItem(COOLDOWN_KEY, String(cooldownUntil.value)); } catch (_) { /* Storage may be disabled. */ }
   runTicker();
 }
+const aiEnabled = ref(false);
+const welcomeText = ref('嗨，我是小度，想要什么素材，或者遇到了什么问题，都可以告诉我，我会帮你转达给团队~');
 const messages = ref([
-  { id: 1, from: 'bot', text: '嗨，我是小度，想要什么素材，或者遇到了什么问题，都可以告诉我，我会帮你转达给团队~' }
+  { id: 1, from: 'bot', text: welcomeText.value }
 ]);
 let nextId = 2;
 
@@ -84,6 +86,15 @@ onMounted(() => {
   window.addEventListener('pointermove', onPointerMove, { passive: true });
   window.addEventListener('fbot:open', onExternalOpen);
   if (cooldownLeft.value > 0) runTicker();
+  // AI 状态只影响展示，失败时保持普通留言模式
+  apiClient.get('/api/v1/bot/status').then(res => {
+    aiEnabled.value = res.data?.data?.aiEnabled === true;
+    const welcome = res.data?.data?.welcomeMessage;
+    if (typeof welcome === 'string' && welcome.trim()) {
+      welcomeText.value = welcome;
+      if (messages.value[0]?.id === 1) messages.value[0].text = welcome;
+    }
+  }).catch(() => {});
 });
 onUnmounted(() => {
   window.removeEventListener('pointermove', onPointerMove);
@@ -137,14 +148,30 @@ async function send() {
   if (!canSend.value) return;
   const content = text.value.trim();
   const message = topic.value ? `【${topic.value.label}】${content}` : content;
+  // 取历史要在把本条消息放进列表之前，服务端会单独追加当前消息
+  const history = topic.value ? [] : messages.value
+    .filter(m => m.from === 'bot' || m.from === 'user')
+    .slice(-8)
+    .map(m => ({ role: m.from === 'bot' ? 'assistant' : 'user', content: m.text }));
   pushUser(content);
   text.value = '';
   sending.value = true;
   try {
-    await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
-    startCooldown(COOLDOWN_MS);
-    topic.value = null;
-    pushBot('收到啦！已经帮你转给团队了，谢谢你', 'ok');
+    let answered = false;
+    if (!topic.value) {
+      const res = await apiClient.post('/api/v1/bot/chat', { message: content, userId: getUserId(), history });
+      if (res.data?.data?.ai === true) {
+        startCooldown(COOLDOWN_MS);
+        pushBot(res.data.data.reply);
+        answered = true;
+      }
+    }
+    if (!answered) {
+      await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
+      startCooldown(COOLDOWN_MS);
+      topic.value = null;
+      pushBot('收到啦！已经帮你转给团队了，谢谢你', 'ok');
+    }
   } catch (err) {
     const status = err?.response?.status;
     const serverMsg = err?.response?.data?.message;
@@ -157,6 +184,7 @@ async function send() {
       if (/已经收到/.test(serverMsg || '')) restore = false; // 重复内容不用放回输入框
     } else if (status === 503) pushBot('留言功能暂时关闭了，晚点再来找我吧~');
     else if (status === 400) pushBot(serverMsg || '内容好像不太对，换个说法试试？');
+    else if (status === 502 && serverMsg) pushBot(serverMsg);
     else pushBot('网络开小差了，你的话还在输入框里，再点一次发送吧');
     if (restore) text.value = content;
   } finally {
@@ -179,7 +207,7 @@ function onKeydown(e) {
         <header class="fbot-head">
           <span class="fbot-head-dot"></span>
           <strong>小度</strong>
-          <span class="fbot-head-sub">反馈小助手</span>
+          <span class="fbot-head-sub">{{ aiEnabled ? 'AI 助手' : '反馈小助手' }}</span>
           <button class="fbot-close" aria-label="关闭" @click="open = false">×</button>
         </header>
 
