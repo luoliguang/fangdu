@@ -2,8 +2,14 @@ import axios from 'axios';
 
 // 创建 axios 实例
 const apiClient = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3002',
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
 });
+
+// 供 fetch / sendBeacon 复用：与 Axios 的 /api 前缀规则保持一致。
+export function resolveApiUrl(path) {
+    const base = String(apiClient.defaults.baseURL || '').replace(/\/+$/, '').replace(/\/api$/i, '');
+    return `${base}${path}`;
+}
 
 // 请求拦截器
 // 它的作用就是在每次请求发送前，都检查一下本地有没有令牌，有的话就带上

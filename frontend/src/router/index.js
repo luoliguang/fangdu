@@ -144,8 +144,8 @@ function stopHeartbeat() {
 async function notifyOffline() {
     try {
         const sessionId = getSessionId();
-        const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3002';
-        const url = `${baseURL}/api/v1/visits/offline`;
+        const { default: apiClient, resolveApiUrl } = await import('../axiosConfig.js');
+        const url = resolveApiUrl('/api/v1/visits/offline');
         
         // 使用 sendBeacon API 确保请求能在页面关闭时发送
         const data = JSON.stringify({ sessionId });
@@ -155,7 +155,6 @@ async function notifyOffline() {
             navigator.sendBeacon(url, blob);
         } else {
             // 降级方案：使用 fetch 同步请求
-            const { default: apiClient } = await import('../axiosConfig.js');
             apiClient.post('/api/v1/visits/offline', { sessionId }).catch(() => {});
         }
     } catch (error) {

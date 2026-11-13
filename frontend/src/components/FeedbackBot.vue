@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import MarkdownIt from 'markdown-it';
-import apiClient from '../axiosConfig.js';
+import apiClient, { resolveApiUrl } from '../axiosConfig.js';
 import { ElMessage } from 'element-plus';
 import { useTheme } from '../composables/useTheme.js';
 
@@ -229,12 +229,11 @@ function fallbackAck(content) {
 }
 // 流式：用原生 fetch 读 SSE，边返回边渲染到气泡；AI 不可用时返回 null 由 send() 回退留言
 async function streamAiReply(content, history, topicLabel) {
-  const base = String(apiClient.defaults.baseURL || '').replace(/\/+$/, '').replace(/\/api$/i, '');
   const payload = { message: content, userId: getUserId(), history, topicLabel };
   const token = localStorage.getItem('authToken') || '';
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${base}/api/v1/bot/chat/stream`, {
+  const res = await fetch(resolveApiUrl('/api/v1/bot/chat/stream'), {
     method: 'POST',
     headers,
     body: JSON.stringify(payload)

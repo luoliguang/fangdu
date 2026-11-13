@@ -15,9 +15,11 @@ export default defineConfig({
   
   // 开发服务器配置
   server: {
+    // ngrok 会使用外部 Host 访问本地 Vite；只让本地代理连接后端。
+    allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3002',
+        target: 'http://127.0.0.1:3002',
         changeOrigin: true,
       }
     }

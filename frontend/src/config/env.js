@@ -63,7 +63,7 @@ const developmentConfig = {
   
   // API配置
   api: {
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3002',
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
     timeout: 10000,
     enableMock: false
   },
@@ -89,7 +89,7 @@ const productionConfig = {
   
   // API配置
   api: {
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'https://api.fangdu.com',
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
     timeout: 30000,
     enableMock: false
   },
@@ -121,7 +121,7 @@ const testConfig = {
   
   // API配置
   api: {
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3002',
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
     timeout: 5000,
     enableMock: true
   },
