@@ -226,15 +226,21 @@ function fallbackAck(content) {
 }
 // 流式：用原生 fetch 读 SSE，边返回边渲染到气泡；AI 不可用时返回 null 由 send() 回退留言
 async function streamAiReply(content, history, topicLabel) {
-  const base = String(apiClient.defaults.baseURL || '').replace(/\/+$/, '');
+  const base = String(apiClient.defaults.baseURL || '').replace(/\/+$/, '').replace(/\/api$/i, '');
+  const payload = { message: content, userId: getUserId(), history, topicLabel };
   const token = localStorage.getItem('authToken') || '';
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${base}/api/v1/bot/chat/stream`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ message: content, userId: getUserId(), history, topicLabel })
+    body: JSON.stringify(payload)
   });
+  // 服务端尚未提供流式路由时，沿用已存在的聊天接口。
+  if (res.status === 404 || res.status === 405) {
+    const fallback = await apiClient.post('/api/v1/bot/chat', payload);
+    return fallback.data?.data?.ai === true ? fallback.data.data.reply : null;
+  }
   const ct = res.headers.get('content-type') || '';
   if (ct.includes('application/json')) {
     const j = await res.json();
@@ -248,6 +254,7 @@ async function streamAiReply(content, history, topicLabel) {
   }
   if (!res.ok) throw new Error('AI 服务暂时不可用，请稍后再试');
 
+  if (!res.body) throw new Error('当前浏览器暂不支持流式回复，请稍后再试');
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   const m = pushStreaming();
@@ -255,6 +262,7 @@ async function streamAiReply(content, history, topicLabel) {
   let buffer = '';
   let full = '';
   let completed = false;
+  let doneReceived = false;
   try {
     while (!completed) {
       const { done, value } = await reader.read();
@@ -277,14 +285,21 @@ async function streamAiReply(content, history, topicLabel) {
           const e = new Error(ev.error || 'AI 服务暂时不可用，请稍后再试');
           e.status = ev.status;
           throw e;
-        } else if (ev.done) { completed = true; break; }
+        } else if (ev.done) { completed = true; doneReceived = true; break; }
       }
     }
+  } catch (error) {
+    removeStreaming(m);
+    throw error;
   } finally {
+    reader.cancel().catch(() => {});
     streaming.value = false;
   }
   if (full === null) return null;
-  if (!full) { removeStreaming(m); throw new Error('AI 没返回内容，请稍后再试'); }
+  if (!doneReceived || !full.trim()) {
+    removeStreaming(m);
+    throw new Error('回复中断了，请稍后重试');
+  }
   finalizeStreaming(m);
   return full;
 }
@@ -303,8 +318,11 @@ async function send() {
   try {
     if (aiEnabled.value) {
       const topicLabel = topic.value?.label || null;
+      const beforeReplyCount = messages.value.length;
       const reply = await streamAiReply(content, history, topicLabel);
       if (reply) {
+        // 流式气泡由 streamAiReply 更新；旧接口一次性返回时需显式展示。
+        if (messages.value.length === beforeReplyCount) pushBot(reply, undefined, { md: true });
         startCooldown(COOLDOWN_MS);
         topic.value = null;
         return;
@@ -327,6 +345,7 @@ async function send() {
       pushBot(serverMsg || '发得有点频繁，稍等一会儿再试试~');
       if (/已经收到/.test(serverMsg || '')) restore = false;
     } else if (status === 503) pushBot('留言功能暂时关闭了，晚点再来找我吧~');
+    else if (status === 404 || status === 405) pushBot('聊天接口暂时不可用，请稍后重试');
     else if (status === 400) pushBot(serverMsg || '内容好像不太对，换个说法试试？');
     else if (status === 502 && serverMsg) pushBot(serverMsg, undefined, { md: true });
     else pushBot(serverMsg || '网络开小差了，你的话还在输入框里，再点一次发送吧');
@@ -365,23 +384,24 @@ function onKeydown(e) {
           <div v-for="m in messages" :key="m.id" class="fbot-msg" :class="`from-${m.from}`">
             <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok', 'is-ai': m.md, 'is-streaming': m.streaming }">
               <svg v-if="m.tone === 'ok'" class="fbot-ok" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.8 12.4l3 3 5.4-6"/></svg>
-              <div v-if="m.md" class="fbot-md" v-html="renderMarkdown(m.text)" @click="onMdClick"></div>
+              <span v-if="m.streaming && !m.text" class="fbot-stream-wait" role="status"><span class="fbot-wait-pulse"></span>正在生成回复…</span>
+              <div v-if="m.md && m.text" class="fbot-md" v-html="renderMarkdown(m.text)" @click="onMdClick"></div>
               <template v-else>{{ m.text }}</template>
               <button v-if="m.md && !m.streaming" class="fbot-copy" type="button" @click="copyMessage(m.text, m.id)">{{ copiedId === m.id ? '✓ 已复制' : '复制' }}</button>
             </div>
           </div>
-          <div v-if="sending && !streaming" class="fbot-msg from-bot">
-            <div class="fbot-bubble fbot-typing"><i></i><i></i><i></i></div>
+          <div v-if="sending && !streaming" class="fbot-msg from-bot" role="status">
+            <div class="fbot-bubble fbot-typing"><i></i><i></i><i></i><span>{{ aiEnabled ? '正在生成回复…' : '正在发送…' }}</span></div>
           </div>
-        </div>
-
-        <div v-if="aiEnabled && !topic && messages.length <= 2" class="fbot-asks">
-          <span class="fbot-asks-label">猜你想问</span>
-          <button v-for="(q, i) in quickQuestions" :key="i" @click="askQuick(q)">{{ q }}</button>
-        </div>
-
-        <div v-if="!topic && messages.length <= 2" class="fbot-chips">
-          <button v-for="t in quickTopics" :key="t.key" @click="pickTopic(t)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="(d, i) in topicIcons[t.icon]" :key="i" :d="d"/></svg>{{ t.label }}</button>
+          <div v-if="!sending && !topic && messages.length === 1" class="fbot-suggestions">
+            <div v-if="aiEnabled" class="fbot-asks">
+              <span class="fbot-asks-label">猜你想问</span>
+              <button v-for="(q, i) in quickQuestions" :key="i" type="button" @click="askQuick(q)">{{ q }}</button>
+            </div>
+            <div class="fbot-chips">
+              <button v-for="t in quickTopics" :key="t.key" type="button" @click="pickTopic(t)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="(d, i) in topicIcons[t.icon]" :key="i" :d="d"/></svg>{{ t.label }}</button>
+            </div>
+          </div>
         </div>
 
         <footer class="fbot-foot">
@@ -580,6 +600,7 @@ function onKeydown(e) {
 
 .fbot-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px 12px 8px;
   display: flex;
@@ -588,7 +609,7 @@ function onKeydown(e) {
   background-image: radial-gradient(rgba(90, 143, 115, 0.07) 1px, transparent 1px);
   background-size: 18px 18px;
 }
-.fbot-msg { display: flex; }
+.fbot-msg { display: flex; flex-shrink: 0; }
 .fbot-msg.from-user { justify-content: flex-end; }
 .fbot-bubble {
   max-width: 84%;
@@ -614,6 +635,8 @@ function onKeydown(e) {
 .fbot-bubble.is-ok { display: flex; align-items: flex-start; gap: 6px; }
 .fbot-ok { flex-shrink: 0; margin-top: 3px; color: #3f9a6b; }
 .fbot-bubble.is-ai { display: flex; flex-direction: column; align-items: stretch; }
+.fbot-stream-wait { display: inline-flex; align-items: center; gap: 8px; color: var(--fb-sub); font-size: 12px; }
+.fbot-wait-pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--fb-accent); animation: fbot-pulse 2s ease-in-out infinite; }
 .fbot-bubble.is-streaming .fbot-md::after {
   content: '▍';
   margin-left: 1px;
@@ -681,13 +704,15 @@ function onKeydown(e) {
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .fbot-copy:hover { color: var(--fb-accent); border-color: var(--fb-accent); background: rgba(90, 143, 115, 0.08); }
-.fbot-typing { display: inline-flex; gap: 4px; padding: 12px 14px; }
+.fbot-typing { display: inline-flex; align-items: center; gap: 4px; padding: 12px 14px; }
+.fbot-typing span { margin-left: 6px; font-size: 12px; color: var(--fb-sub); }
 .fbot-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--fb-sub); animation: fbot-dot 1s infinite; }
 .fbot-typing i:nth-child(2) { animation-delay: 0.15s; }
 .fbot-typing i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes fbot-dot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-4px); opacity: 1; } }
 
-.fbot-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 12px 10px; }
+.fbot-suggestions { flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; padding-bottom: 10px; }
+.fbot-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0; }
 .fbot-chips button {
   display: inline-flex;
   align-items: center;
@@ -702,7 +727,7 @@ function onKeydown(e) {
   transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 .fbot-chips button:hover { border-color: var(--fb-accent); transform: translateY(-1px); box-shadow: 0 3px 8px rgba(10, 61, 34, 0.1); }
-.fbot-asks { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 2px 12px 8px; }
+.fbot-asks { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 2px 0 8px; }
 .fbot-asks-label { font-size: 11px; color: var(--fb-sub); letter-spacing: 0.02em; }
 .fbot-asks button {
   padding: 7px 13px;
