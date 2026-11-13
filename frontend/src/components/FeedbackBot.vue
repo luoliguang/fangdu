@@ -11,6 +11,8 @@ const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 md.validateLink = url => /^(https?:|mailto:)/i.test(url);
 // 不渲染图片，避免加载外部资源；只显示占位符
 md.renderer.rules.image = (tokens, idx) => `<span class="fbot-md-img">🖼 ${md.utils.escapeHtml(tokens[idx].content || '图片')}</span>`;
+// 只有行内关键词提供复制入口，普通回复和代码块不显示复制按钮。
+md.renderer.rules.code_inline = (tokens, idx) => `<code class="fbot-keyword" role="button" tabindex="0" title="点击复制关键词">${md.utils.escapeHtml(tokens[idx].content)}</code>`;
 
 const MAX_LEN = 1000;
 const COOLDOWN_MS = 10000;
@@ -125,7 +127,7 @@ function pushBot(t, tone, opts = {}) {
   // 机器人连续两条一模一样的话没有意义，直接忽略，避免刷屏
   const last = messages.value[messages.value.length - 1];
   if (last && last.from === 'bot' && last.text === t) return;
-  messages.value.push({ id: nextId++, from: 'bot', text: t, tone, md: opts.md === true });
+  messages.value.push({ id: nextId++, from: 'bot', text: t, tone, md: opts.md === true, animate: opts.animate === true });
   scrollBottom();
 }
 function pushUser(t) {
@@ -161,14 +163,13 @@ function getUserId() {
 }
 
 // —— AI 回复的 Markdown 渲染与复制 ——
-const copiedId = ref(null);
 function renderMarkdown(text) {
   return md.render(String(text ?? ''));
 }
 async function copyText(t) {
   const s = String(t ?? '');
   if (navigator.clipboard && window.isSecureContext) {
-    try { await navigator.clipboard.writeText(s); return; } catch (_) {}
+    try { await navigator.clipboard.writeText(s); return true; } catch (_) {}
   }
   const ta = document.createElement('textarea');
   ta.value = s;
@@ -177,23 +178,27 @@ async function copyText(t) {
   ta.style.left = '-9999px';
   document.body.appendChild(ta);
   ta.select();
-  try { document.execCommand('copy'); } catch (_) {}
-  document.body.removeChild(ta);
+  try { return document.execCommand('copy'); }
+  catch (_) { return false; }
+  finally { document.body.removeChild(ta); }
 }
-async function copyMessage(text, id) {
-  await copyText(text);
-  copiedId.value = id;
-  setTimeout(() => { if (copiedId.value === id) copiedId.value = null; }, 1500);
-}
-function onMdClick(e) {
-  const code = e.target?.closest?.('.fbot-md code');
+async function copyKeyword(e) {
+  const code = e.target?.closest?.('.fbot-keyword');
   if (!code) return;
-  copyText(code.textContent);
-  ElMessage.success('已复制');
+  e.preventDefault();
+  const copied = await copyText(code.textContent);
+  if (copied) ElMessage.success('关键词已复制');
+  else ElMessage.error('复制失败，请手动选中关键词');
+}
+function onMdKeydown(e) {
+  if (e.key === 'Enter' || e.key === ' ') copyKeyword(e);
+}
+function onReplyAnimationEnd(e, m) {
+  if (e.target.classList.contains('fbot-bubble') && e.animationName === 'fbot-reply-enter') m.animate = false;
 }
 
 function pushStreaming() {
-  const m = { id: nextId++, from: 'bot', text: '', md: true, streaming: true };
+  const m = { id: nextId++, from: 'bot', text: '', md: true, streaming: true, animate: true };
   messages.value.push(m);
   scrollBottom();
   return m;
@@ -324,7 +329,7 @@ async function send() {
       const reply = await streamAiReply(content, history, topicLabel);
       if (reply) {
         // 流式气泡由 streamAiReply 更新；旧接口一次性返回时需显式展示。
-        if (messages.value.length === beforeReplyCount) pushBot(reply, undefined, { md: true });
+        if (messages.value.length === beforeReplyCount) pushBot(reply, undefined, { md: true, animate: true });
         startCooldown(COOLDOWN_MS);
         topic.value = null;
         return;
@@ -384,13 +389,12 @@ function onKeydown(e) {
         </header>
 
         <div ref="bodyRef" class="fbot-body" role="log" aria-live="polite">
-          <div v-for="m in messages" :key="m.id" class="fbot-msg" :class="`from-${m.from}`">
-            <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok', 'is-ai': m.md, 'is-streaming': m.streaming }">
+          <div v-for="m in messages" :key="m.id" class="fbot-msg" :class="[`from-${m.from}`, { 'is-ai-reply': m.animate }]">
+            <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok', 'is-ai': m.md, 'is-streaming': m.streaming }" @animationend="onReplyAnimationEnd($event, m)">
               <svg v-if="m.tone === 'ok'" class="fbot-ok" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.8 12.4l3 3 5.4-6"/></svg>
               <span v-if="m.streaming && !m.text" class="fbot-stream-wait" role="status"><span class="fbot-wait-pulse"></span>正在生成回复…</span>
-              <div v-if="m.md && m.text" class="fbot-md" v-html="renderMarkdown(m.text)" @click="onMdClick"></div>
-              <template v-else>{{ m.text }}</template>
-              <button v-if="m.md && !m.streaming" class="fbot-copy" type="button" @click="copyMessage(m.text, m.id)">{{ copiedId === m.id ? '✓ 已复制' : '复制' }}</button>
+              <div v-if="m.md && m.text" class="fbot-md" v-html="renderMarkdown(m.text)" @click="copyKeyword" @keydown="onMdKeydown"></div>
+              <template v-else-if="!m.md">{{ m.text }}</template>
             </div>
           </div>
           <div v-if="sending && !streaming" class="fbot-msg from-bot" role="status">
@@ -617,6 +621,19 @@ function onKeydown(e) {
 }
 .fbot-msg { display: flex; flex-shrink: 0; }
 .fbot-msg.from-user { justify-content: flex-end; }
+@media (prefers-reduced-motion: no-preference) {
+  .fbot-msg.is-ai-reply .fbot-bubble { animation: fbot-reply-enter 520ms cubic-bezier(.2, .85, .25, 1) both; }
+  .fbot-msg.is-ai-reply .fbot-md { animation: fbot-reply-text 320ms ease-out both; }
+}
+@keyframes fbot-reply-enter {
+  0% { opacity: 0; transform: translate3d(0, 12px, 0) scale(.97); box-shadow: 0 0 0 0 rgba(90, 143, 115, 0); }
+  65% { opacity: 1; transform: translate3d(0, -2px, 0) scale(1.005); box-shadow: 0 0 0 4px rgba(90, 143, 115, .13); }
+  100% { opacity: 1; transform: none; box-shadow: 0 1px 2px rgba(10, 61, 34, .06); }
+}
+@keyframes fbot-reply-text {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
 .fbot-bubble {
   max-width: 84%;
   padding: 10px 14px;
@@ -680,6 +697,23 @@ function onKeydown(e) {
   border: 1px solid rgba(90, 143, 115, 0.28);
   cursor: pointer;
 }
+.fbot-md :deep(.fbot-keyword) {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--fb-line);
+  border-bottom: 1px dashed var(--fb-accent);
+  border-radius: 5px;
+  background: rgba(90, 143, 115, 0.15);
+  color: var(--fb-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .92em;
+  cursor: pointer;
+}
+.fbot-md :deep(.fbot-keyword:hover), .fbot-md :deep(.fbot-keyword:focus-visible) {
+  background: rgba(90, 143, 115, 0.28);
+  outline: 2px solid var(--fb-accent);
+  outline-offset: 2px;
+}
 .fbot-md code:hover { background: rgba(90, 143, 115, 0.28); }
 .fbot-md pre {
   margin: 4px 0 8px;
@@ -696,20 +730,6 @@ function onKeydown(e) {
 .fbot-md-img { opacity: 0.7; }
 .is-dark .fbot-md code { color: #b7e6c9; background: rgba(90, 143, 115, 0.22); border-color: rgba(90, 143, 115, 0.4); }
 .is-dark .fbot-md pre { background: rgba(255, 255, 255, 0.04); }
-.fbot-copy {
-  align-self: flex-end;
-  margin-top: 6px;
-  padding: 2px 10px;
-  font-size: 11px;
-  line-height: 1.6;
-  color: var(--fb-sub);
-  background: transparent;
-  border: 1px solid var(--fb-line);
-  border-radius: 999px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-.fbot-copy:hover { color: var(--fb-accent); border-color: var(--fb-accent); background: rgba(90, 143, 115, 0.08); }
 .fbot-typing { display: inline-flex; align-items: center; gap: 4px; padding: 12px 14px; }
 .fbot-typing span { margin-left: 6px; font-size: 12px; color: var(--fb-sub); }
 .fbot-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--fb-sub); animation: fbot-dot 1s infinite; }
@@ -811,6 +831,7 @@ function onKeydown(e) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fbot-float, .fbot-shadow, .fbot-light, .fbot-eyes, .fbot-typing i, .fbot-head-dot { animation: none; }
+  .fbot-float, .fbot-shadow, .fbot-light, .fbot-eyes, .fbot-typing i, .fbot-head-dot, .fbot-wait-pulse { animation: none; }
+  .fbot-bubble.is-streaming .fbot-md::after { content: none; }
 }
 </style>
