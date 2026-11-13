@@ -3,14 +3,15 @@ const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'; // 固定地�
 const DEFAULT_MODEL = 'deepseek-chat';
 const ALLOWED_MODELS = ['deepseek-chat', 'deepseek-reasoner'];
 const API_KEY_MASK = '••••';
+const PROMPT_VERSION = 2; // 提示词文案版本：升级后用于迁移「站长称呼 / Markdown 排版 / 可复制搜索词」等默认文案
 const REQUEST_TIMEOUT_MS = 30000;
 const MAX_HISTORY = 20;
 const MAX_MESSAGE_LEN = 1000;
 const MAX_HISTORY_CONTENT_LEN = 2000;
 
-const DEFAULT_SYSTEM_PROMPT = '你是「小度」，方度素材库的智能助手。你的职责：1) 帮用户查找素材，了解想要的款式、面料、颜色、类别并给出查找建议；2) 解答网站使用问题（色卡、尺码、分类浏览等）；3) 收集用户对素材的反馈，引导用户把需求或问题描述清楚。要求：用简洁、友好、中文口语回答，一般不超过 100 字；不确定的事不要编造，建议用户联系团队确认；严格遵守下方报价政策。';
-const DEFAULT_QUOTE_POLICY = '本站不提供任何报价、价格咨询、接单或收费说明。当用户询问价格、报价、多少钱、费用、收费、能不能便宜点等，必须明确友好地说明：我们这里不报价，主要提供找素材和素材反馈服务；如需报价，请通过微信或其他渠道联系团队。不要猜测或给出任何价格数字，不要答应报价。';
-const DEFAULT_WELCOME = '嗨，我是小度，可以帮你找素材、解答使用问题，也能帮你把反馈转给团队~ 想了解什么？';
+const DEFAULT_SYSTEM_PROMPT = '你是「小度」，方度素材库的智能助手。这个网站是站长「罗洋洋」（自称「洋洋大王」）一个人开发的。你的职责：1) 帮用户查找素材，了解想要的款式、面料、颜色、类别并给出查找建议；2) 解答网站使用问题（色卡、尺码、分类浏览等）；3) 收集用户对素材的反馈，引导用户把需求或问题描述清楚。回答要求：- 用简体中文口语，友好简洁，一般不超过 120 字；- 必须用 Markdown 排版：短段落、列表用「-」开头、重点用「**加粗**」、搜索关键词用反引号包裹，避免输出一整段没有换行的长文；- 教用户怎么搜索或给搜索建议时，把可直接复制的搜索关键词单独用反引号列出来，方便用户复制；- 不确定的事不要编造，建议用户联系站长罗洋洋确认；- 提到网站开发者时就说「罗洋洋」，也可以俏皮地叫他「洋洋大王」；- 严格遵守下方报价政策。';
+const DEFAULT_QUOTE_POLICY = '本站不提供任何报价、价格咨询、接单或收费说明。当用户询问价格、报价、多少钱、费用、收费、能不能便宜点等，必须明确友好地说明：我们这里不报价，主要提供找素材和素材反馈服务；如需报价，请通过微信或其他渠道联系站长罗洋洋（洋洋大王）。不要猜测或给出任何价格数字，不要答应报价。';
+const DEFAULT_WELCOME = '嗨，我是小度～ 这个网站是洋洋大王（罗洋洋）一个人折腾出来的，我可以帮你找素材、解答使用问题，也能把你的反馈转达给站长。想了解什么？';
 
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 
@@ -23,7 +24,8 @@ function defaults() {
     maxTokens: 800,
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     quotePolicy: DEFAULT_QUOTE_POLICY,
-    welcomeMessage: DEFAULT_WELCOME
+    welcomeMessage: DEFAULT_WELCOME,
+    promptVersion: PROMPT_VERSION
   };
 }
 
@@ -40,7 +42,8 @@ function coerce(stored) {
     maxTokens: Number.isInteger(s.maxTokens) && s.maxTokens >= 1 && s.maxTokens <= 4096 ? s.maxTokens : base.maxTokens,
     systemPrompt: text(s.systemPrompt, base.systemPrompt, 2000),
     quotePolicy: typeof s.quotePolicy === 'string' && s.quotePolicy.trim().length <= 1000 ? s.quotePolicy.trim() : base.quotePolicy,
-    welcomeMessage: text(s.welcomeMessage, base.welcomeMessage, 300)
+    welcomeMessage: text(s.welcomeMessage, base.welcomeMessage, 300),
+    promptVersion: Number.isInteger(s.promptVersion) && s.promptVersion >= 0 ? s.promptVersion : base.promptVersion
   };
 }
 
@@ -99,6 +102,11 @@ class BotService {
     if (!row) return defaults();
     let stored;
     try { stored = JSON.parse(row.value); } catch (_) { stored = null; }
+    // 提示词版本迁移：旧配置未带 promptVersion 时，覆盖为最新默认文案（站长称呼、Markdown 排版、可复制搜索词）
+    if (stored && (stored.promptVersion ?? 0) < PROMPT_VERSION) {
+      stored = { ...stored, systemPrompt: DEFAULT_SYSTEM_PROMPT, quotePolicy: DEFAULT_QUOTE_POLICY, welcomeMessage: DEFAULT_WELCOME, promptVersion: PROMPT_VERSION };
+      await this.repository.upsert({ key: KEY, value: JSON.stringify(stored) });
+    }
     return coerce(stored);
   }
 
