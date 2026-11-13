@@ -1,10 +1,16 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
+import MarkdownIt from 'markdown-it';
 import apiClient from '../axiosConfig.js';
 import { ElMessage } from 'element-plus';
 import { useTheme } from '../composables/useTheme.js';
 
 const { isDark } = useTheme();
+
+const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
+md.validateLink = url => /^(https?:|mailto:)/i.test(url);
+// 不渲染图片，避免加载外部资源；只显示占位符
+md.renderer.rules.image = (tokens, idx) => `<span class="fbot-md-img">🖼 ${md.utils.escapeHtml(tokens[idx].content || '图片')}</span>`;
 
 const MAX_LEN = 1000;
 const COOLDOWN_MS = 10000;
@@ -53,7 +59,7 @@ function startCooldown(ms) {
   runTicker();
 }
 const aiEnabled = ref(false);
-const welcomeText = ref('嗨，我是小度～ 这个网站是洋洋大王（罗洋洋）一个人折腾出来的，我可以帮你找素材、解答使用问题，也能把你的反馈转达给站长。想了解什么？');
+const welcomeText = ref('嗨，我是小度，方度素材库的驻店小助手～ 这家店是掌柜的一个人搭起来的，找素材、答疑、传话都可以交给我。想找点什么？');
 const messages = ref([
   { id: 1, from: 'bot', text: welcomeText.value }
 ]);
@@ -147,37 +153,8 @@ function getUserId() {
 
 // —— AI 回复的 Markdown 渲染与复制 ——
 const copiedId = ref(null);
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-function renderInline(s) {
-  return s
-    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`\n]+)`/g, '<code>$1</code>');
-}
 function renderMarkdown(text) {
-  const src = String(text ?? '').replace(/\r\n?/g, '\n');
-  const out = [];
-  let list = null;
-  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
-  for (const raw of src.split('\n')) {
-    const t = raw.trim();
-    if (!t) { closeList(); continue; }
-    const h = t.match(/^(#{1,6})\s+(.*)$/);
-    if (h) { closeList(); out.push(`<p><strong>${renderInline(escapeHtml(h[2]))}</strong></p>`); continue; }
-    const ul = t.match(/^[-*•]\s+(.*)$/);
-    const ol = t.match(/^\d+[.)]\s+(.*)$/);
-    if (ul || ol) {
-      const tag = ul ? 'ul' : 'ol';
-      if (list !== tag) { closeList(); out.push(`<${tag}>`); list = tag; }
-      out.push(`<li>${renderInline(escapeHtml(ul ? ul[1] : ol[1]))}</li>`);
-      continue;
-    }
-    closeList();
-    out.push(`<p>${renderInline(escapeHtml(t))}</p>`);
-  }
-  closeList();
-  return out.join('');
+  return md.render(String(text ?? ''));
 }
 async function copyText(t) {
   const s = String(t ?? '');
@@ -232,7 +209,7 @@ async function send() {
       await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
       startCooldown(COOLDOWN_MS);
       topic.value = null;
-      pushBot('收到啦！已经帮你转给罗洋洋（洋洋大王）啦，谢谢你', 'ok');
+      pushBot('收到啦！已经帮你转给掌柜的啦，谢谢你', 'ok');
     }
   } catch (err) {
     const status = err?.response?.status;
@@ -267,9 +244,14 @@ function onKeydown(e) {
     <Transition name="fbot-panel">
       <section v-if="open" class="fbot-panel" role="dialog" aria-label="反馈小助手" @keydown.esc="open = false">
         <header class="fbot-head">
-          <span class="fbot-head-dot"></span>
-          <strong>小度</strong>
-          <span class="fbot-head-sub">{{ aiEnabled ? 'AI 助手' : '反馈小助手' }}</span>
+          <span class="fbot-head-avatar" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.7 5 5 1.7-5 1.7L12 16.4l-1.7-5-5-1.7 5-1.7z"/><path d="M19 15v4M17 17h4"/></svg>
+          </span>
+          <span class="fbot-head-meta">
+            <strong>小度</strong>
+            <span class="fbot-head-sub">{{ aiEnabled ? 'AI 助手在线' : '反馈小助手' }}</span>
+          </span>
+          <span class="fbot-head-dot" :class="{ 'is-off': !aiEnabled }"></span>
           <button class="fbot-close" aria-label="关闭" @click="open = false">×</button>
         </header>
 
@@ -301,7 +283,10 @@ function onKeydown(e) {
             aria-label="反馈内容"
             @keydown="onKeydown"
           ></textarea>
-          <button class="fbot-send" :disabled="!canSend" @click="send">{{ cooldownLeft > 0 ? cooldownLabel : '发送' }}</button>
+          <button class="fbot-send" :disabled="!canSend" @click="send">
+            <svg v-if="cooldownLeft === 0" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+            <span>{{ cooldownLeft > 0 ? cooldownLabel : '发送' }}</span>
+          </button>
         </footer>
         <div class="fbot-hint">
           <span>Enter 发送 · Shift+Enter 换行</span>
@@ -353,21 +338,25 @@ function onKeydown(e) {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 10px;
-  --fb-bg: #ffffff;
-  --fb-text: #1f2d26;
-  --fb-sub: #6b7f74;
-  --fb-line: rgba(90, 143, 115, 0.22);
-  --fb-bot-bubble: #eef6f1;
-  --fb-input: #f6faf8;
+  gap: 12px;
+  --fb-bg: rgba(251, 253, 252, 0.96);
+  --fb-text: #20342b;
+  --fb-sub: #6f857a;
+  --fb-line: rgba(90, 143, 115, 0.24);
+  --fb-bot-bubble: #eaf4ee;
+  --fb-input: #f3f8f5;
+  --fb-accent: #5a8f73;
+  --fb-deep: #0a3d22;
 }
 .fbot.is-dark {
-  --fb-bg: rgba(14, 22, 18, 0.96);
-  --fb-text: #e6efe9;
-  --fb-sub: #92a89b;
-  --fb-line: rgba(90, 143, 115, 0.32);
-  --fb-bot-bubble: rgba(90, 143, 115, 0.18);
+  --fb-bg: rgba(15, 24, 19, 0.97);
+  --fb-text: #e7f0ea;
+  --fb-sub: #93a99d;
+  --fb-line: rgba(90, 143, 115, 0.34);
+  --fb-bot-bubble: rgba(90, 143, 115, 0.16);
   --fb-input: rgba(255, 255, 255, 0.06);
+  --fb-accent: #6ba284;
+  --fb-deep: #0a3d22;
 }
 
 .fbot-avatar {
@@ -416,36 +405,57 @@ function onKeydown(e) {
 @keyframes fbot-blink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
 
 .fbot-panel {
-  width: min(340px, calc(100vw - 32px));
-  height: min(460px, calc(100vh - 220px));
+  width: min(352px, calc(100vw - 32px));
+  height: min(480px, calc(100vh - 220px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
   color: var(--fb-text);
   background: var(--fb-bg);
   border: 1px solid var(--fb-line);
-  border-radius: 20px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.25);
+  border-radius: 22px;
+  box-shadow:
+    0 0 0 1px rgba(10, 61, 34, 0.05),
+    0 24px 60px rgba(10, 61, 34, 0.30),
+    0 6px 18px rgba(10, 61, 34, 0.16);
+  backdrop-filter: blur(14px);
   transform-origin: bottom right;
 }
 .fbot-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 13px 14px;
   color: #fff;
-  background: linear-gradient(135deg, #0a3d22, #5a8f73);
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.055) 0 8px, rgba(255, 255, 255, 0) 8px 16px),
+    linear-gradient(135deg, #0a3d22, #5a8f73);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.42);
 }
-.fbot-head-dot { width: 8px; height: 8px; border-radius: 50%; background: #9ef0c0; box-shadow: 0 0 8px #9ef0c0; animation: fbot-pulse 1.6s ease-in-out infinite; }
+.fbot-head-avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: #0a3d22;
+  background: linear-gradient(135deg, #d9f2e3, #9ef0c0);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.fbot-head-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.fbot-head-meta strong { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
+.fbot-head-sub { font-size: 11px; opacity: 0.85; font-weight: 500; }
+.fbot-head-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: #9ef0c0; box-shadow: 0 0 0 0 rgba(158, 240, 192, 0.6); animation: fbot-pulse 2s ease-in-out infinite; }
+.fbot-head-dot.is-off { background: rgba(255, 255, 255, 0.5); box-shadow: none; animation: none; }
 @keyframes fbot-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px #9ef0c0, 0 0 0 0 rgba(158, 240, 192, 0.55); }
-  50% { opacity: 0.35; transform: scale(0.8); box-shadow: 0 0 3px #9ef0c0, 0 0 0 5px rgba(158, 240, 192, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(158, 240, 192, 0.55); }
+  50% { box-shadow: 0 0 0 5px rgba(158, 240, 192, 0); }
 }
-.fbot-head-sub { font-size: 12px; opacity: 0.8; }
 .fbot-close {
-  margin-left: auto;
-  width: 26px;
-  height: 26px;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 50%;
   font-size: 18px;
@@ -453,38 +463,66 @@ function onKeydown(e) {
   color: #fff;
   background: rgba(255, 255, 255, 0.16);
   cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
 }
-.fbot-close:hover { background: rgba(255, 255, 255, 0.28); }
+.fbot-close:hover { background: rgba(255, 255, 255, 0.28); transform: rotate(90deg); }
 
-.fbot-body { flex: 1; overflow-y: auto; padding: 14px 12px 6px; display: flex; flex-direction: column; gap: 8px; }
+.fbot-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-image: radial-gradient(rgba(90, 143, 115, 0.07) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
 .fbot-msg { display: flex; }
 .fbot-msg.from-user { justify-content: flex-end; }
 .fbot-bubble {
-  max-width: 82%;
-  padding: 9px 13px;
+  max-width: 84%;
+  padding: 10px 14px;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   border-radius: 16px;
   background: var(--fb-bot-bubble);
+  border: 1px solid var(--fb-line);
   border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(10, 61, 34, 0.06);
 }
 .from-user .fbot-bubble {
   color: #fff;
   background: linear-gradient(135deg, #0a3d22, #5a8f73);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-bottom-left-radius: 16px;
   border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 12px rgba(10, 61, 34, 0.22);
 }
 .fbot-bubble.is-ok { display: flex; align-items: flex-start; gap: 6px; }
 .fbot-ok { flex-shrink: 0; margin-top: 3px; color: #3f9a6b; }
 .fbot-bubble.is-ai { display: flex; flex-direction: column; align-items: stretch; }
 .fbot-md { white-space: normal; overflow-wrap: break-word; }
+.fbot-md > :first-child { margin-top: 0; }
+.fbot-md > :last-child { margin-bottom: 0; }
 .fbot-md p { margin: 0 0 6px; }
-.fbot-md p:last-child { margin-bottom: 0; }
 .fbot-md ul, .fbot-md ol { margin: 2px 0 6px; padding-left: 18px; }
 .fbot-md li { margin: 2px 0; }
+.fbot-md li::marker { color: var(--fb-accent); }
 .fbot-md strong { font-weight: 700; }
+.fbot-md em { font-style: italic; }
+.fbot-md a { color: var(--fb-accent); text-decoration: underline; text-underline-offset: 2px; }
+.fbot-md h1, .fbot-md h2, .fbot-md h3, .fbot-md h4, .fbot-md h5, .fbot-md h6 { margin: 8px 0 4px; font-size: 14px; font-weight: 700; line-height: 1.4; }
+.fbot-md hr { border: none; border-top: 1px dashed var(--fb-line); margin: 8px 0; }
+.fbot-md blockquote {
+  margin: 4px 0 8px;
+  padding: 4px 10px;
+  border-left: 3px solid var(--fb-accent);
+  color: var(--fb-sub);
+  background: rgba(90, 143, 115, 0.08);
+  border-radius: 0 8px 8px 0;
+}
 .fbot-md code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.92em;
@@ -496,7 +534,21 @@ function onKeydown(e) {
   cursor: pointer;
 }
 .fbot-md code:hover { background: rgba(90, 143, 115, 0.28); }
+.fbot-md pre {
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  background: rgba(10, 61, 34, 0.05);
+  border: 1px solid var(--fb-line);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+.fbot-md pre code { background: transparent; border: none; padding: 0; color: inherit; font-size: 12.5px; }
+.fbot-md table { border-collapse: collapse; margin: 4px 0 8px; width: 100%; font-size: 12.5px; }
+.fbot-md th, .fbot-md td { border: 1px solid var(--fb-line); padding: 4px 8px; text-align: left; }
+.fbot-md th { background: rgba(90, 143, 115, 0.1); }
+.fbot-md-img { opacity: 0.7; }
 .is-dark .fbot-md code { color: #b7e6c9; background: rgba(90, 143, 115, 0.22); border-color: rgba(90, 143, 115, 0.4); }
+.is-dark .fbot-md pre { background: rgba(255, 255, 255, 0.04); }
 .fbot-copy {
   align-self: flex-end;
   margin-top: 6px;
@@ -508,67 +560,79 @@ function onKeydown(e) {
   border: 1px solid var(--fb-line);
   border-radius: 999px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.fbot-copy:hover { color: #5a8f73; border-color: #5a8f73; }
+.fbot-copy:hover { color: var(--fb-accent); border-color: var(--fb-accent); background: rgba(90, 143, 115, 0.08); }
 .fbot-typing { display: inline-flex; gap: 4px; padding: 12px 14px; }
 .fbot-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--fb-sub); animation: fbot-dot 1s infinite; }
 .fbot-typing i:nth-child(2) { animation-delay: 0.15s; }
 .fbot-typing i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes fbot-dot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-4px); opacity: 1; } }
 
-.fbot-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 8px; }
+.fbot-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 12px 10px; }
 .fbot-chips button {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 12px;
+  padding: 7px 13px;
   font-size: 13px;
   color: var(--fb-text);
-  background: transparent;
+  background: var(--fb-bot-bubble);
   border: 1px solid var(--fb-line);
   border-radius: 999px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.fbot-chips button:hover { background: var(--fb-bot-bubble); border-color: #5a8f73; }
+.fbot-chips button:hover { border-color: var(--fb-accent); transform: translateY(-1px); box-shadow: 0 3px 8px rgba(10, 61, 34, 0.1); }
 
-.fbot-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 4px; border-top: 1px solid var(--fb-line); }
+.fbot-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px dashed var(--fb-line); background: var(--fb-bg); }
 .fbot-hint { display: flex; justify-content: space-between; gap: 8px; padding: 0 14px 10px; font-size: 11px; color: var(--fb-sub); }
 .fbot-hint .is-warn { color: #d9534f; }
 .fbot-foot textarea {
   flex: 1;
   min-width: 0;
   width: 0;
-  height: 56px;
+  height: 54px;
   resize: none;
   box-sizing: border-box;
-  padding: 8px 10px;
+  padding: 10px 12px;
   font: inherit;
   font-size: 14px;
+  line-height: 1.5;
   color: var(--fb-text);
   background: var(--fb-input);
   border: 1px solid var(--fb-line);
-  border-radius: 12px;
+  border-radius: 14px;
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.fbot-foot textarea:focus { border-color: #5a8f73; }
+.fbot-foot textarea:focus { border-color: var(--fb-accent); box-shadow: 0 0 0 3px rgba(90, 143, 115, 0.14); }
 .fbot-send {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-width: 68px;
+  height: 54px;
   white-space: nowrap;
-  padding: 9px 16px;
+  padding: 0 16px;
   font-size: 14px;
   font-weight: 600;
   color: #fff;
   background: linear-gradient(135deg, #0a3d22, #5a8f73);
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
-  transition: filter 0.15s, opacity 0.15s;
+  transition: filter 0.15s, opacity 0.15s, transform 0.15s;
 }
-.fbot-send:hover:not(:disabled) { filter: brightness(1.12); }
+.fbot-send:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
 .fbot-send:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.fbot-body::-webkit-scrollbar { width: 6px; }
+.fbot-body::-webkit-scrollbar-thumb { background: rgba(90, 143, 115, 0.35); border-radius: 999px; }
+.fbot-body::-webkit-scrollbar-thumb:hover { background: rgba(90, 143, 115, 0.5); }
+.fbot-body::-webkit-scrollbar-track { background: transparent; }
 
 .fbot-panel-enter-active { transition: opacity 0.22s ease, transform 0.25s cubic-bezier(0.34, 1.3, 0.64, 1); }
 .fbot-panel-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
