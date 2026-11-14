@@ -6,6 +6,7 @@ import Toast from 'vue-toastification' // 引入库
 import 'vue-toastification/dist/index.css' // 引入样式
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import './assets/gallery-shared.css'
 
 const app = createApp(App)
 
