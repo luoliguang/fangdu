@@ -49,7 +49,11 @@ const checkingReplies = ref(false);
 const showCodeLookup = ref(false);
 const lookupCode = ref('');
 const lookingUpCode = ref(false);
-const shownReplies = new Map();
+const feedbackRecords = ref([]);
+const feedbackTotal = ref(0);
+const feedbackPages = ref({});
+const showFeedbackRecords = ref(false);
+const pendingFeedbackId = ref(null);
 const bodyRef = ref(null);
 const inputRef = ref(null);
 
@@ -121,6 +125,8 @@ function onExternalOpen(e) {
 onMounted(() => {
   window.addEventListener('pointermove', onPointerMove, { passive: true });
   window.addEventListener('fbot:open', onExternalOpen);
+  window.addEventListener('hashchange', onFeedbackLink);
+  onFeedbackLink();
   if (cooldownLeft.value > 0) runTicker();
   // AI 状态只影响展示，失败时保持普通留言模式
   apiClient.get('/api/v1/bot/status').then(res => {
@@ -135,6 +141,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('pointermove', onPointerMove);
   window.removeEventListener('fbot:open', onExternalOpen);
+  window.removeEventListener('hashchange', onFeedbackLink);
   clearInterval(tickTimer);
   if (open.value) finishConversation();
 });
@@ -182,16 +189,51 @@ function pickTopic(t) {
   setTimeout(() => pushBot(t.hint), 350);
 }
 
+const USER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function getUserId() {
   let id = localStorage.getItem('user_id');
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '')) {
-    id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-      const r = Math.random() * 16 | 0;
-      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
-    localStorage.setItem('user_id', id);
+  if (!USER_ID_RE.test(id || '')) {
+    id = newSessionId();
+    if (id) localStorage.setItem('user_id', id);
   }
   return id;
+}
+function onFeedbackLink() {
+  const id = /^#fbot-feedback=([0-9a-f-]{36})$/i.exec(window.location.hash)?.[1];
+  if (!USER_ID_RE.test(id || '')) return;
+  if (!open.value) toggle();
+  if (id === getUserId()) {
+    window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
+    checkReplies();
+    return;
+  }
+  pendingFeedbackId.value = id;
+}
+async function acceptFeedbackLink() {
+  if (!pendingFeedbackId.value) return;
+  const previousId = getUserId();
+  const incomingId = pendingFeedbackId.value;
+  if (previousId && previousId !== incomingId) {
+    let others = [];
+    try { others = JSON.parse(localStorage.getItem('feedback_other_user_ids') || '[]'); } catch (_) { /* Ignore invalid local data. */ }
+    others = Array.isArray(others) ? others.filter(id => USER_ID_RE.test(id) && id !== incomingId) : [];
+    localStorage.setItem('feedback_other_user_ids', JSON.stringify([previousId, ...others].slice(0, 5)));
+  }
+  localStorage.setItem('user_id', incomingId);
+  pendingFeedbackId.value = null;
+  window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
+  pushBot('已在这台设备使用反馈链接。以后提交的新需求也会显示在这条链接里；原本在本设备的需求仍可在下方查看。');
+  await checkReplies();
+}
+async function copyFeedbackLink() {
+  const id = getUserId();
+  if (!id) {
+    ElMessage.error('当前浏览器无法生成私密链接，请保留查询码');
+    return;
+  }
+  const link = `${window.location.origin}/#fbot-feedback=${id}`;
+  if (await copyText(link)) ElMessage.success('私密链接已复制，请保存到自己的收藏，勿转发给他人');
+  else ElMessage.error('复制失败，请稍后再试');
 }
 
 // —— AI 回复的 Markdown 渲染与复制 ——
@@ -269,21 +311,47 @@ function isExplicitFeedback(content) {
 }
 async function checkReplies() {
   if (checkingReplies.value) return;
+  const activeId = getUserId();
+  if (!activeId) {
+    pushBot('当前浏览器无法保存反馈身份，请用提交时保存的查询码查询。');
+    return;
+  }
   checkingReplies.value = true;
   try {
-    const response = await apiClient.get(`/api/v1/feedbacks/user/${getUserId()}`, { params: { limit: 20 } });
-    const records = Array.isArray(response.data?.data) ? response.data.data : [];
-    const replies = records.filter(item => typeof item.admin_reply === 'string' && item.admin_reply.trim() && shownReplies.get(item.id) !== item.admin_reply).slice(0, 3);
-    if (!replies.length) {
-      pushBot(records.length ? '暂时没有新的回复。掌柜的处理后，你可以再点这里查看。换设备可用保存的查询码。' : '这台设备还没有反馈记录。换设备可用查询码查看；搜不到图时也可以提交新需求。');
-      return;
-    }
-    for (const item of replies.reverse()) {
-      shownReplies.set(item.id, item.admin_reply);
-      pushBot(`掌柜的回复（反馈 #${item.id}）：\n${item.admin_reply}`, undefined, { md: true });
-    }
+    let others = [];
+    try { others = JSON.parse(localStorage.getItem('feedback_other_user_ids') || '[]'); } catch (_) { /* Ignore invalid local data. */ }
+    const ids = [activeId, ...(Array.isArray(others) ? others.filter(id => USER_ID_RE.test(id) && id !== activeId).slice(0, 5) : [])];
+    const responses = await Promise.all(ids.map(id => apiClient.get(`/api/v1/feedbacks/user/${id}`, { params: { limit: 50 } })));
+    feedbackRecords.value = responses.flatMap(res => Array.isArray(res.data?.data) ? res.data.data : [])
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id);
+    feedbackTotal.value = responses.reduce((count, res) => count + (Number(res.data?.meta?.total) || 0), 0);
+    feedbackPages.value = Object.fromEntries(ids.map((id, i) => [id, { page: 1, totalPages: Number(responses[i].data?.meta?.totalPages) || 1 }]));
+    showFeedbackRecords.value = true;
+    if (!feedbackRecords.value.length) pushBot('还没有反馈记录。需要找图时可以提交需求，再保存一条私密链接，换设备也能查看。');
+    scrollBottom();
   } catch (_) {
     pushBot('暂时无法读取反馈回复，请稍后再试。');
+  } finally {
+    checkingReplies.value = false;
+  }
+}
+async function loadMoreFeedbackRecords() {
+  if (checkingReplies.value) return;
+  const entries = Object.entries(feedbackPages.value).filter(([, state]) => state.page < state.totalPages);
+  if (!entries.length) return;
+  checkingReplies.value = true;
+  try {
+    const responses = await Promise.all(entries.map(([id, state]) =>
+      apiClient.get(`/api/v1/feedbacks/user/${id}`, { params: { limit: 50, page: state.page + 1 } })
+    ));
+    feedbackRecords.value = [...feedbackRecords.value, ...responses.flatMap(res => res.data?.data || [])]
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id);
+    feedbackPages.value = Object.fromEntries(Object.entries(feedbackPages.value).map(([id, state]) =>
+      [id, entries.some(([nextId]) => nextId === id) ? { ...state, page: state.page + 1 } : state]
+    ));
+    scrollBottom();
+  } catch (_) {
+    pushBot('暂时无法加载更多需求，请稍后再试。');
   } finally {
     checkingReplies.value = false;
   }
@@ -429,9 +497,10 @@ async function send() {
       startCooldown(COOLDOWN_MS);
       topic.value = null;
       const accessCode = submitted.data?.data?.accessCode;
+      showFeedbackRecords.value = false;
       pushBot(accessCode
-        ? `需求已提交。以后可点“查看反馈回复”查看；换设备请保存查询码，点它可复制：\`${accessCode}\`。查询码请勿发给别人。`
-        : '需求已经提交给掌柜的。处理后用这台设备点“查看反馈回复”查看结果。', undefined, { md: true });
+        ? `需求已提交。点“我的需求”可查看全部记录；想换设备查看，请点“复制我的反馈链接”保存私密链接。单条需求的备用查询码：\`${accessCode}\`。链接与查询码都不要转发给别人。`
+        : '需求已经提交给掌柜的。处理后点“我的需求”查看结果，也可以复制私密链接在别的设备查看。', undefined, { md: true });
       return;
     }
     if (aiEnabled.value) {
@@ -510,6 +579,15 @@ function onKeydown(e) {
               <button v-if="m.aiReply && !m.streaming && getKeywords(m.text).length > 1" class="fbot-copy-terms" type="button" title="每行一个；也可点上方关键词单独复制" @click="copyRecommendations(m.text)">复制全部推荐词</button>
             </div>
           </div>
+          <div v-if="showFeedbackRecords" class="fbot-record-list" aria-label="我的需求">
+            <div class="fbot-record-head"><strong>我的需求（{{ feedbackTotal }}）</strong><button type="button" @click="showFeedbackRecords = false">收起</button></div>
+            <article v-for="item in feedbackRecords" :key="item.id" class="fbot-record">
+              <div class="fbot-record-head"><span>需求 #{{ item.id }}</span><span>{{ item.admin_reply ? '已回复' : item.status === 'pending' ? '待处理' : '已处理' }}</span></div>
+              <p>{{ item.message }}</p>
+              <p v-if="item.admin_reply" class="fbot-record-reply">掌柜回复：{{ item.admin_reply }}</p>
+            </article>
+            <button v-if="feedbackTotal > feedbackRecords.length" class="fbot-record-more" type="button" :disabled="checkingReplies" @click="loadMoreFeedbackRecords">{{ checkingReplies ? '加载中…' : '加载更多需求' }}</button>
+          </div>
           <div v-if="sending && !streaming" class="fbot-msg from-bot" role="status">
             <div class="fbot-bubble fbot-typing"><i></i><i></i><i></i><span>{{ aiEnabled ? '正在生成回复…' : '正在发送…' }}</span></div>
           </div>
@@ -529,6 +607,10 @@ function onKeydown(e) {
           </div>
         </div>
 
+        <div v-if="pendingFeedbackId" class="fbot-link-import">
+          <span>检测到私密反馈链接。使用后，这台设备提交的新需求会归到该链接；原有需求仍可在本设备查看。</span>
+          <button type="button" @click="acceptFeedbackLink">使用链接并查看</button>
+        </div>
         <div v-if="showCodeLookup" class="fbot-code-lookup">
           <label for="fbot-access-code">查询码</label>
           <input id="fbot-access-code" v-model="lookupCode" maxlength="32" autocomplete="off" placeholder="粘贴保存的查询码" @keydown.enter.prevent="lookupReply" />
@@ -551,8 +633,9 @@ function onKeydown(e) {
         </footer>
         <div class="fbot-hint">
           <span>Enter 发送 · Shift+Enter 换行</span>
-          <button class="fbot-check-replies" type="button" :disabled="checkingReplies" @click="checkReplies">{{ checkingReplies ? '查询中…' : '查看反馈回复' }}</button>
-          <button class="fbot-check-replies" type="button" @click="showCodeLookup = !showCodeLookup">凭查询码查回复</button>
+          <button class="fbot-check-replies" type="button" :disabled="checkingReplies" @click="checkReplies">{{ checkingReplies ? '查询中…' : '我的需求' }}</button>
+          <button class="fbot-check-replies" type="button" @click="copyFeedbackLink">复制我的反馈链接</button>
+          <button class="fbot-check-replies" type="button" @click="showCodeLookup = !showCodeLookup">凭查询码查询</button>
           <span v-if="text.length > MAX_LEN * 0.8" :class="{ 'is-warn': remaining < 50 }">{{ text.length }}/{{ MAX_LEN }}</span>
         </div>
       </section>
@@ -901,6 +984,17 @@ function onKeydown(e) {
 .fbot-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px dashed var(--fb-line); background: var(--fb-bg); }
 .fbot-hint { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 0 14px 10px; font-size: 11px; color: var(--fb-sub); }
 .fbot-hint .is-warn { color: #d9534f; }
+.fbot-record-list { margin: 4px 12px 12px; display: grid; gap: 8px; }
+.fbot-record-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--fb-sub); }
+.fbot-record-head strong { color: var(--fb-text); }
+.fbot-record-head button { border: 0; background: transparent; color: var(--fb-accent); cursor: pointer; }
+.fbot-record { border: 1px solid var(--fb-line); border-radius: 12px; background: var(--fb-bot-bubble); padding: 10px; overflow-wrap: anywhere; }
+.fbot-record p { margin: 6px 0 0; white-space: pre-wrap; font-size: 13px; color: var(--fb-text); }
+.fbot-record .fbot-record-reply { padding-top: 8px; border-top: 1px solid var(--fb-line); color: var(--fb-accent); }
+.fbot-record-more { border: 1px solid var(--fb-line); border-radius: 8px; padding: 6px; background: var(--fb-bg); color: var(--fb-accent); font: inherit; cursor: pointer; }
+.fbot-record-more:disabled { opacity: .6; cursor: wait; }
+.fbot-link-import { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; background: var(--fb-bot-bubble); color: var(--fb-text); font-size: 12px; }
+.fbot-link-import button { flex: none; border: 1px solid var(--fb-accent); border-radius: 8px; padding: 5px 8px; background: var(--fb-bg); color: var(--fb-accent); cursor: pointer; }
 .fbot-check-replies { border: 0; background: transparent; color: var(--fb-accent); font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
 .fbot-check-replies:hover, .fbot-check-replies:focus-visible { text-decoration: underline; }
 .fbot-check-replies:disabled { opacity: .6; cursor: wait; }
