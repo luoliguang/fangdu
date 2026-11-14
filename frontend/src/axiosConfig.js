@@ -53,7 +53,7 @@ apiClient.interceptors.response.use(
                                 error.config?.url?.includes('/auth/verify')
             if (!isAuthRoute) {
                 localStorage.removeItem('authToken')
-                window.location.href = '/login'
+                window.location.href = '/#/login'
             }
         }
         return Promise.reject(error)
