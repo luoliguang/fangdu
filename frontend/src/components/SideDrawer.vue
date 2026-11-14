@@ -214,6 +214,7 @@
                   <span class="timestamp">{{ formatDateTime(feedback.created_at) }}</span>
                 </div>
                 <p class="feedback-message">{{ feedback.message }}</p>
+                <p v-if="feedback.admin_reply" class="feedback-message">掌柜回复：{{ feedback.admin_reply }}</p>
               </div>
             </div>
             <div v-else class="feedback-empty">
@@ -346,6 +347,7 @@ const toggleDrawer = () => {
   if (isDrawerOpen.value && activeDrawerTab.value === 'announcement') {
     markAllAnnouncementsAsRead();
   }
+  if (isDrawerOpen.value && activeDrawerTab.value === 'feedback') fetchUserFeedbacks();
 };
 
 const switchDrawerTab = (tab) => {
@@ -354,6 +356,7 @@ const switchDrawerTab = (tab) => {
   if (tab === 'announcement') {
     markAllAnnouncementsAsRead();
   }
+  if (tab === 'feedback') fetchUserFeedbacks();
 };
 
 // 标记所有公告为已读

@@ -9,7 +9,8 @@ const { createFeedbackGuard } = require('../middleware/feedbackGuard');
  * POST /chat          一次性 AI 对话；未启用时返回 ai:false，由前端回退到普通留言
  * POST /chat/stream   流式 AI 对话（SSE）；未启用时返回 ai:false
  * POST /chat/end      结束本次会话并异步整理反馈
- * POST /feedback      AI 未启用时的普通留言，仅保留到后台、不直接推飞书
+ * POST /feedback      AI 未启用时的普通留言，仅保留到后台
+ * POST /request       用户明确提交找图/网站反馈，记录并按既有服务推送一次飞书
  *
  * 新客户端传随机 sessionId：收集成功的 AI 对话，关闭或空闲后只落一条值得处理的总结。
  * 未传 sessionId 的旧客户端仍按原有话题留言方式工作。
@@ -113,6 +114,16 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
       res.write(`data: ${JSON.stringify({ error: 'AI 服务暂时不可用，请稍后再试' })}\n\n`);
     }
     res.end();
+  });
+
+  router.post('/request', ...createFeedbackGuard(), async (req, res) => {
+    if (!feedbackService) return res.status(503).json({ success: false, message: '留言暂不可用' });
+    try {
+      const result = await feedbackService.submitFeedback({ message: req.body.message, user_id: req.body.user_id });
+      return res.status(201).json(result);
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message || '留言提交失败' });
+    }
   });
 
   router.post('/feedback', ...createFeedbackGuard(), async (req, res) => {

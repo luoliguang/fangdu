@@ -4,12 +4,17 @@ import { storeToRefs } from 'pinia';
 import { DataTable, ConfirmDialog } from '@/components/common';
 import { useFeedbackStore } from '@/stores/feedback';
 import { ElMessage } from 'element-plus';
+import apiClient from '@/axiosConfig';
 
 const feedbackStore = useFeedbackStore();
 const confirmDialog = ref(null);
 const deleteItemId = ref(null);
 const searchQuery = ref('');
 const statusFilter = ref('all');
+const replyOpen = ref(false);
+const replyItem = ref(null);
+const replyText = ref('');
+const isReplying = ref(false);
 
 const { feedbacks, isLoading: isFeedbacksLoading, pendingCount: pendingFeedbacksCount } = storeToRefs(feedbackStore);
 
@@ -35,6 +40,34 @@ const columns = [
 
 const updateFeedbackStatus = async (id, status) => {
   await feedbackStore.updateFeedbackStatus(id, status);
+};
+
+const isPhotoRequest = item => /【(?:想要新素材|没找到想要的|素材需求)】/.test(item.message);
+
+const openReply = item => {
+  replyItem.value = item;
+  replyText.value = item.admin_reply || '';
+  replyOpen.value = true;
+};
+
+const submitReply = async () => {
+  const content = replyText.value.trim();
+  if (!content) return ElMessage.warning('请先填写给客户的回复');
+  if (!replyItem.value || isReplying.value) return;
+  isReplying.value = true;
+  try {
+    const token = localStorage.getItem('authToken');
+    await apiClient.post(`/api/v1/feedbacks/${replyItem.value.id}/reply`, { adminReply: content }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    replyOpen.value = false;
+    ElMessage.success('已保存回复，客户回到网站后可查看');
+    await Promise.all([feedbackStore.fetchFeedbacks(), feedbackStore.fetchPendingCount()]);
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || '回复失败，请稍后重试');
+  } finally {
+    isReplying.value = false;
+  }
 };
 
 const showDeleteConfirm = (id) => {
@@ -72,7 +105,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
     <div class="page-config-container">
       <div class="page-header">
         <h1>留言管理</h1>
-        <p class="page-description">查看并处理用户通过侧边抽屉提交的反馈留言。</p>
+        <p class="page-description">查看搜索实拍图的需求和网站反馈；找到素材后回复名称或链接，客户可在小度查看。</p>
       </div>
 
       <!-- 统计卡片 -->
@@ -118,6 +151,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
       >
         <template #column-message="{ item }">
           <div class="feedback-content" :title="item.message">{{ item.message }}</div>
+          <div v-if="item.admin_reply" class="feedback-reply-preview">已回复：{{ item.admin_reply }}</div>
         </template>
 
         <template #column-created_at="{ item }">
@@ -126,19 +160,20 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 
         <template #column-status="{ item }">
           <span class="status-badge" :class="item.status === 'pending' ? 'status-pending' : 'status-processed'">
-            {{ item.status === 'pending' ? '待处理' : '已处理' }}
+            {{ item.status === 'pending' ? '待处理' : item.status === 'replied' ? '已回复' : '已处理' }}
           </span>
         </template>
 
         <template #actions="{ item }">
           <div class="action-buttons">
+            <button v-if="item.user_id" class="btn-action btn-process" @click="openReply(item)">回复客户</button>
             <button
-              v-if="item.status === 'pending'"
+              v-if="item.status === 'pending' && (!isPhotoRequest(item) || !item.user_id)"
               class="btn-action btn-process"
               @click="updateFeedbackStatus(item.id, 'approved')"
             >标记已处理</button>
             <button
-              v-else
+              v-else-if="item.status !== 'pending' && item.status !== 'replied'"
               class="btn-action btn-revert"
               @click="updateFeedbackStatus(item.id, 'pending')"
             >恢复待处理</button>
@@ -146,6 +181,15 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
           </div>
         </template>
       </DataTable>
+
+      <el-dialog v-model="replyOpen" title="回复客户的找图需求" width="min(480px, 90vw)" :close-on-click-modal="false">
+        <p v-if="replyItem" class="reply-source">{{ replyItem.message }}</p>
+        <el-input v-model="replyText" type="textarea" :rows="5" maxlength="500" show-word-limit placeholder="填写找到的实拍图名称、搜索词或可打开的链接…" />
+        <template #footer>
+          <el-button @click="replyOpen = false">取消</el-button>
+          <el-button type="primary" :loading="isReplying" @click="submitReply">发送回复</el-button>
+        </template>
+      </el-dialog>
 
       <ConfirmDialog
         ref="confirmDialog"
@@ -329,6 +373,8 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
   color: #374151;
 }
 
+.feedback-reply-preview { margin-top: 6px; color: #5a8f73; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
+.reply-source { margin: 0 0 14px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; color: #374151; }
 .date-text { font-size: 0.85rem; color: #64748b; white-space: nowrap; }
 
 .status-badge {
@@ -345,7 +391,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 .action-buttons {
   display: flex;
   gap: 6px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .btn-action {

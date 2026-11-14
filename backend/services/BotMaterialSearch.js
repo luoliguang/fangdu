@@ -1,10 +1,12 @@
-// 只读业务 SQLite：仅用现有素材名称做严格匹配，不根据标签或相近类别推断库存。
+// 只读业务 SQLite：搜索实拍图名称与标签，返回真实名称供用户在画廊检索。
 const STOP_WORDS = new Set([
   '我', '你', '你们', '这里', '店里', '请问', '是否', '有没有', '有', '帮', '帮我', '给我',
   '想', '想要', '要', '找', '找点', '搜', '搜索', '推荐', '看看', '一下', '一些',
   '什么', '哪些', '可以', '能', '的', '和', '或者', '关于', '素材', '面料', '款式',
   '名字', '昵称', '图案', '图片', '网站', '怎么', '如何', '不知道', '知道', '不会',
-  '哪里', '输入', '这个', '那个'
+  '哪里', '哪种', '什么样', '输入', '这个', '那个', '实拍图', '实拍', '照片', '图', '需要',
+  '搜索词', '关键词', '关键', '隔离', '拆分', '搜索栏', '顶部', '我要',
+  '怎么办', '没搜到', '搜不到', '找不到', '没找到'
 ]);
 const MAX_TERMS = 5;
 const MAX_RESULTS = 3;
@@ -12,9 +14,7 @@ const VISIBLE_MATERIALS = `
       FROM materials
       WHERE (conversion_status IS NULL OR conversion_status != 'converting')
         AND file_path IS NOT NULL AND file_path != ''
-        AND LENGTH(name) <= 80 AND INSTR(name, CHAR(96)) = 0
-        AND name NOT LIKE '%棉%' AND LOWER(name) NOT LIKE '%cotton%'
-        AND (tags IS NULL OR (tags NOT LIKE '%棉%' AND LOWER(tags) NOT LIKE '%cotton%'))`;
+        AND LENGTH(name) <= 80 AND INSTR(name, CHAR(96)) = 0`;
 
 function termsFromMessage(message) {
   if (typeof message !== 'string') return [];
@@ -69,12 +69,9 @@ class BotMaterialSearch {
 
   async recommend(message) {
     const terms = termsFromMessage(message);
-    if (!terms.length) {
-      const rows = await this.query(`SELECT name ${VISIBLE_MATERIALS} ORDER BY id DESC LIMIT ?`, [MAX_RESULTS]);
-      return { kind: 'explore', names: this.names(rows) };
-    }
+    if (!terms.length) return { kind: 'guide', names: [], terms: [] };
     const exact = await this.search(message);
-    if (exact.length) return { kind: 'exact', names: exact };
+    if (exact.length) return { kind: 'exact', names: exact, terms };
 
     const filters = terms.map(() => "(name LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')");
     const score = terms.map(() => "(CASE WHEN name LIKE ? ESCAPE '\\' THEN 3 ELSE 0 END + CASE WHEN tags LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END)").join(' + ');
@@ -82,7 +79,7 @@ class BotMaterialSearch {
     const rows = await this.query(`SELECT name ${VISIBLE_MATERIALS}
       AND (${filters.join(' OR ')}) ORDER BY (${score}) DESC, id DESC LIMIT ?`,
     [...params, ...params, MAX_RESULTS]);
-    return { kind: 'related', names: this.names(rows) };
+    return { kind: 'related', names: this.names(rows), terms };
   }
 }
 

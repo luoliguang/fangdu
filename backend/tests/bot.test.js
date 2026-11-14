@@ -125,8 +125,9 @@ test('capability and cotton questions give verified process answers and only cat
   await service.save(enabledInput());
   const materialSearch = { search: async () => ['涤纶提花纹样'] };
   const capability = await service.chat({ message: '你能做什么？', materialSearch });
-  assert.match(capability.reply, /涤纶/);
-  assert.match(capability.reply, /含棉或纯棉.*做不了/);
+  assert.match(capability.reply, /搜索实拍图/);
+  assert.match(capability.reply, /短关键词/);
+  assert.doesNotMatch(capability.reply, /涤纶|工艺/);
   assert.doesNotMatch(capability.reply, /涤纶运动面料|雪纺礼服|素材库中实际找到/);
   const cotton = await service.chat({ message: '可以做棉吗？', materialSearch });
   assert.match(cotton.reply, /含棉或纯棉的做不了/);
@@ -134,7 +135,7 @@ test('capability and cotton questions give verified process answers and only cat
   assert.match(cottonPrice.reply, /不报价.*含棉或纯棉的做不了/);
   const dress = await service.chat({ message: '能做雪纺礼服吗？', materialSearch });
   assert.doesNotMatch(dress.reply, /可以做|能做雪纺礼服/);
-  assert.match(dress.reply, /具体款式能否加工需要掌柜的确认/);
+  assert.match(dress.reply, /具体款式能否加工请联系掌柜的确认/);
   const dressPrice = await service.chat({ message: '雪纺礼服多少钱？', materialSearch });
   assert.match(dressPrice.reply, /不报价/);
   assert.doesNotMatch(dressPrice.reply, /有雪纺礼服/);
@@ -146,10 +147,10 @@ test('catalog questions are answered only from database names even if the model 
   await service.save(enabledInput());
   const materialSearch = { search: async () => ['涤纶提花纹样'] };
   const result = await service.chat({ message: '帮我找涤纶提花面料', materialSearch });
-  assert.match(result.reply, /素材库中实际找到：`涤纶提花纹样`/);
+  assert.match(result.reply, /可复制的实拍图名称：`涤纶提花纹样`/);
   assert.doesNotMatch(result.reply, /雪纺礼服/);
   const missing = await service.chat({ message: '你们有雪纺礼服吗？', materialSearch: { search: async () => [] } });
-  assert.match(missing.reply, /没找到相关名称/);
+  assert.match(missing.reply, /没找到想要的/);
   assert.doesNotMatch(missing.reply, /雪纺礼服/);
   assert.equal(calls.length, 0, 'catalog answers must not use unrestricted AI text');
   await assert.rejects(service.chat({ message: '推荐涤纶素材', materialSearch: { search: async () => { throw new Error('database down'); } } }),
@@ -160,20 +161,22 @@ test('discovery replies distinguish exact, partial and exploratory database reco
   const { service, calls } = await setup(t, async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '有雪纺礼服' } }] }) }));
   await service.save(enabledInput());
   const materialSearch = { recommend: async message => {
-    if (message.includes('雪纺')) return { kind: 'related', names: ['雪纺印花', '礼服廓形'] };
-    if (message.includes('怎么搜索')) return { kind: 'explore', names: ['经典速干小方格'] };
-    return { kind: 'exact', names: ['涤纶运动面料'] };
+    if (message.includes('雪纺')) return { kind: 'related', names: ['雪纺印花', '礼服廓形'], terms: ['雪纺', '礼服'] };
+    if (message.includes('怎么搜索')) return { kind: 'guide', names: [], terms: [] };
+    return { kind: 'exact', names: ['涤纶运动面料'], terms: ['涤纶', '运动'] };
   } };
   const partial = await service.chat({ message: '你们有雪纺礼服吗？', materialSearch });
-  assert.match(partial.reply, /没有查到完全匹配.*只匹配部分描述/);
+  assert.match(partial.reply, /只有部分关键词相关的实拍图/);
+  assert.match(partial.reply, /分别试 `雪纺`、`礼服`/);
   assert.match(partial.reply, /`雪纺印花`.*`礼服廓形`/);
   assert.doesNotMatch(partial.reply, /有雪纺礼服/);
   const mixed = await service.chat({ message: '你能做什么？我想找雪纺礼服', materialSearch });
-  assert.match(mixed.reply, /只匹配部分描述/);
+  assert.match(mixed.reply, /只有部分关键词相关的实拍图/);
   const guide = await service.chat({ message: '怎么搜索素材？', materialSearch });
-  assert.match(guide.reply, /没有具体关键词[\s\S]*`经典速干小方格`/);
+  assert.match(guide.reply, /颜色、花型或用途.*短关键词/);
+  assert.doesNotMatch(guide.reply, /经典速干小方格/);
   const exact = await service.chat({ message: '找涤纶运动面料', materialSearch });
-  assert.match(exact.reply, /素材库中有这些名称[\s\S]*`涤纶运动面料`/);
+  assert.match(exact.reply, /与描述匹配的实拍图[\s\S]*`涤纶运动面料`/);
   assert.equal(calls.length, 0);
 });
 
@@ -184,7 +187,7 @@ test('public bot chat route uses the injected catalog lookup', async t => {
   const response = await fetch(`${url}/api/v1/bot/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: '找涤纶运动面料' }) });
   assert.equal(response.status, 200);
   const body = await response.json();
-  assert.match(body.data.reply, /素材库中实际找到：`涤纶运动面料`/);
+  assert.match(body.data.reply, /可复制的实拍图名称：`涤纶运动面料`/);
 });
 
 test('chat maps DeepSeek errors to friendly messages without leaking the key', async t => {
@@ -374,6 +377,20 @@ test('AI-disabled bot feedback is rate-limited and does not notify Lark', async 
   const invalid = await fetch(`${url}/api/v1/bot/feedback`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: '', user_id })
   });
+  assert.equal(invalid.status, 400);
+});
+
+test('explicit photo request is stored once and follows the Feishu notification path', async t => {
+  const { url, feedbacks, feedbackOptions } = await setup(t);
+  const payload = { message: '【没找到想要的】想找蓝色条纹实拍图，试过蓝色、条纹', user_id: randomUUID() };
+  const send = () => fetch(`${url}/api/v1/bot/request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const first = await send();
+  assert.equal(first.status, 201);
+  assert.equal(feedbacks[0].message, payload.message);
+  assert.deepEqual(feedbackOptions, [undefined], 'explicit request uses the normal Feishu notification path');
+  assert.equal((await send()).status, 429);
+  assert.equal(feedbacks.length, 1);
+  const invalid = await fetch(`${url}/api/v1/bot/request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: '', user_id: payload.user_id }) });
   assert.equal(invalid.status, 400);
 });
 

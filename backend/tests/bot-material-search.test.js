@@ -7,7 +7,7 @@ function run(db, sql, params = []) {
   return new Promise((resolve, reject) => db.run(sql, params, error => error ? reject(error) : resolve()));
 }
 
-test('read-only catalog search returns real visible names and excludes cotton/converting/missing media', async t => {
+test('read-only photo search uses real visible names and separates search from process ability', async t => {
   const db = new sqlite3.Database(':memory:');
   t.after(() => new Promise(resolve => db.close(resolve)));
   await run(db, 'CREATE TABLE materials (id INTEGER PRIMARY KEY, name TEXT, tags TEXT, file_path TEXT, conversion_status TEXT)');
@@ -31,7 +31,8 @@ test('read-only catalog search returns real visible names and excludes cotton/co
   const search = new BotMaterialSearch(db);
   const names = await search.search('帮我找涤纶运动面料');
   assert.ok(names.includes('涤纶运动面料'));
-  assert.ok(names.every(name => !/棉|cotton|转码|未上传/i.test(name)));
+  assert.ok(names.every(name => !/转码|未上传/i.test(name)));
+  assert.deepEqual(await search.search('找纯棉运动面料实拍图'), ['纯棉运动面料']);
   assert.ok((await search.recommend('涤纶')).names.every(name => name.length <= 80 && !name.includes('`')));
   assert.deepEqual(await search.search('速干布'), ['经典速干小方格']);
   assert.deepEqual(await search.search('完全不存在的昵称'), []);
@@ -41,11 +42,12 @@ test('read-only catalog search returns real visible names and excludes cotton/co
   assert.equal(related.kind, 'related');
   assert.deepEqual(related.names.sort(), ['礼服廓形', '雪纺印花']);
   assert.ok(related.names.every(name => name !== '雪纺礼服'));
-  const explore = await search.recommend('有什么素材？');
-  assert.equal(explore.kind, 'explore');
-  assert.equal((await search.recommend('我不知道怎么搜索素材')).kind, 'explore');
+  const guide = await search.recommend('怎么拆关键词搜索实拍图');
+  assert.deepEqual(guide, { kind: 'guide', names: [], terms: [] });
+  assert.equal((await search.recommend('我不知道怎么搜索素材')).kind, 'guide');
   assert.equal((await search.recommend('想找运动透气面料')).kind, 'related');
-  assert.ok(explore.names.length > 0 && explore.names.length <= 3);
-  assert.ok(explore.names.every(name => !/棉|cotton/i.test(name)));
   assert.ok(termsFromMessage('帮我找涤纶面料').includes('涤纶'));
+  const split = termsFromMessage('我想找蓝色条纹实拍图');
+  assert.ok(split.includes('蓝色') && split.includes('条纹'));
+  assert.ok(!split.includes('实拍图'));
 });

@@ -43,6 +43,10 @@ class BotConversationService {
     clearTimeout(session.timer);
     this.sessions.delete(sessionId); // 先移除，关闭与空闲计时器只会处理一次
     if (!session.messages.length) return false;
+    // 搜索咨询不属于反馈，不为每轮搜索调用 AI，也避免误发飞书。
+    const actionable = session.messages.some(item => ['想要新素材', '没找到想要的', '网站有问题'].includes(item.topic)
+      || /我要反馈|我想反馈|希望新增|希望增加|请新增|请增加|帮忙找.{0,30}实拍图|网站有问题|网站打不开|页面报错|我有个建议/.test(item.message));
+    if (!actionable) return false;
     try {
       const decision = await this.botService.summarizeFeedback(session.messages);
       if (!decision?.notify) return false;

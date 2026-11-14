@@ -95,7 +95,7 @@ onMounted(load);
       <div>
         <span class="eyebrow">反馈机器人</span>
         <h1>机器人配置</h1>
-        <p>接入 DeepSeek 后，前台「小度」可以回答素材与使用问题；未启用时仍按原有方式收集留言。</p>
+        <p>小度帮助客户搜索实拍图、拆分关键词；找不到的需求可直接提交给掌柜的，回复在网站查看。关闭 AI 也不影响需求提交。</p>
       </div>
       <el-tag v-if="status" :type="status.enabled && status.configured ? 'success' : 'info'">
         {{ status.enabled && status.configured ? 'AI 助手已开启' : 'AI 助手未开启' }}
@@ -154,7 +154,7 @@ onMounted(load);
           <li>API Key 仅保存在服务器，页面只显示脱敏状态，不会回传给前台。</li>
           <li>聊天接口有防刷限流，并限制消息与历史长度，超限请求会被拒绝。</li>
           <li>报价政策会强制注入系统提示词，约束机器人不报价、不猜测价格。</li>
-          <li>AI 调用失败或未启用时，前台会自动回退为普通留言，不影响反馈提交。</li>
+          <li>AI 不可用时普通搜索只显示基础指引；客户明确提交的找图需求仍会进留言管理并按飞书配置通知。</li>
         </ul>
       </section>
 

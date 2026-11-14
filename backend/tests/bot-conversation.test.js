@@ -35,6 +35,17 @@ test('ordinary chat is not submitted even if it came from a topic chip', async (
   sessions.record({ sessionId: id, userId: uid, topicLabel: '其他想说的', message: '你能做什么' });
   assert.equal(await sessions.finish(id), false);
   assert.equal(feedbacks.length, 0);
+  assert.equal(sessions.sessions.size, 0);
+});
+
+test('plain photo searches are never classified as feedback', async () => {
+  const { sessions, calls, feedbacks } = setup({ notify: true, topic: '素材需求', summary: '误判' });
+  const id = randomUUID();
+  sessions.record({ sessionId: id, userId: uid, message: '怎么搜索实拍图' });
+  sessions.record({ sessionId: id, userId: uid, message: '我想找蓝色条纹图片' });
+  assert.equal(await sessions.finish(id), false);
+  assert.equal(calls.length, 0);
+  assert.equal(feedbacks.length, 0);
 });
 
 test('classifier outage preserves explicit feedback in admin list without sending Lark', async () => {
@@ -53,7 +64,7 @@ test('idle timeout automatically finalizes a session once', async () => {
   const bot = { async summarizeFeedback(items) { resolveSummary(items); return { notify: false }; } };
   const sessions = new BotConversationService(bot, { submitFeedback: async () => { throw new Error('unexpected feedback'); } }, { idleMs: 15 });
   const id = randomUUID();
-  sessions.record({ sessionId: id, message: '怎么搜索素材' });
+  sessions.record({ sessionId: id, message: '希望新增蓝色条纹实拍图' });
   let timeout;
   const items = await Promise.race([
     summarized,
@@ -84,7 +95,7 @@ test('invalid IDs and overlong messages cannot create sessions; history is bound
   assert.equal(sessions.sessions.size, 0);
   assert.equal(validSessionId('guessed'), false);
   const id = randomUUID();
-  for (let i = 0; i < 15; i++) sessions.record({ sessionId: id, message: `test-${i}` });
+  for (let i = 0; i < 15; i++) sessions.record({ sessionId: id, message: `test-${i}`, topicLabel: i === 0 ? '想要新素材' : '' });
   await sessions.finish(id);
   assert.equal(calls[0].length, 12);
   assert.equal(calls[0][0].message, 'test-0');

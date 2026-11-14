@@ -18,18 +18,18 @@ const MAX_LEN = 1000;
 const COOLDOWN_MS = 10000;
 
 const quickTopics = [
-  { key: 'material', label: '想要新素材', icon: 'sparkle', hint: '告诉我具体需求，发送后直接记给掌柜的~' },
-  { key: 'notfound', label: '没找到想要的', icon: 'search', hint: '说说你找过的关键词，发送后我会直接记下来~' },
+  { key: 'material', label: '想要新素材', icon: 'sparkle', hint: '说说需要什么实拍图，发送后交给掌柜的查找~' },
+  { key: 'notfound', label: '没找到想要的', icon: 'search', hint: '说说想找的实拍图和试过的关键词，我会转给掌柜的~' },
   { key: 'bug', label: '网站有问题', icon: 'bug', hint: '哪里不对劲啦？描述一下，我马上转告~' },
   { key: 'other', label: '其他想说的', icon: 'chat', hint: '想说什么都可以，我在听~' }
 ];
 
 // 猜你想问：点一下直接作为问题发出，帮助新用户快速进入对话
 const quickQuestions = [
-  '你能做什么？',
-  '怎么搜索素材？',
-  '找涤纶素材',
-  '支持哪些工艺？'
+  '怎么搜索实拍图？',
+  '怎么拆搜索关键词？',
+  '没搜到图怎么办？',
+  '你能做什么？'
 ];
 
 // 线性图标（Lucide 风格路径），随文字颜色走，亮/暗色都协调
@@ -45,6 +45,8 @@ const text = ref('');
 const topic = ref(null);
 const sending = ref(false);
 const streaming = ref(false);
+const checkingReplies = ref(false);
+const shownReplies = new Map();
 const bodyRef = ref(null);
 const inputRef = ref(null);
 
@@ -70,7 +72,7 @@ function startCooldown(ms) {
   runTicker();
 }
 const aiEnabled = ref(false);
-const welcomeText = ref('嗨，我是小度，方度素材库的驻店小助手～ 这里主要做涤纶工艺，不做含棉或纯棉的。找素材、答疑、传话都可以交给我。想找点什么？');
+const welcomeText = ref('嗨，我是小度。这里可以搜索实拍图；不知道怎么搜，就告诉我颜色、花型或用途，我帮你拆关键词。找不到想要的图，也可以直接提交需求给掌柜的。');
 const messages = ref([
   { id: 1, from: 'bot', text: welcomeText.value }
 ]);
@@ -179,7 +181,7 @@ function pickTopic(t) {
 
 function getUserId() {
   let id = localStorage.getItem('user_id');
-  if (!id) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '')) {
     id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
       const r = Math.random() * 16 | 0;
       return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
@@ -262,18 +264,39 @@ function isExplicitFeedback(content) {
   return /^(?:我想反馈|我要反馈|反馈一下|我有个建议|我想提建议|我要提建议|我想投诉|我要投诉|建议新增|建议增加|希望新增|希望增加)/.test(content)
     || /(?:网站|页面).{0,8}(?:有问题|出错|打不开|白屏|报错)/.test(content);
 }
+async function checkReplies() {
+  if (checkingReplies.value) return;
+  checkingReplies.value = true;
+  try {
+    const response = await apiClient.get(`/api/v1/feedbacks/user/${getUserId()}`, { params: { limit: 20 } });
+    const records = Array.isArray(response.data?.data) ? response.data.data : [];
+    const replies = records.filter(item => typeof item.admin_reply === 'string' && item.admin_reply.trim() && shownReplies.get(item.id) !== item.admin_reply).slice(0, 3);
+    if (!replies.length) {
+      pushBot(records.length ? '暂时没有新的回复。掌柜的处理后，你可以再点这里查看。' : '你还没有提交过找图需求。搜不到时可以点“没找到想要的”告诉掌柜的。');
+      return;
+    }
+    for (const item of replies.reverse()) {
+      shownReplies.set(item.id, item.admin_reply);
+      pushBot(`掌柜的回复（反馈 #${item.id}）：\n${item.admin_reply}`, undefined, { md: true });
+    }
+  } catch (_) {
+    pushBot('暂时无法读取反馈回复，请稍后再试。');
+  } finally {
+    checkingReplies.value = false;
+  }
+}
 function fallbackAck(content) {
   const t = String(content || '');
   if (/你能做什么|你会做什么|你能干啥|你会啥|你是谁|介绍一下/.test(t)) {
-    return '我现在是「留言模式」，可以帮你把需求转给掌柜的，也可以在顶部搜索栏找素材。工艺主要做涤纶，含棉或纯棉的做不了。';
+    return '这个网站用来搜索实拍图。现在是留言模式，你可以在顶部搜索栏试短关键词，找不到的图可以提交需求给掌柜的。';
   }
   if (/价格|报价|多少钱|收费|便宜/.test(t)) {
     return '这里不报价哦～ 我们主要帮你找素材和反馈素材，报价请微信联系掌柜的。';
   }
-  if (/含棉|纯棉|棉麻|棉布|棉质/.test(t)) {
-    return '这边主要做涤纶工艺，含棉和纯棉的做不了。如果你想找涤纶相关素材，可以告诉我款式或颜色；其他需求也可以留言给掌柜的。';
+  if (/棉/.test(t) && /能做|加工|工艺|生产/.test(t)) {
+    return '含棉和纯棉工艺做不了。这里主要是实拍图搜索，图片检索不代表能够加工。';
   }
-  return '收到啦，掌柜的会尽快看～ 想找素材的话，也可以直接去顶部搜索栏输入关键词试试。';
+  return '可以在顶部搜索栏分别试颜色、花型或用途等短关键词，再把有用的词组合起来搜。找不到时点“没找到想要的”，掌柜的会收到具体需求。';
 }
 // 流式：用原生 fetch 读 SSE，边返回边渲染到气泡；AI 不可用时返回 null 由 send() 回退留言
 async function streamAiReply(content, history, topicLabel, currentSessionId) {
@@ -370,14 +393,14 @@ async function send() {
     if (topic.value || isExplicitFeedback(content)) {
       const message = topic.value ? `【${topic.value.label}】${content}` : content;
       try {
-        await apiClient.post('/api/v1/bot/feedback', { message, user_id: getUserId() });
+        await apiClient.post('/api/v1/bot/request', { message, user_id: getUserId() });
       } catch (error) {
         if (error?.response?.status !== 404) throw error;
         await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
       }
       startCooldown(COOLDOWN_MS);
       topic.value = null;
-      pushBot('反馈已经记下来，掌柜的可以在后台看到。');
+      pushBot('需求已经提交给掌柜的。处理后点“查看反馈回复”，可以看到查找结果。');
       return;
     }
     if (aiEnabled.value) {
@@ -394,17 +417,8 @@ async function send() {
       }
       // AI 中途变为不可用 → 落到下方普通留言
     }
-    // 回退：普通留言（AI 未启用 / 临时不可用）
-    const message = topic.value ? `【${topic.value.label}】${content}` : content;
-    try {
-      await apiClient.post('/api/v1/bot/feedback', { message, user_id: getUserId() });
-    } catch (error) {
-      // 旧后端未提供静默留言接口时保留原有普通留言能力。
-      if (error?.response?.status !== 404) throw error;
-      await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
-    }
+    // AI 不可用时只给搜索指引；明确需求已在上方单独提交。
     startCooldown(COOLDOWN_MS);
-    topic.value = null;
     pushBot(fallbackAck(content), undefined, { md: true });
   } catch (err) {
     const status = err?.response?.status || err?.status;
@@ -449,8 +463,7 @@ function onKeydown(e) {
           </span>
           <span class="fbot-head-meta">
             <strong>小度</strong>
-            <span class="fbot-head-sub">{{ aiEnabled ? 'AI 助手在线' : '反馈小助手' }}</span>
-            <span class="fbot-head-process">主营涤纶工艺 · 不做含棉/纯棉</span>
+            <span class="fbot-head-sub">{{ aiEnabled ? '实拍图搜索与反馈' : '反馈小助手' }}</span>
           </span>
           <span class="fbot-head-dot" :class="{ 'is-off': !aiEnabled }"></span>
           <button class="fbot-close" aria-label="关闭" @click="closePanel">×</button>
@@ -480,6 +493,9 @@ function onKeydown(e) {
               <button v-for="t in quickTopics" :key="t.key" type="button" @click="pickTopic(t)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="(d, i) in topicIcons[t.icon]" :key="i" :d="d"/></svg>{{ t.label }}</button>
             </div>
           </div>
+          <div v-else-if="!sending && !topic" class="fbot-followup">
+            <button type="button" @click="pickTopic(quickTopics[1])">没找到实拍图？提交需求</button>
+          </div>
         </div>
 
         <footer class="fbot-foot">
@@ -488,7 +504,7 @@ function onKeydown(e) {
             v-model="text"
             rows="2"
             :maxlength="MAX_LEN"
-            placeholder="想说点什么…"
+            placeholder="描述要找的实拍图，或提交需求…"
             aria-label="反馈内容"
             @keydown="onKeydown"
           ></textarea>
@@ -499,13 +515,14 @@ function onKeydown(e) {
         </footer>
         <div class="fbot-hint">
           <span>Enter 发送 · Shift+Enter 换行</span>
+          <button class="fbot-check-replies" type="button" :disabled="checkingReplies" @click="checkReplies">{{ checkingReplies ? '查询中…' : '查看反馈回复' }}</button>
           <span v-if="text.length > MAX_LEN * 0.8" :class="{ 'is-warn': remaining < 50 }">{{ text.length }}/{{ MAX_LEN }}</span>
         </div>
       </section>
     </Transition>
 
     <button ref="botRef" class="fbot-avatar" :aria-label="open ? '收起小助手' : '打开反馈小助手'" @click="toggle">
-      <span v-if="!open" class="fbot-tip">有想法？告诉我~</span>
+      <span v-if="!open" class="fbot-tip">找实拍图？问小度~</span>
       <svg viewBox="0 0 80 80" width="64" height="64" aria-hidden="true">
         <defs>
           <linearGradient id="fbotBody" x1="0" y1="0" x2="1" y2="1">
@@ -655,7 +672,6 @@ function onKeydown(e) {
 .fbot-head-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
 .fbot-head-meta strong { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
 .fbot-head-sub { font-size: 11px; opacity: 0.85; font-weight: 500; }
-.fbot-head-process { font-size: 11px; opacity: 0.95; font-weight: 500; line-height: 1.4; }
 .fbot-head-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: #9ef0c0; box-shadow: 0 0 0 0 rgba(158, 240, 192, 0.6); animation: fbot-pulse 2s ease-in-out infinite; }
 .fbot-head-dot.is-off { background: rgba(255, 255, 255, 0.5); box-shadow: none; animation: none; }
 @keyframes fbot-pulse {
@@ -843,8 +859,14 @@ function onKeydown(e) {
 .fbot-asks button:hover { border-color: var(--fb-accent); background: var(--fb-bot-bubble); transform: translateY(-1px); }
 
 .fbot-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px dashed var(--fb-line); background: var(--fb-bg); }
-.fbot-hint { display: flex; justify-content: space-between; gap: 8px; padding: 0 14px 10px; font-size: 11px; color: var(--fb-sub); }
+.fbot-hint { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 0 14px 10px; font-size: 11px; color: var(--fb-sub); }
 .fbot-hint .is-warn { color: #d9534f; }
+.fbot-check-replies { border: 0; background: transparent; color: var(--fb-accent); font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
+.fbot-check-replies:hover, .fbot-check-replies:focus-visible { text-decoration: underline; }
+.fbot-check-replies:disabled { opacity: .6; cursor: wait; }
+.fbot-followup { padding: 6px 12px 12px; text-align: right; }
+.fbot-followup button { border: 1px solid var(--fb-line); border-radius: 12px; background: var(--fb-bg); color: var(--fb-accent); padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.fbot-followup button:hover, .fbot-followup button:focus-visible { border-color: var(--fb-accent); }
 .fbot-foot textarea {
   flex: 1;
   min-width: 0;
