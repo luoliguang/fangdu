@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import MarkdownIt from 'markdown-it';
 import apiClient, { resolveApiUrl } from '../axiosConfig.js';
 import { ElMessage } from 'element-plus';
@@ -46,6 +46,7 @@ const topic = ref(null);
 const sending = ref(false);
 const streaming = ref(false);
 const panelView = ref('chat');
+const panelMode = ref(localStorage.getItem('fbot-panel-mode') === 'focus' ? 'focus' : 'float');
 const checkingReplies = ref(false);
 const showCodeLookup = ref(false);
 const showSubmitEmail = ref(Boolean(localStorage.getItem('fbot-lookup-email')));
@@ -66,6 +67,9 @@ const feedbackSearch = ref('');
 const activeFeedbackSearch = ref('');
 const bodyRef = ref(null);
 const inputRef = ref(null);
+const panelRef = ref(null);
+const containerRef = ref(null);
+const panelModeAnnouncement = ref('');
 
 // 发送冷却：按钮上显示倒计时，不再往聊天里追加提示；刷新页面后仍然有效
 const COOLDOWN_KEY = 'fbot-cooldown-until';
@@ -94,6 +98,23 @@ const messages = ref([
   { id: 1, from: 'bot', text: welcomeText.value }
 ]);
 let nextId = 2;
+const backgroundInertStates = new Map();
+
+function setBackgroundInert(active) {
+  if (active && containerRef.value?.parentElement) {
+    for (const element of containerRef.value.parentElement.children) {
+      if (element === containerRef.value || backgroundInertStates.has(element)) continue;
+      backgroundInertStates.set(element, element.hasAttribute('inert'));
+      element.setAttribute('inert', '');
+    }
+    return;
+  }
+  for (const [element, wasInert] of backgroundInertStates) {
+    if (!wasInert) element.removeAttribute('inert');
+  }
+  backgroundInertStates.clear();
+}
+watch([open, panelMode], ([isOpen, mode]) => setBackgroundInert(isOpen && mode === 'focus'), { flush: 'post' });
 
 function newSessionId() {
   if (!globalThis.crypto?.getRandomValues) return null;
@@ -149,6 +170,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('pointermove', onPointerMove);
   window.removeEventListener('fbot:open', onExternalOpen);
+  setBackgroundInert(false);
   clearInterval(tickTimer);
   if (open.value) finishConversation();
 });
@@ -182,6 +204,7 @@ function closePanel() {
   open.value = false;
   panelView.value = 'chat';
   finishConversation();
+  nextTick(() => botRef.value?.focus());
 }
 function onPanelEscape() {
   if (panelView.value === 'requests') panelView.value = 'chat';
@@ -191,6 +214,26 @@ function openRequests() {
   panelView.value = 'requests';
   feedbackLookupMessage.value = '';
   if (window.matchMedia?.('(pointer: fine)').matches) nextTick(() => document.getElementById('fbot-lookup-email')?.focus());
+}
+function togglePanelMode() {
+  panelMode.value = panelMode.value === 'focus' ? 'float' : 'focus';
+  localStorage.setItem('fbot-panel-mode', panelMode.value);
+  panelModeAnnouncement.value = panelMode.value === 'focus' ? '已切换到居中专注模式' : '已还原为右下角浮动模式';
+}
+function trapPanelFocus(event) {
+  if (panelMode.value !== 'focus' || !panelRef.value) return;
+  const focusable = [...panelRef.value.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+    .filter(element => element.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 function toggle() {
   if (open.value) return closePanel();
@@ -318,7 +361,6 @@ function assertSearchApplied(response, search) {
 }
 async function checkReplies(useDevice = false) {
   if (checkingReplies.value) return;
-  showFeedbackRecords.value = false;
   feedbackLookupDone.value = false;
   const email = useDevice ? '' : lookupEmail.value.trim();
   const search = feedbackSearch.value.trim();
@@ -611,9 +653,12 @@ function onKeydown(e) {
 </script>
 
 <template>
-  <div class="fbot" :class="{ 'is-dark': isDark, 'is-open': open }">
+  <div ref="containerRef" class="fbot" :class="{ 'is-dark': isDark, 'is-open': open, 'is-focus': open && panelMode === 'focus' }">
+    <Transition name="fbot-backdrop">
+      <button v-if="open && panelMode === 'focus'" class="fbot-backdrop" type="button" aria-label="关闭专注模式窗口" @click="closePanel"></button>
+    </Transition>
     <Transition name="fbot-panel">
-      <section v-if="open" class="fbot-panel" :class="{ 'is-requests': panelView === 'requests' }" role="dialog" :aria-label="panelView === 'chat' ? '小度实拍图助手' : '我的需求'" @keydown.esc="onPanelEscape">
+      <section v-if="open" ref="panelRef" class="fbot-panel" :class="{ 'is-requests': panelView === 'requests' }" role="dialog" :aria-modal="panelMode === 'focus' ? 'true' : undefined" :aria-label="panelView === 'chat' ? '小度实拍图助手' : '我的需求'" @keydown.esc="onPanelEscape" @keydown.tab="trapPanelFocus">
         <header class="fbot-head">
           <button v-if="panelView === 'requests'" class="fbot-head-back" type="button" aria-label="返回聊天" @click="panelView = 'chat'">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
@@ -626,10 +671,17 @@ function onKeydown(e) {
             <span class="fbot-head-sub">{{ panelView === 'chat' ? (aiEnabled ? '实拍图搜索与反馈' : '反馈小助手') : '查看处理进度与跟单回复' }}</span>
           </span>
           <button v-if="panelView === 'chat'" class="fbot-head-action" type="button" @click="openRequests">我的需求</button>
+          <button class="fbot-size-toggle" type="button" :aria-label="panelMode === 'focus' ? '还原浮动窗口' : '切换到居中专注模式'" :title="panelMode === 'focus' ? '还原浮动窗口' : '居中放大'" @click="togglePanelMode">
+            <svg v-if="panelMode === 'float'" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+            <svg v-else viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6"/></svg>
+          </button>
           <button class="fbot-close" type="button" aria-label="关闭" @click="closePanel">×</button>
+          <span class="sr-only" aria-live="polite">{{ panelModeAnnouncement }}</span>
         </header>
 
-        <div v-if="panelView === 'chat'" ref="bodyRef" class="fbot-body" role="log" aria-live="polite">
+        <Transition name="fbot-view" mode="out-in">
+          <div v-if="panelView === 'chat'" key="chat" class="fbot-chat-view">
+            <div ref="bodyRef" class="fbot-body" role="log" aria-live="polite">
           <div v-for="m in messages" :key="m.id" class="fbot-msg" :class="[`from-${m.from}`, { 'is-ai-reply': m.animate }]">
             <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok', 'is-ai': m.md, 'is-streaming': m.streaming }" @animationend="onReplyAnimationEnd($event, m)">
               <svg v-if="m.tone === 'ok'" class="fbot-ok" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.8 12.4l3 3 5.4-6"/></svg>
@@ -658,8 +710,7 @@ function onKeydown(e) {
           </div>
         </div>
 
-        <template v-if="panelView === 'chat'">
-          <div v-if="topic" class="fbot-submit-email">
+            <div v-if="topic" class="fbot-submit-email">
             <button v-if="!showSubmitEmail" type="button" @click="showSubmitEmail = true">需要换设备看回复？添加邮箱（选填）</button>
             <template v-else>
               <label for="fbot-submit-email">跨设备查看回复（选填）</label>
@@ -682,13 +733,13 @@ function onKeydown(e) {
               <span>{{ cooldownLeft > 0 ? cooldownLabel : '发送' }}</span>
             </button>
           </footer>
-          <div class="fbot-hint">
-            <span>Enter 发送 · Shift+Enter 换行</span>
-            <span v-if="text.length > MAX_LEN * 0.8" :class="{ 'is-warn': remaining < 50 }">{{ text.length }}/{{ MAX_LEN }}</span>
+            <div class="fbot-hint">
+              <span>Enter 发送 · Shift+Enter 换行</span>
+              <span v-if="text.length > MAX_LEN * 0.8" :class="{ 'is-warn': remaining < 50 }">{{ text.length }}/{{ MAX_LEN }}</span>
+            </div>
           </div>
-        </template>
 
-        <div v-else class="fbot-requests-view">
+          <div v-else key="requests" class="fbot-requests-view">
           <section class="fbot-lookup-card" aria-labelledby="fbot-lookup-title">
             <div class="fbot-lookup-intro">
               <strong id="fbot-lookup-title">跨设备查询</strong>
@@ -702,22 +753,28 @@ function onKeydown(e) {
             <button class="fbot-local-lookup" type="button" :disabled="checkingReplies" @click="startFeedbackLookup(true)">查看这台设备提交的需求</button>
           </section>
 
-          <p v-if="feedbackLookupMessage" class="fbot-lookup-state" role="status">{{ feedbackLookupMessage }}</p>
-          <section v-if="showFeedbackRecords && (feedbackRecords.length || activeFeedbackSearch)" class="fbot-record-list" aria-label="需求查询结果">
+          <Transition name="fbot-state">
+            <p v-if="feedbackLookupMessage" class="fbot-lookup-state" role="status">{{ feedbackLookupMessage }}</p>
+          </Transition>
+          <section v-if="showFeedbackRecords && (feedbackRecords.length || activeFeedbackSearch)" class="fbot-record-list" :class="{ 'is-loading': checkingReplies }" aria-label="需求查询结果" :aria-busy="checkingReplies">
             <form class="fbot-record-search" role="search" @submit.prevent="searchFeedbackRecords">
               <label class="sr-only" for="fbot-record-search">搜索需求和回复</label>
-              <input id="fbot-record-search" v-model="feedbackSearch" type="search" maxlength="100" placeholder="输入关键词，如：蓝色 条纹" />
+              <input id="fbot-record-search" v-model="feedbackSearch" type="search" maxlength="100" placeholder="输入关键词，如：蓝色 条纹" :disabled="checkingReplies" />
               <button v-if="activeFeedbackSearch" class="is-clear" type="button" :disabled="checkingReplies" @click="clearFeedbackSearch">清除</button>
               <button type="submit" :disabled="checkingReplies">{{ checkingReplies ? '搜索中…' : '搜索' }}</button>
             </form>
             <small class="fbot-search-help">支持空格、逗号分隔多个关键词，同时匹配需求内容和跟单回复。</small>
             <div class="fbot-record-summary"><strong>{{ activeFeedbackSearch ? `“${activeFeedbackSearch}”的搜索结果` : '全部查询结果' }}</strong><span>共 {{ feedbackTotal }} 条</span></div>
-            <article v-for="item in feedbackRecords" :key="item.id" class="fbot-record">
-              <div class="fbot-record-head"><span>需求 #{{ item.id }} · 提交于 {{ formatFeedbackTime(item.created_at) }}</span><span :class="{ 'is-replied': item.admin_reply }">{{ item.admin_reply ? '已回复' : item.status === 'pending' ? '待处理' : '已处理' }}</span></div>
-              <p>{{ item.message }}</p>
-              <p v-if="item.admin_reply" class="fbot-record-reply"><strong>跟单回复</strong>{{ item.admin_reply }}</p>
-            </article>
-            <button v-if="feedbackTotal > feedbackRecords.length" class="fbot-record-more" type="button" :disabled="checkingReplies" @click="loadMoreFeedbackRecords">{{ checkingReplies ? '加载中…' : '加载更多需求' }}</button>
+            <TransitionGroup name="fbot-record" tag="div" class="fbot-record-items">
+              <article v-for="item in feedbackRecords" :key="item.id" class="fbot-record">
+                <div class="fbot-record-head"><span>需求 #{{ item.id }} · 提交于 {{ formatFeedbackTime(item.created_at) }}</span><span :class="{ 'is-replied': item.admin_reply }">{{ item.admin_reply ? '已回复' : item.status === 'pending' ? '待处理' : '已处理' }}</span></div>
+                <p>{{ item.message }}</p>
+                <p v-if="item.admin_reply" class="fbot-record-reply"><strong>跟单回复</strong>{{ item.admin_reply }}</p>
+              </article>
+            </TransitionGroup>
+            <Transition name="fbot-state">
+              <button v-if="feedbackTotal > feedbackRecords.length" class="fbot-record-more" type="button" :disabled="checkingReplies" @click="loadMoreFeedbackRecords">{{ checkingReplies ? '加载中…' : '加载更多需求' }}</button>
+            </Transition>
           </section>
           <div v-else-if="!feedbackLookupDone" class="fbot-requests-empty">
             <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="m4 7 8 6 8-6"/></svg>
@@ -738,8 +795,9 @@ function onKeydown(e) {
                 <p class="fbot-record-reply"><strong>跟单回复</strong>{{ codeLookupResult.admin_reply }}</p>
               </article>
             </div>
-          </section>
-        </div>
+            </section>
+          </div>
+        </Transition>
       </section>
     </Transition>
 
@@ -795,6 +853,25 @@ function onKeydown(e) {
   --fb-input: #f3f8f5;
   --fb-accent: #5a8f73;
   --fb-deep: #0a3d22;
+}
+.fbot.is-focus {
+  inset: 0;
+  z-index: 1100;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  pointer-events: none;
+}
+.fbot-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(5, 24, 14, 0.38);
+  backdrop-filter: blur(3px);
+  pointer-events: auto;
+  cursor: default;
 }
 .fbot.is-dark {
   --fb-bg: rgba(15, 24, 19, 0.97);
@@ -868,7 +945,18 @@ function onKeydown(e) {
     0 6px 18px rgba(10, 61, 34, 0.16);
   backdrop-filter: blur(14px);
   transform-origin: bottom right;
+  transition: width 0.24s ease, height 0.24s ease, border-radius 0.24s ease;
 }
+.fbot.is-focus .fbot-panel {
+  z-index: 1;
+  width: min(720px, calc(100vw - 48px));
+  height: min(720px, calc(100vh - 64px));
+  height: min(720px, calc(100dvh - 64px));
+  border-radius: 24px;
+  transform-origin: center;
+  pointer-events: auto;
+}
+.fbot.is-focus.is-open .fbot-avatar { display: none; }
 .fbot-panel.is-requests {
   width: min(420px, calc(100vw - 32px));
   height: min(560px, calc(100vh - 210px));
@@ -900,7 +988,7 @@ function onKeydown(e) {
 .fbot-head-sub { font-size: 11px; opacity: 0.85; font-weight: 500; }
 .fbot-head-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: #9ef0c0; box-shadow: 0 0 0 0 rgba(158, 240, 192, 0.6); animation: fbot-pulse 2s ease-in-out infinite; }
 .fbot-head-dot.is-off { background: rgba(255, 255, 255, 0.5); box-shadow: none; animation: none; }
-.fbot-head-back, .fbot-head-action {
+.fbot-head-back, .fbot-head-action, .fbot-size-toggle {
   flex-shrink: 0;
   border: 0;
   color: #fff;
@@ -909,8 +997,9 @@ function onKeydown(e) {
 }
 .fbot-head-back { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border-radius: 50%; }
 .fbot-head-action { padding: 6px 9px; border-radius: 999px; font: inherit; font-size: 11px; font-weight: 600; }
-.fbot-head-back:hover, .fbot-head-action:hover { background: rgba(255, 255, 255, 0.25); }
-.fbot-head-back:focus-visible, .fbot-head-action:focus-visible, .fbot-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.fbot-size-toggle { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border-radius: 50%; }
+.fbot-head-back:hover, .fbot-head-action:hover, .fbot-size-toggle:hover { background: rgba(255, 255, 255, 0.25); }
+.fbot-head-back:focus-visible, .fbot-head-action:focus-visible, .fbot-size-toggle:focus-visible, .fbot-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 @keyframes fbot-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(158, 240, 192, 0.55); }
   50% { box-shadow: 0 0 0 5px rgba(158, 240, 192, 0); }
@@ -930,6 +1019,7 @@ function onKeydown(e) {
 }
 .fbot-close:hover { background: rgba(255, 255, 255, 0.28); transform: rotate(90deg); }
 
+.fbot-chat-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .fbot-body {
   flex: 1;
   min-height: 0;
@@ -1126,7 +1216,9 @@ function onKeydown(e) {
 .fbot-requests-empty svg { color: var(--fb-accent); }
 .fbot-requests-empty strong { color: var(--fb-text); font-size: 13px; }
 .fbot-requests-empty span { max-width: 240px; font-size: 11px; line-height: 1.5; }
-.fbot-record-list { margin-top: 14px; display: grid; gap: 9px; }
+.fbot-record-list { margin-top: 14px; display: grid; gap: 9px; transition: opacity 0.18s ease, transform 0.18s ease; }
+.fbot-record-list.is-loading { opacity: 0.72; }
+.fbot-record-items { position: relative; display: grid; gap: 9px; }
 .fbot-record-search { display: flex; gap: 7px; }
 .fbot-record-search input { flex: 1; min-width: 0; border: 1px solid var(--fb-line); border-radius: 9px; padding: 8px 9px; color: var(--fb-text); background: var(--fb-bg); font: inherit; font-size: 12px; }
 .fbot-record-search button { border: 1px solid var(--fb-line); border-radius: 9px; padding: 7px 12px; color: var(--fb-accent); background: var(--fb-bot-bubble); font: inherit; font-size: 12px; cursor: pointer; }
@@ -1210,16 +1302,40 @@ function onKeydown(e) {
 .fbot-panel-enter-active { transition: opacity 0.22s ease, transform 0.25s cubic-bezier(0.34, 1.3, 0.64, 1); }
 .fbot-panel-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
 .fbot-panel-enter-from, .fbot-panel-leave-to { opacity: 0; transform: translateY(10px) scale(0.92); }
+.fbot-backdrop-enter-active, .fbot-backdrop-leave-active { transition: opacity 0.2s ease; }
+.fbot-backdrop-enter-from, .fbot-backdrop-leave-to { opacity: 0; }
+.fbot-view-enter-active, .fbot-view-leave-active { transition: opacity 0.16s ease, transform 0.18s ease; }
+.fbot-view-enter-from { opacity: 0; transform: translateX(10px); }
+.fbot-view-leave-to { opacity: 0; transform: translateX(-8px); }
+.fbot-state-enter-active, .fbot-state-leave-active { transition: opacity 0.16s ease, transform 0.16s ease; }
+.fbot-state-enter-from, .fbot-state-leave-to { opacity: 0; transform: translateY(-4px); }
+.fbot-record-enter-active, .fbot-record-leave-active, .fbot-record-move { transition: opacity 0.2s ease, transform 0.22s ease; }
+.fbot-record-enter-from, .fbot-record-leave-to { opacity: 0; transform: translateY(8px) scale(0.985); }
+.fbot-record-leave-active { position: absolute; width: 100%; }
 
 @media (max-width: 768px) {
   .fbot { right: 14px; bottom: 124px; }
+  .fbot.is-focus { inset: 0; }
   .fbot-tip { display: none; }
   .fbot-panel { width: min(352px, calc(100vw - 28px)); height: min(440px, calc(100vh - 260px)); }
   .fbot-panel.is-requests { width: calc(100vw - 28px); height: min(560px, calc(100vh - 210px)); }
+  .fbot.is-focus .fbot-panel {
+    width: calc(100vw - 16px);
+    height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    border-radius: 18px;
+  }
+  .fbot-head { gap: 7px; padding-inline: 10px; }
+  .fbot-head-action { padding-inline: 7px; }
+}
+
+@media (max-width: 380px) {
+  .fbot-head-sub { display: none; }
+  .fbot-head-action { font-size: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .fbot-float, .fbot-shadow, .fbot-light, .fbot-eyes, .fbot-typing i, .fbot-head-dot, .fbot-wait-pulse { animation: none; }
   .fbot-bubble.is-streaming .fbot-md::after { content: none; }
+  .fbot-panel, .fbot-record-list, .fbot-panel-enter-active, .fbot-panel-leave-active, .fbot-backdrop-enter-active, .fbot-backdrop-leave-active, .fbot-view-enter-active, .fbot-view-leave-active, .fbot-state-enter-active, .fbot-state-leave-active, .fbot-record-enter-active, .fbot-record-leave-active, .fbot-record-move { transition: none; }
 }
 </style>
