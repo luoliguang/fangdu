@@ -101,25 +101,29 @@ class Feedback {
   async getByUserId(userId, options = {}) {
     const {
       page = 1,
-      limit = 10
+      limit = 10,
+      search = ''
     } = options;
 
     const offset = (page - 1) * limit;
-    
+    const escapedSearch = search.replace(/[\\%_]/g, '\\$&');
+    const searchClause = search ? ` AND (message LIKE ? ESCAPE '\\' OR admin_reply LIKE ? ESCAPE '\\')` : '';
+    const searchParams = search ? [`%${escapedSearch}%`, `%${escapedSearch}%`] : [];
+
     // 获取总数
-    const countSql = `SELECT COUNT(*) as total FROM feedbacks WHERE user_id = ?`;
-    const total = await this.queryOne(countSql, [userId]);
+    const countSql = `SELECT COUNT(*) as total FROM feedbacks WHERE user_id = ?${searchClause}`;
+    const total = await this.queryOne(countSql, [userId, ...searchParams]);
 
     // 获取分页数据
     const dataSql = `
       SELECT f.id, f.message, f.status, f.created_at, f.user_id, f.admin_reply
       FROM feedbacks f
-      WHERE f.user_id = ? 
-      ORDER BY f.created_at DESC 
+      WHERE f.user_id = ?${searchClause}
+      ORDER BY f.created_at DESC, f.id DESC
       LIMIT ? OFFSET ?
     `;
-    
-    const feedbacks = await this.queryAll(dataSql, [userId, limit, offset]);
+
+    const feedbacks = await this.queryAll(dataSql, [userId, ...searchParams, limit, offset]);
 
     return {
       data: feedbacks,
@@ -132,13 +136,19 @@ class Feedback {
     };
   }
 
-  async getByLookupEmail(email, { page = 1, limit = 20 } = {}) {
+  async getByLookupEmail(email, { page = 1, limit = 20, search = '' } = {}) {
     const offset = (page - 1) * limit;
-    const total = await this.queryOne('SELECT COUNT(*) AS total FROM feedbacks WHERE lookup_email = ?', [email]);
+    const escapedSearch = search.replace(/[\\%_]/g, '\\$&');
+    const searchClause = search ? ` AND (message LIKE ? ESCAPE '\\' OR admin_reply LIKE ? ESCAPE '\\')` : '';
+    const searchParams = search ? [`%${escapedSearch}%`, `%${escapedSearch}%`] : [];
+    const total = await this.queryOne(
+      `SELECT COUNT(*) AS total FROM feedbacks WHERE lookup_email = ?${searchClause}`,
+      [email, ...searchParams]
+    );
     const data = await this.queryAll(
       `SELECT id, message, status, created_at, admin_reply FROM feedbacks
-       WHERE lookup_email = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
-      [email, limit, offset]
+       WHERE lookup_email = ?${searchClause} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+      [email, ...searchParams, limit, offset]
     );
     return { data, meta: { total: total.total, page, limit, totalPages: Math.ceil(total.total / limit) } };
   }

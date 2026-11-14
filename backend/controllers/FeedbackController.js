@@ -205,7 +205,8 @@ class FeedbackController {
       res.json(result);
     } catch (error) {
       console.error('获取用户留言列表失败:', error);
-      res.status(500).json({
+      const statusCode = error.message === '搜索内容不能超过100个字符' ? 400 : 500;
+      res.status(statusCode).json({
         success: false,
         message: error.message || '获取用户留言列表失败'
       });

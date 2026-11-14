@@ -8,6 +8,12 @@ function normalizeLookupEmail(value) {
   return email;
 }
 
+function normalizeFeedbackSearch(value) {
+  if (value == null) return '';
+  if (typeof value !== 'string' || value.trim().length > 100) throw new Error('搜索内容不能超过100个字符');
+  return value.trim();
+}
+
 /**
  * Feedback 服务层
  * 处理留言反馈相关的业务逻辑
@@ -75,10 +81,11 @@ class FeedbackService {
     }
   }
 
-  async getFeedbacksByLookupEmail(email, page = 1) {
+  async getFeedbacksByLookupEmail(email, page = 1, search = '') {
     const normalized = normalizeLookupEmail(email);
+    const normalizedSearch = normalizeFeedbackSearch(search);
     const currentPage = Number.isSafeInteger(Number(page)) && Number(page) > 0 ? Math.min(Number(page), 10000) : 1;
-    return this.feedbackModel.getByLookupEmail(normalized, { page: currentPage, limit: 20 });
+    return this.feedbackModel.getByLookupEmail(normalized, { page: currentPage, limit: 20, search: normalizedSearch });
   }
 
   async getFeedbackByAccessCode(accessCode) {
@@ -204,11 +211,12 @@ class FeedbackService {
    */
   async getFeedbacksByUserId(userId, query = {}) {
     try {
-      const { page, limit } = query;
+      const { page, limit, search } = query;
       
       const options = {
         page: parseInt(page) || 1,
-        limit: Math.min(parseInt(limit) || 10, 50)
+        limit: Math.min(parseInt(limit) || 10, 50),
+        search: normalizeFeedbackSearch(search)
       };
 
       const result = await this.feedbackModel.getByUserId(userId, options);
@@ -220,6 +228,7 @@ class FeedbackService {
       };
     } catch (error) {
       console.error('获取用户留言列表失败:', error);
+      if (error.message === '搜索内容不能超过100个字符') throw error;
       throw new Error('获取用户留言列表失败');
     }
   }

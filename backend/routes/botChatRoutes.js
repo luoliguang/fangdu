@@ -138,10 +138,12 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
     if (!feedbackService) return res.status(503).json({ success: false, message: '查询暂不可用' });
     res.set('Cache-Control', 'no-store');
     try {
-      const result = await feedbackService.getFeedbacksByLookupEmail(req.body?.email, req.body?.page);
+      const result = await feedbackService.getFeedbacksByLookupEmail(req.body?.email, req.body?.page, req.body?.search);
       return res.json({ success: true, ...result });
     } catch (error) {
-      if (error.message === '请输入有效的查询邮箱') return res.status(400).json({ success: false, message: error.message });
+      if (error.message === '请输入有效的查询邮箱' || error.message === '搜索内容不能超过100个字符') {
+        return res.status(400).json({ success: false, message: error.message });
+      }
       console.error('[bot] 邮箱查询失败:', error?.message);
       return res.status(503).json({ success: false, message: '查询暂不可用，请稍后再试' });
     }

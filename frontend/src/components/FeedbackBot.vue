@@ -62,6 +62,8 @@ const feedbackPages = ref({});
 const showFeedbackRecords = ref(false);
 const feedbackLookupDone = ref(false);
 const feedbackLookupMessage = ref('');
+const feedbackSearch = ref('');
+const activeFeedbackSearch = ref('');
 const bodyRef = ref(null);
 const inputRef = ref(null);
 
@@ -213,6 +215,16 @@ function getUserId() {
   }
   return id;
 }
+function formatFeedbackTime(value) {
+  if (!value) return '时间未知';
+  const source = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? `${value.replace(' ', 'T')}Z` : value;
+  const date = new Date(source);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).format(date);
+}
 // —— AI 回复的 Markdown 渲染与复制 ——
 function renderMarkdown(text) {
   return md.render(String(text ?? ''));
@@ -286,11 +298,19 @@ function isExplicitFeedback(content) {
   return /^(?:我想反馈|我要反馈|反馈一下|我有个建议|我想提建议|我要提建议|我想投诉|我要投诉|我想提交需求|我要提交需求|提交找图需求|建议新增|建议增加|希望新增|希望增加)/.test(content)
     || /(?:网站|页面).{0,8}(?:有问题|出错|打不开|白屏|报错)/.test(content);
 }
+function startFeedbackLookup(useDevice = false) {
+  feedbackSearch.value = '';
+  checkReplies(useDevice);
+}
+function searchFeedbackRecords() {
+  checkReplies(!emailLookupMode.value);
+}
 async function checkReplies(useDevice = false) {
   if (checkingReplies.value) return;
   showFeedbackRecords.value = false;
   feedbackLookupDone.value = false;
   const email = useDevice ? '' : lookupEmail.value.trim();
+  const search = feedbackSearch.value.trim();
   if (email) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
       feedbackLookupDone.value = true;
@@ -300,16 +320,19 @@ async function checkReplies(useDevice = false) {
     checkingReplies.value = true;
     feedbackLookupMessage.value = '';
     try {
-      const response = await apiClient.post('/api/v1/bot/request/by-email', { email });
+      const response = await apiClient.post('/api/v1/bot/request/by-email', { email, ...(search ? { search } : {}) });
       feedbackRecords.value = Array.isArray(response.data?.data) ? response.data.data : [];
       feedbackTotal.value = Number(response.data?.meta?.total) || 0;
       feedbackPages.value = { email: { page: 1, totalPages: Number(response.data?.meta?.totalPages) || 1 } };
       emailLookupMode.value = true;
       activeLookupEmail.value = email;
+      activeFeedbackSearch.value = search;
       localStorage.setItem('fbot-lookup-email', email);
       showFeedbackRecords.value = true;
       feedbackLookupDone.value = true;
-      if (!feedbackRecords.value.length) feedbackLookupMessage.value = '这个邮箱下还没有新需求。提交找图需求时填写同一个邮箱，之后就能在这里查到。';
+      if (!feedbackRecords.value.length) feedbackLookupMessage.value = search
+        ? `没有找到包含“${search}”的需求或回复。`
+        : '这个邮箱下还没有新需求。提交找图需求时填写同一个邮箱，之后就能在这里查到。';
     } catch (error) {
       feedbackLookupDone.value = true;
       feedbackLookupMessage.value = error?.response?.data?.message || '邮箱查询暂时不可用，请稍后再试。';
@@ -328,13 +351,16 @@ async function checkReplies(useDevice = false) {
   checkingReplies.value = true;
   feedbackLookupMessage.value = '';
   try {
-    const response = await apiClient.get(`/api/v1/feedbacks/user/${activeId}`, { params: { limit: 50 } });
+    const response = await apiClient.get(`/api/v1/feedbacks/user/${activeId}`, { params: { limit: 50, ...(search ? { search } : {}) } });
     feedbackRecords.value = Array.isArray(response.data?.data) ? response.data.data : [];
     feedbackTotal.value = Number(response.data?.meta?.total) || 0;
     feedbackPages.value = { [activeId]: { page: 1, totalPages: Number(response.data?.meta?.totalPages) || 1 } };
+    activeFeedbackSearch.value = search;
     showFeedbackRecords.value = true;
     feedbackLookupDone.value = true;
-    if (!feedbackRecords.value.length) feedbackLookupMessage.value = '这台设备还没有需求记录。提交找图需求后可在这里查看处理状态和掌柜回复。';
+    if (!feedbackRecords.value.length) feedbackLookupMessage.value = search
+      ? `没有找到包含“${search}”的需求或回复。`
+      : '这台设备还没有需求记录。提交找图需求后可在这里查看处理状态和跟单回复。';
   } catch (_) {
     feedbackLookupDone.value = true;
     feedbackLookupMessage.value = '暂时无法读取需求回复，请稍后再试。';
@@ -349,8 +375,8 @@ async function loadMoreFeedbackRecords() {
   checkingReplies.value = true;
   try {
     const responses = await Promise.all(entries.map(([id, state]) => emailLookupMode.value
-      ? apiClient.post('/api/v1/bot/request/by-email', { email: activeLookupEmail.value, page: state.page + 1 })
-      : apiClient.get(`/api/v1/feedbacks/user/${id}`, { params: { limit: 50, page: state.page + 1 } })
+      ? apiClient.post('/api/v1/bot/request/by-email', { email: activeLookupEmail.value, page: state.page + 1, ...(activeFeedbackSearch.value ? { search: activeFeedbackSearch.value } : {}) })
+      : apiClient.get(`/api/v1/feedbacks/user/${id}`, { params: { limit: 50, page: state.page + 1, ...(activeFeedbackSearch.value ? { search: activeFeedbackSearch.value } : {}) } })
     ));
     feedbackRecords.value = [...feedbackRecords.value, ...responses.flatMap(res => res.data?.data || [])]
       .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id);
@@ -511,7 +537,7 @@ async function send() {
       if (requestEmail && accessCode) localStorage.setItem('fbot-lookup-email', requestEmail);
       showFeedbackRecords.value = false;
       pushBot(requestEmail && accessCode
-        ? `需求已提交。换设备时输入同一个邮箱，在“我的需求”查看这组需求和掌柜的回复。`
+        ? `需求已提交。换设备时输入同一个邮箱，在“我的需求”查看这组需求和跟单回复。`
         : accessCode
           ? `匿名需求已提交。换设备查询这条需求，请保存并点击复制查询码：\`${accessCode}\`。`
           : '需求已经提交。处理后可在这台设备点“我的需求”查看结果。', undefined, { md: true });
@@ -580,7 +606,7 @@ function onKeydown(e) {
           </span>
           <span class="fbot-head-meta">
             <strong>{{ panelView === 'chat' ? '小度' : '我的需求' }}</strong>
-            <span class="fbot-head-sub">{{ panelView === 'chat' ? (aiEnabled ? '实拍图搜索与反馈' : '反馈小助手') : '查看处理进度与掌柜回复' }}</span>
+            <span class="fbot-head-sub">{{ panelView === 'chat' ? (aiEnabled ? '实拍图搜索与反馈' : '反馈小助手') : '查看处理进度与跟单回复' }}</span>
           </span>
           <button v-if="panelView === 'chat'" class="fbot-head-action" type="button" @click="openRequests">我的需求</button>
           <button class="fbot-close" type="button" aria-label="关闭" @click="closePanel">×</button>
@@ -652,26 +678,31 @@ function onKeydown(e) {
               <span>输入提交需求时填写的邮箱</span>
             </div>
             <div class="fbot-email-entry-row">
-              <input id="fbot-lookup-email" v-model="lookupEmail" type="email" maxlength="254" autocomplete="email" placeholder="查询邮箱" aria-describedby="fbot-email-note" @keydown.enter.prevent="checkReplies()" />
-              <button type="button" :disabled="checkingReplies" @click="checkReplies()">{{ checkingReplies ? '查询中…' : '查询' }}</button>
+              <input id="fbot-lookup-email" v-model="lookupEmail" type="email" maxlength="254" autocomplete="email" placeholder="查询邮箱" aria-describedby="fbot-email-note" @keydown.enter.prevent="startFeedbackLookup(false)" />
+              <button type="button" :disabled="checkingReplies" @click="startFeedbackLookup(false)">{{ checkingReplies ? '查询中…' : '查询' }}</button>
             </div>
             <small id="fbot-email-note">邮箱无需验证，知道邮箱的人也能查看关联的新需求和回复，请勿填写私人信息。</small>
-            <button class="fbot-local-lookup" type="button" :disabled="checkingReplies" @click="checkReplies(true)">查看这台设备提交的需求</button>
+            <button class="fbot-local-lookup" type="button" :disabled="checkingReplies" @click="startFeedbackLookup(true)">查看这台设备提交的需求</button>
           </section>
 
           <p v-if="feedbackLookupMessage" class="fbot-lookup-state" role="status">{{ feedbackLookupMessage }}</p>
-          <section v-if="showFeedbackRecords && feedbackRecords.length" class="fbot-record-list" aria-label="需求查询结果">
-            <div class="fbot-record-summary"><strong>查询结果</strong><span>共 {{ feedbackTotal }} 条</span></div>
+          <section v-if="showFeedbackRecords && (feedbackRecords.length || activeFeedbackSearch)" class="fbot-record-list" aria-label="需求查询结果">
+            <form class="fbot-record-search" role="search" @submit.prevent="searchFeedbackRecords">
+              <label class="sr-only" for="fbot-record-search">搜索需求和回复</label>
+              <input id="fbot-record-search" v-model="feedbackSearch" type="search" maxlength="100" placeholder="搜索需求或跟单回复" />
+              <button type="submit" :disabled="checkingReplies">{{ checkingReplies ? '搜索中…' : '搜索' }}</button>
+            </form>
+            <div class="fbot-record-summary"><strong>{{ activeFeedbackSearch ? '搜索结果' : '查询结果' }}</strong><span>共 {{ feedbackTotal }} 条</span></div>
             <article v-for="item in feedbackRecords" :key="item.id" class="fbot-record">
-              <div class="fbot-record-head"><span>需求 #{{ item.id }}</span><span :class="{ 'is-replied': item.admin_reply }">{{ item.admin_reply ? '已回复' : item.status === 'pending' ? '待处理' : '已处理' }}</span></div>
+              <div class="fbot-record-head"><span>需求 #{{ item.id }} · 提交于 {{ formatFeedbackTime(item.created_at) }}</span><span :class="{ 'is-replied': item.admin_reply }">{{ item.admin_reply ? '已回复' : item.status === 'pending' ? '待处理' : '已处理' }}</span></div>
               <p>{{ item.message }}</p>
-              <p v-if="item.admin_reply" class="fbot-record-reply"><strong>掌柜回复</strong>{{ item.admin_reply }}</p>
+              <p v-if="item.admin_reply" class="fbot-record-reply"><strong>跟单回复</strong>{{ item.admin_reply }}</p>
             </article>
             <button v-if="feedbackTotal > feedbackRecords.length" class="fbot-record-more" type="button" :disabled="checkingReplies" @click="loadMoreFeedbackRecords">{{ checkingReplies ? '加载中…' : '加载更多需求' }}</button>
           </section>
           <div v-else-if="!feedbackLookupDone" class="fbot-requests-empty">
             <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="m4 7 8 6 8-6"/></svg>
-            <strong>掌柜的回复会显示在这里</strong>
+            <strong>跟单回复会显示在这里</strong>
             <span>可以用邮箱跨设备查询，也可以查看本机记录。</span>
           </div>
 
@@ -684,8 +715,8 @@ function onKeydown(e) {
               <div><input id="fbot-access-code" v-model="lookupCode" maxlength="32" autocomplete="off" placeholder="粘贴 32 位查询码" @keydown.enter.prevent="lookupReply" /><button type="button" :disabled="lookingUpCode" @click="lookupReply">{{ lookingUpCode ? '查询中…' : '查询' }}</button></div>
               <p v-if="codeLookupMessage" class="fbot-code-message" role="status">{{ codeLookupMessage }}</p>
               <article v-if="codeLookupResult?.admin_reply" class="fbot-record">
-                <div class="fbot-record-head"><span>需求 #{{ codeLookupResult.id }}</span><span class="is-replied">已回复</span></div>
-                <p class="fbot-record-reply"><strong>掌柜回复</strong>{{ codeLookupResult.admin_reply }}</p>
+                <div class="fbot-record-head"><span>需求 #{{ codeLookupResult.id }} · 提交于 {{ formatFeedbackTime(codeLookupResult.created_at) }}</span><span class="is-replied">已回复</span></div>
+                <p class="fbot-record-reply"><strong>跟单回复</strong>{{ codeLookupResult.admin_reply }}</p>
               </article>
             </div>
           </section>
@@ -1077,9 +1108,16 @@ function onKeydown(e) {
 .fbot-requests-empty strong { color: var(--fb-text); font-size: 13px; }
 .fbot-requests-empty span { max-width: 240px; font-size: 11px; line-height: 1.5; }
 .fbot-record-list { margin-top: 14px; display: grid; gap: 9px; }
+.fbot-record-search { display: flex; gap: 7px; }
+.fbot-record-search input { flex: 1; min-width: 0; border: 1px solid var(--fb-line); border-radius: 9px; padding: 8px 9px; color: var(--fb-text); background: var(--fb-bg); font: inherit; font-size: 12px; }
+.fbot-record-search button { border: 1px solid var(--fb-line); border-radius: 9px; padding: 7px 12px; color: var(--fb-accent); background: var(--fb-bot-bubble); font: inherit; font-size: 12px; cursor: pointer; }
+.fbot-record-search button:disabled { opacity: .6; cursor: wait; }
+.fbot-record-search input:focus { outline: 2px solid rgba(90, 143, 115, .35); border-color: var(--fb-accent); }
 .fbot-record-summary { display: flex; align-items: center; justify-content: space-between; color: var(--fb-sub); font-size: 12px; }
 .fbot-record-summary strong { color: var(--fb-text); font-size: 13px; }
-.fbot-record-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: var(--fb-sub); }
+.fbot-record-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; font-size: 11px; line-height: 1.45; color: var(--fb-sub); }
+.fbot-record-head > span:first-child { min-width: 0; }
+.fbot-record-head > span:last-child { flex-shrink: 0; }
 .fbot-record-head .is-replied { color: #357b56; font-weight: 700; }
 .fbot-record { border: 1px solid var(--fb-line); border-radius: 12px; background: var(--fb-bg); padding: 11px; overflow-wrap: anywhere; box-shadow: 0 3px 12px rgba(10, 61, 34, 0.05); }
 .fbot-record p { margin: 7px 0 0; white-space: pre-wrap; font-size: 13px; line-height: 1.55; color: var(--fb-text); }
@@ -1101,6 +1139,7 @@ function onKeydown(e) {
 .fbot-submit-email input:focus, .fbot-email-entry-row input:focus, .fbot-code-lookup input:focus { outline: 2px solid rgba(90, 143, 115, .35); border-color: var(--fb-accent); }
 .fbot-requests-view::-webkit-scrollbar { width: 6px; }
 .fbot-requests-view::-webkit-scrollbar-thumb { background: rgba(90, 143, 115, 0.35); border-radius: 999px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .fbot-foot textarea {
   flex: 1;
   min-width: 0;

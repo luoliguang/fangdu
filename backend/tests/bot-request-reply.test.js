@@ -84,8 +84,8 @@ test('an explicit photo request notifies once and an admin reply reaches the sam
     body: JSON.stringify({ message: '【没找到想要的】还想找蓝色纯色实拍图', user_id: secondId, lookupEmail: 'client@example.com' })
   });
   assert.equal(secondSubmit.status, 201);
-  const byEmail = (email, page = 1) => fetch(`${base}/bot/request/by-email`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, page })
+  const byEmail = (email, page = 1, search = '') => fetch(`${base}/bot/request/by-email`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, page, search })
   });
   const grouped = await (await byEmail(' CLIENT@example.COM ')).json();
   assert.equal(grouped.meta.total, 2);
@@ -93,8 +93,21 @@ test('an explicit photo request notifies once and an admin reply reaches the sam
   assert.ok(grouped.data.some(item => item.id === id && item.admin_reply === '找到了，请搜索：蓝色条纹'));
   assert.ok(!JSON.stringify(grouped).includes('access_token_hash'));
   assert.ok(!JSON.stringify(grouped).includes('client@example.com'));
+  assert.ok(grouped.data.every(item => item.created_at), 'query results include submission time');
+  const searchedMessage = await (await byEmail('client@example.com', 1, '纯色')).json();
+  assert.equal(searchedMessage.meta.total, 1);
+  assert.match(searchedMessage.data[0].message, /纯色/);
+  const searchedReply = await (await byEmail('client@example.com', 1, '找到了')).json();
+  assert.equal(searchedReply.meta.total, 1);
+  assert.equal(searchedReply.data[0].id, id);
+  assert.equal((await (await byEmail('client@example.com', 1, '%')).json()).meta.total, 0, 'LIKE wildcards are searched literally');
+  const ownSearch = await (await fetch(`${base}/feedbacks/user/${userId}?search=${encodeURIComponent('蓝色条纹')}`)).json();
+  assert.equal(ownSearch.meta.total, 1);
+  assert.equal(ownSearch.data[0].id, id);
   assert.deepEqual((await (await byEmail('other@example.com')).json()).data, []);
   assert.equal((await byEmail('bad-email')).status, 400);
+  assert.equal((await byEmail('client@example.com', 1, 'x'.repeat(101))).status, 400);
+  assert.equal((await fetch(`${base}/feedbacks/user/${userId}?search=${'x'.repeat(101)}`)).status, 400);
   assert.equal(grouped.data.some(item => item.message === '旧留言'), false);
   assert.equal(notices.length, 2, 'each explicit request notifies once');
 });
