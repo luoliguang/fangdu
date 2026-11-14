@@ -49,7 +49,7 @@ const getSteps = () => [
     element: '.drawer-trigger',
     popover: {
       title: '收藏夹 & 功能菜单',
-      description: '点击左侧「菜单」按钮，可在侧边抽屉中查看所有收藏的素材、快速筛选，以及提交意见反馈。',
+      description: '点击左侧「菜单」按钮，可在侧边抽屉中查看收藏素材、公告、教程和快速筛选。找图或提交需求请使用右下角的小度。',
       side: 'right',
       align: 'center'
     }

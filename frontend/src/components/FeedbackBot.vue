@@ -70,6 +70,8 @@ const inputRef = ref(null);
 const panelRef = ref(null);
 const containerRef = ref(null);
 const panelModeAnnouncement = ref('');
+const botExpression = ref('idle');
+let expressionTimer;
 
 // 发送冷却：按钮上显示倒计时，不再往聊天里追加提示；刷新页面后仍然有效
 const COOLDOWN_KEY = 'fbot-cooldown-until';
@@ -131,6 +133,23 @@ let pendingFinishId = null;
 
 const remaining = computed(() => MAX_LEN - text.value.length);
 const canSend = computed(() => text.value.trim().length > 0 && !sending.value && remaining.value >= 0 && cooldownLeft.value === 0);
+const botMood = computed(() => {
+  if (sending.value || streaming.value || checkingReplies.value || lookingUpCode.value) return 'thinking';
+  if (botExpression.value !== 'idle') return botExpression.value;
+  return open.value ? 'listening' : 'idle';
+});
+const botMouthPath = computed(() => ({
+  happy: 'M33 47 Q40 57 47 47',
+  concerned: 'M35 52 Q40 47 45 52',
+  thinking: 'M37 50 Q40 47 43 50',
+  listening: 'M35 48 Q40 53 45 48',
+  idle: 'M36 48 Q40 52 44 48'
+}[botMood.value]));
+function showBotExpression(expression, duration = 1800) {
+  clearTimeout(expressionTimer);
+  botExpression.value = expression;
+  expressionTimer = setTimeout(() => { botExpression.value = 'idle'; }, duration);
+}
 
 // 眼睛跟随鼠标
 const eye = ref({ x: 0, y: 0 });
@@ -172,6 +191,7 @@ onUnmounted(() => {
   window.removeEventListener('fbot:open', onExternalOpen);
   setBackgroundInert(false);
   clearInterval(tickTimer);
+  clearTimeout(expressionTimer);
   if (open.value) finishConversation();
 });
 
@@ -387,11 +407,13 @@ async function checkReplies(useDevice = false) {
       if (!feedbackRecords.value.length) feedbackLookupMessage.value = search
         ? `没有找到包含“${search}”的需求或回复。`
         : '这个邮箱下还没有新需求。提交找图需求时填写同一个邮箱，之后就能在这里查到。';
+      showBotExpression('happy');
     } catch (error) {
       feedbackLookupDone.value = true;
       feedbackLookupMessage.value = error?.isSearchCompatibilityError
         ? error.message
         : error?.response?.data?.message || '邮箱查询暂时不可用，请稍后再试。';
+      showBotExpression('concerned');
     } finally {
       checkingReplies.value = false;
     }
@@ -418,11 +440,13 @@ async function checkReplies(useDevice = false) {
     if (!feedbackRecords.value.length) feedbackLookupMessage.value = search
       ? `没有找到包含“${search}”的需求或回复。`
       : '这台设备还没有需求记录。提交找图需求后可在这里查看处理状态和跟单回复。';
+    showBotExpression('happy');
   } catch (error) {
     feedbackLookupDone.value = true;
     feedbackLookupMessage.value = error?.isSearchCompatibilityError
       ? error.message
       : error?.response?.data?.message || '暂时无法读取需求回复，请稍后再试。';
+    showBotExpression('concerned');
   } finally {
     checkingReplies.value = false;
   }
@@ -442,8 +466,10 @@ async function loadMoreFeedbackRecords() {
     feedbackPages.value = Object.fromEntries(Object.entries(feedbackPages.value).map(([id, state]) =>
       [id, entries.some(([nextId]) => nextId === id) ? { ...state, page: state.page + 1 } : state]
     ));
+    showBotExpression('happy');
   } catch (_) {
     feedbackLookupMessage.value = '暂时无法加载更多需求，请稍后再试。';
+    showBotExpression('concerned');
   } finally {
     checkingReplies.value = false;
   }
@@ -463,9 +489,11 @@ async function lookupReply() {
     const feedback = response.data?.data;
     codeLookupResult.value = feedback || null;
     if (!feedback?.admin_reply) codeLookupMessage.value = '这条需求还在处理中。请保留查询码，稍后再来查看。';
+    showBotExpression('happy');
   } catch (error) {
     codeLookupResult.value = null;
     codeLookupMessage.value = error?.response?.data?.message || '暂时查不到这条需求，请稍后再试。';
+    showBotExpression('concerned');
   } finally {
     lookingUpCode.value = false;
   }
@@ -600,6 +628,7 @@ async function send() {
         : accessCode
           ? `匿名需求已提交。换设备查询这条需求，请保存并点击复制查询码：\`${accessCode}\`。`
           : '需求已经提交。处理后可在这台设备点“我的需求”查看结果。', undefined, { md: true });
+      showBotExpression('happy');
       return;
     }
     if (aiEnabled.value) {
@@ -612,6 +641,7 @@ async function send() {
         startCooldown(COOLDOWN_MS);
         if (currentSessionId === sessionId.value) sessionHasAiMessages.value = true;
         topic.value = null;
+        showBotExpression('happy');
         return;
       }
       // AI 中途变为不可用 → 落到下方普通留言
@@ -619,6 +649,7 @@ async function send() {
     // AI 不可用时只给搜索指引；明确需求已在上方单独提交。
     startCooldown(COOLDOWN_MS);
     pushBot(fallbackAck(content), undefined, { md: true });
+    showBotExpression('happy');
   } catch (err) {
     const status = err?.response?.status || err?.status;
     const serverMsg = err?.response?.data?.message || err?.message;
@@ -633,6 +664,7 @@ async function send() {
     else if (status === 400) pushBot(serverMsg || '内容好像不太对，换个说法试试？');
     else if (status === 502 && serverMsg) pushBot(serverMsg, undefined, { md: true });
     else pushBot(serverMsg || '网络开小差了，你的话还在输入框里，再点一次发送吧');
+    showBotExpression('concerned');
     if (restore) text.value = content;
   } finally {
     sending.value = false;
@@ -801,7 +833,7 @@ function onKeydown(e) {
       </section>
     </Transition>
 
-    <button ref="botRef" class="fbot-avatar" :aria-label="open ? '收起小助手' : '打开反馈小助手'" @click="toggle">
+    <button ref="botRef" class="fbot-avatar" :class="`is-${botMood}`" :aria-label="open ? '收起小助手' : '打开反馈小助手'" @click="toggle">
       <span v-if="!open" class="fbot-tip">找实拍图？问小度~</span>
       <svg viewBox="0 0 80 80" width="64" height="64" aria-hidden="true">
         <defs>
@@ -819,16 +851,28 @@ function onKeydown(e) {
           <rect x="14" y="19" width="52" height="46" rx="22" fill="url(#fbotBody)" stroke="#0a3d22" stroke-width="2.5" />
           <rect x="21" y="29" width="38" height="25" rx="12.5" fill="#f4fbf7" />
           <g :transform="`translate(${eye.x} ${eye.y})`">
-            <g class="fbot-eyes">
+            <g v-if="botMood === 'happy'" class="fbot-happy-eyes" fill="none" stroke="#0a3d22" stroke-width="2.6" stroke-linecap="round">
+              <path d="M28.5 41 Q32 36.5 35.5 41" />
+              <path d="M44.5 41 Q48 36.5 51.5 41" />
+            </g>
+            <g v-else class="fbot-eyes">
               <ellipse cx="32" cy="40" rx="3.6" ry="4.6" fill="#0a3d22" />
               <ellipse cx="48" cy="40" rx="3.6" ry="4.6" fill="#0a3d22" />
               <circle cx="33.2" cy="38.4" r="1.2" fill="#fff" />
               <circle cx="49.2" cy="38.4" r="1.2" fill="#fff" />
             </g>
           </g>
+          <g v-if="botMood === 'concerned'" class="fbot-brows" fill="none" stroke="#0a3d22" stroke-width="1.8" stroke-linecap="round">
+            <path d="M28 34.5 L35 36" />
+            <path d="M45 36 L52 34.5" />
+          </g>
+          <g v-if="botMood === 'thinking'" class="fbot-thought-dots" fill="#0a3d22">
+            <circle cx="56" cy="27" r="1.2" />
+            <circle cx="61" cy="23" r="1.7" />
+          </g>
           <ellipse cx="26" cy="48" rx="3.4" ry="2.2" fill="#ffb4b4" opacity=".75" />
           <ellipse cx="54" cy="48" rx="3.4" ry="2.2" fill="#ffb4b4" opacity=".75" />
-          <path d="M36 48 Q40 52 44 48" fill="none" stroke="#0a3d22" stroke-width="2" stroke-linecap="round" />
+          <path class="fbot-mouth" :d="botMouthPath" fill="none" stroke="#0a3d22" stroke-width="2" stroke-linecap="round" />
         </g>
       </svg>
     </button>
@@ -919,15 +963,29 @@ function onKeydown(e) {
 }
 .fbot-avatar:hover .fbot-tip { opacity: 1; transform: none; }
 
-.fbot-float { animation: fbot-float 3.2s ease-in-out infinite; }
+.fbot-float { transform-origin: 40px 55px; animation: fbot-float 3.2s ease-in-out infinite; }
 .fbot-shadow { transform-origin: 40px 74px; animation: fbot-shadow 3.2s ease-in-out infinite; }
-.fbot-light { animation: fbot-blink-light 1.8s ease-in-out infinite; }
+.fbot-light { transition: fill 0.2s ease; animation: fbot-blink-light 1.8s ease-in-out infinite; }
 .fbot-eyes { transform-box: fill-box; transform-origin: center; animation: fbot-blink 4.5s infinite; }
+.fbot-mouth { transition: d 0.18s ease; }
+.fbot-avatar.is-listening .fbot-light { fill: #fff0a8; animation-duration: 1.15s; }
+.fbot-avatar.is-thinking .fbot-eyes { animation: fbot-think-eyes 1.15s ease-in-out infinite; }
+.fbot-avatar.is-thinking .fbot-light { fill: #8ed8ff; animation-duration: 0.75s; }
+.fbot-avatar.is-thinking .fbot-thought-dots { animation: fbot-thought 1.15s ease-in-out infinite; }
+.fbot-avatar.is-happy .fbot-float { animation: fbot-happy 0.65s ease-in-out 2; }
+.fbot-avatar.is-happy .fbot-light { fill: #ffe168; animation-duration: 0.55s; }
+.fbot-avatar.is-happy .fbot-shadow { animation-duration: 0.65s; }
+.fbot-avatar.is-concerned .fbot-float { animation: fbot-concerned 0.65s ease-in-out 2; }
+.fbot-avatar.is-concerned .fbot-light { fill: #ffbd86; animation-duration: 1s; }
 
 @keyframes fbot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 @keyframes fbot-shadow { 0%, 100% { transform: scaleX(1); opacity: 1; } 50% { transform: scaleX(0.82); opacity: 0.7; } }
 @keyframes fbot-blink-light { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 @keyframes fbot-blink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+@keyframes fbot-think-eyes { 0%, 100% { transform: translateX(-1.5px); } 50% { transform: translateX(1.5px); } }
+@keyframes fbot-thought { 0%, 100% { opacity: 0.35; transform: translateY(1px); } 50% { opacity: 1; transform: translateY(-1px); } }
+@keyframes fbot-happy { 0%, 100% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-6px) rotate(-3deg); } 70% { transform: translateY(-2px) rotate(3deg); } }
+@keyframes fbot-concerned { 0%, 100% { transform: rotate(0); } 33% { transform: rotate(-2.5deg); } 66% { transform: rotate(2.5deg); } }
 
 .fbot-panel {
   width: min(352px, calc(100vw - 32px));
@@ -1334,8 +1392,9 @@ function onKeydown(e) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fbot-float, .fbot-shadow, .fbot-light, .fbot-eyes, .fbot-typing i, .fbot-head-dot, .fbot-wait-pulse { animation: none; }
+  .fbot-float, .fbot-shadow, .fbot-light, .fbot-eyes, .fbot-thought-dots, .fbot-typing i, .fbot-head-dot, .fbot-wait-pulse { animation: none; }
   .fbot-bubble.is-streaming .fbot-md::after { content: none; }
+  .fbot-light, .fbot-mouth { transition: none; }
   .fbot-panel, .fbot-record-list, .fbot-panel-enter-active, .fbot-panel-leave-active, .fbot-backdrop-enter-active, .fbot-backdrop-leave-active, .fbot-view-enter-active, .fbot-view-leave-active, .fbot-state-enter-active, .fbot-state-leave-active, .fbot-record-enter-active, .fbot-record-leave-active, .fbot-record-move { transition: none; }
 }
 </style>

@@ -16,8 +16,7 @@ async function initDrawerConfig() {
       { key: 'announcement', label: '公告', icon: '📢', sort_order: 1 },
       { key: 'tutorial', label: '教程', icon: '📚', sort_order: 2 },
       { key: 'filter', label: '筛选', icon: '🔍', sort_order: 3 },
-      { key: 'favorites', label: '收藏', icon: '❤️', sort_order: 4 },
-      { key: 'feedback', label: '反馈', icon: '💬', sort_order: 5 }
+      { key: 'favorites', label: '收藏', icon: '❤️', sort_order: 4 }
     ];
 
     for (const tab of tabs) {

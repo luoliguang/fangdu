@@ -53,10 +53,6 @@
           <svg v-else-if="tab.key === 'favorites'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
-          <!-- 反馈 - 消息图标 -->
-          <svg v-else-if="tab.key === 'feedback'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
         </span>
         <span class="tab-label">{{ tab.label }}</span>
         <span v-if="tab.key === 'announcement' && hasUnreadAnnouncements" class="tab-notification-dot"></span>
@@ -191,52 +187,6 @@
           </div>
         </div>
       </div>
-
-      <!-- 反馈建议 -->
-      <div v-if="activeDrawerTab === 'feedback'" class="tab-content">
-        <div class="feedback-section">
-          <h4>意见反馈</h4>
-          <div class="feedback-form">
-            <textarea v-model="feedbackMessage" placeholder="请告诉我们您的建议或遇到的问题..." rows="4"></textarea>
-            <button @click="submitFeedback" class="feedback-submit-btn">提交反馈</button>
-          </div>
-          
-          <!-- 用户留言历史记录 -->
-          <div class="feedback-history">
-            <h5>我的反馈历史</h5>
-            <div v-if="isUserFeedbacksLoading" class="loading-message">加载中...</div>
-            <div v-else-if="userFeedbacks && userFeedbacks.length > 0" class="feedback-list">
-              <div v-for="feedback in userFeedbacks" :key="feedback.id" class="feedback-item">
-                <div class="feedback-meta">
-                  <span :class="{ 'status-tag': true, 'status-pending': feedback.status === 'pending', 'status-resolved': feedback.status !== 'pending' }">
-                    {{ feedback.status === 'pending' ? '待处理' : '已处理' }}
-                  </span>
-                  <span class="timestamp">{{ formatDateTime(feedback.created_at) }}</span>
-                </div>
-                <p class="feedback-message">{{ feedback.message }}</p>
-                <p v-if="feedback.admin_reply" class="feedback-message">掌柜回复：{{ feedback.admin_reply }}</p>
-              </div>
-            </div>
-            <div v-else class="feedback-empty">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <span>还没有提交过反馈</span>
-            </div>
-          </div>
-          
-          <div class="contact-info">
-            <h5>联系我们</h5>
-            <div v-if="isContactInfosLoading" class="loading-message">加载中...</div>
-            <div v-else-if="contactInfos && contactInfos.length > 0">
-              <p v-for="contact in contactInfos" :key="contact.id">
-                {{ contact.icon }} {{ contact.label }}：{{ contact.value }}
-              </p>
-            </div>
-            <div v-else class="empty-contact-info">
-              <p>暂无联系方式</p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -244,7 +194,6 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import apiClient from '../axiosConfig.js';
-import { ElMessage } from 'element-plus';
 import { MdPreview } from 'md-editor-v3';
 import 'md-editor-v3/lib/preview.css';
 
@@ -257,7 +206,7 @@ const props = defineProps({
 });
 
 // Emits
-const emit = defineEmits(['showMedia', 'removeFromFavorites', 'applyFilter', 'submitFeedback']);
+const emit = defineEmits(['showMedia', 'removeFromFavorites', 'applyFilter']);
 
 // 抽屉状态
 const isDrawerOpen = ref(false);
@@ -270,23 +219,13 @@ watch(isDrawerOpen, (open) => {
 onUnmounted(() => {
   document.body.style.overflow = '';
 });
-const feedbackMessage = ref('');
-
-// 用户留言相关状态
-const userFeedbacks = ref([]);
-const isUserFeedbacksLoading = ref(false);
-
-// 联系信息相关状态
-const contactInfos = ref([]);
-const isContactInfosLoading = ref(false);
 
 // 配置数据 - 将从后台获取
 const drawerTabs = ref([
   { key: 'announcement', label: '公告', icon: '🔔' },
   { key: 'tutorial', label: '教程', icon: '📖' },
   { key: 'filter', label: '筛选', icon: '⚡' },
-  { key: 'favorites', label: '收藏', icon: '♥' },
-  { key: 'feedback', label: '反馈', icon: '💬' }
+  { key: 'favorites', label: '收藏', icon: '♥' }
 ]);
 
 const announcements = ref([]);
@@ -347,7 +286,6 @@ const toggleDrawer = () => {
   if (isDrawerOpen.value && activeDrawerTab.value === 'announcement') {
     markAllAnnouncementsAsRead();
   }
-  if (isDrawerOpen.value && activeDrawerTab.value === 'feedback') fetchUserFeedbacks();
 };
 
 const switchDrawerTab = (tab) => {
@@ -356,7 +294,6 @@ const switchDrawerTab = (tab) => {
   if (tab === 'announcement') {
     markAllAnnouncementsAsRead();
   }
-  if (tab === 'feedback') fetchUserFeedbacks();
 };
 
 // 标记所有公告为已读
@@ -378,43 +315,6 @@ const applyQuickFilter = (filterValue) => {
   isDrawerOpen.value = false; // 应用筛选后关闭抽屉
 };
 
-const submitFeedback = async () => {
-  // 确保留言内容非空且去除首尾空格
-  const trimmedMessage = feedbackMessage.value.trim();
-  if (!trimmedMessage) {
-    // 使用美化的提示样式替代原生alert
-    ElMessage({
-      message: '请输入反馈内容',
-      type: 'warning',
-      showClose: true,
-      duration: 2000
-    });
-    return;
-  }
-  
-  emit('submitFeedback', trimmedMessage);
-  feedbackMessage.value = '';
-  
-  // 提交成功后刷新用户留言列表
-  await fetchUserFeedbacks();
-};
-
-// 获取用户留言列表
-const fetchUserFeedbacks = async () => {
-  const userId = localStorage.getItem('user_id');
-  if (!userId) return; // 如果没有用户ID，则不加载
-
-  isUserFeedbacksLoading.value = true;
-  try {
-    const response = await apiClient.get(`/api/v1/feedbacks/user/${userId}`);
-    userFeedbacks.value = response.data.data;
-  } catch (error) {
-    console.error('获取用户留言失败:', error);
-  } finally {
-    isUserFeedbacksLoading.value = false;
-  }
-};
-
 // 格式化日期时间
 const formatDateTime = (isoString) => {
   return new Date(isoString).toLocaleString();
@@ -433,28 +333,11 @@ const fetchDrawerConfig = async () => {
     }
     if (config.tutorials) tutorialSteps.value = config.tutorials;
     if (config.quickFilters) quickFilters.value = config.quickFilters;
-    if (config.tabs) drawerTabs.value = config.tabs;
-    
-    // 获取联系信息
-    await fetchContactInfos();
+    if (Array.isArray(config.tabs)) drawerTabs.value = config.tabs.filter(tab => tab.key !== 'feedback');
   } catch (error) {
     console.error('获取抽屉配置失败:', error);
     // 使用默认配置
     loadDefaultConfig();
-  }
-};
-
-// 获取联系信息
-const fetchContactInfos = async () => {
-  isContactInfosLoading.value = true;
-  try {
-    const response = await apiClient.get('/api/v1/drawer-config/contacts');
-    contactInfos.value = response.data.data;
-  } catch (error) {
-    console.error('获取联系信息失败:', error);
-    contactInfos.value = [];
-  } finally {
-    isContactInfosLoading.value = false;
   }
 };
 
@@ -1301,93 +1184,6 @@ defineExpose({ toggleDrawer, isDrawerOpen });
   width: 12px;
   height: 12px;
   color: white;
-}
-
-/* 反馈样式 */
-.feedback-section h4 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-}
-
-.feedback-form {
-  margin-bottom: 24px;
-}
-
-.feedback-form textarea {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  resize: vertical;
-  font-family: inherit;
-  font-size: 14px;
-  margin-bottom: 12px;
-  transition: border-color 0.2s;
-}
-
-.feedback-form textarea:focus {
-  outline: none;
-  border-color: #5a8f73;
-  box-shadow: 0 0 0 3px rgba(90, 143, 115, 0.12);
-}
-
-.feedback-submit-btn {
-  background: linear-gradient(135deg, #0a3d22, #5a8f73);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.feedback-submit-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(10, 61, 34, 0.22);
-}
-
-.feedback-history {
-  margin-bottom: 20px;
-}
-
-.feedback-history h5 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #555;
-}
-
-.feedback-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 20px 0;
-  color: #94a3b8;
-  font-size: 13px;
-}
-
-.contact-info {
-  background: #f8f9fa;
-  padding: 16px;
-  border-radius: 8px;
-}
-
-.contact-info h5 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-}
-
-.contact-info p {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-  color: #666;
 }
 
 /* 响应式设计 */

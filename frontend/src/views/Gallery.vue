@@ -1,21 +1,11 @@
 <script setup>
 import { ref, shallowRef, computed, onMounted, onUnmounted, watch, onActivated, inject, nextTick } from 'vue';
 import apiClient from '../axiosConfig.js';
-import { useFeedbackStore } from '@/stores/feedback';
 import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
 import { useTheme } from '../composables/useTheme.js';
 
 const { isDark } = useTheme();
-
-// 简单的 UUID 生成函数
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0,
-      v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
 
 // --- 基础状态 ---
 const materials = shallowRef([]);
@@ -194,49 +184,11 @@ const videoModalVisible = ref(false);
 const currentVideoUrl = ref('');
 const currentVideoName = ref(''); // 添加当前视频名称
 const currentVideoPoster = ref(''); // 添加当前视频封面
-const feedbackMessage = ref(''); // 用户留言内容（页面底部）
 
 // --- 搜索建议相关状态 ---
 const searchSuggestions = ref([]); // 搜索建议列表
 const showSuggestions = ref(false); // 是否显示建议
 const isFetchingSuggestions = ref(false); // 是否正在获取建议
-
-// 新增：提交留言功能（页面底部）
-const submitFeedback = async () => {
-  // 确保留言内容非空且去除首尾空格
-  const trimmedMessage = feedbackMessage.value.trim();
-  if (!trimmedMessage) {
-    showCustomToast('留言内容不能为空！', 'error');
-    return;
-  }
-
-  // 获取或生成用户ID
-  let userId = localStorage.getItem('user_id');
-  if (!userId) {
-    userId = generateUUID();
-    localStorage.setItem('user_id', userId);
-  }
-
-  try {
-    // 确保提交的数据格式正确
-    const result = await feedbackStore.submitFeedback({
-      message: trimmedMessage, // 使用去除空格后的内容
-      user_id: userId
-    });
-    
-    if (result.success) {
-      showCustomToast('留言成功，感谢您的反馈！', 'success');
-      feedbackMessage.value = ''; // 清空留言内容
-    } else {
-      showCustomToast(result.message || '提交留言失败，请稍后再试。', 'error');
-    }
-  } catch (error) {
-    console.error('提交留言失败:', error);
-    showCustomToast('提交留言失败，请稍后再试。', 'error');
-  }
-};
-const showFeedbackForm = ref(false); // 新增：控制留言表单的显示
-const feedbackStore = useFeedbackStore(); // 反馈store
 
 // 将OSS URL转换为CDN URL
 const CDN_BASE_URL = import.meta.env.VITE_CDN_BASE_URL || 'https://assets.fangdutex.cn';
@@ -404,7 +356,6 @@ const fetchMaterials = async (isLoadMore = false) => {
             console.warn("后端返回数据格式不正确，缺少 meta 信息");
             materials.value = [];
             displayMaterials.value = [];
-            showFeedbackForm.value = materials.value.length === 0 && !isLoading.value;
 
             if (query.search.length > 0) {
                 await fetchSearchSuggestions();
@@ -417,7 +368,6 @@ const fetchMaterials = async (isLoadMore = false) => {
     } finally {
         if (requestId === requestSerial) {
           isLoading.value = false;
-          showFeedbackForm.value = materials.value.length === 0 && !isLoading.value;
         }
     }
 };
@@ -536,36 +486,6 @@ const showCustomToast = (message, type = 'success') => {
         showToast.value = false;
     }, 2000);
 };
-
-// 处理抽屉组件的反馈提交
-const handleFeedbackSubmit = async (feedbackData) => {
-  // 获取或生成用户ID
-  let userId = localStorage.getItem('user_id');
-  if (!userId) {
-    userId = generateUUID();
-    localStorage.setItem('user_id', userId);
-  }
-
-  try {
-    // 处理从SideDrawer传来的字符串或对象格式
-    const message = typeof feedbackData === 'string' ? feedbackData : feedbackData.message;
-    
-    const result = await feedbackStore.submitFeedback({
-      message: message,
-      user_id: userId
-    });
-    
-    if (result.success) {
-      showCustomToast('留言成功，感谢您的反馈！', 'success');
-    } else {
-      showCustomToast(result.message || '提交留言失败，请稍后再试。', 'error');
-    }
-  } catch (error) {
-    console.error('提交留言失败:', error);
-    showCustomToast('提交留言失败，请稍后再试。', 'error');
-  }
-};
-
 
 const fetchTags = async () => {
   try {
@@ -790,9 +710,6 @@ function stopConversionPolling() {
   if (conversionPollTimer) { clearInterval(conversionPollTimer); conversionPollTimer = null; }
 }
 
-
-// 留言表单始终显示
-showFeedbackForm.value = true;
 
 // 将任意图片 blob 转为 PNG（ClipboardItem 只支持 image/png）
 // maxDim: 最长边超过此值时按比例缩小，避免大图 toBlob 耗时过长
@@ -2277,61 +2194,6 @@ body.theme-light .footer-link { color: #5a8f73; }
     padding: 0.6rem 1.2rem;
     font-size: 0.85em;
   }
-}
-
-.feedback-form {
-  margin-top: 1.5rem;
-  padding: 1.5rem;
-  background-color: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-  max-width: 100%;
-  border: 1px solid #e0e0e0;
-}
-
-
-.feedback-form textarea {
-  width: calc(100% - 24px); /* 减去padding和border */
-  padding: 12px;
-  border: 1px solid #dcdcdc;
-  border-radius: 8px;
-  font-size: 1.05rem;
-  margin-bottom: 1.2rem;
-  box-sizing: border-box; 
-  resize: vertical; 
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  }
-
-.feedback-form textarea:focus {
-  outline: none;
-  border-color: #5a8f73;
-  box-shadow: 0 0 0 4px rgba(90, 143, 115, 0.15);
-}
-
-.feedback-form button {
-  display: block;
-  width: 100%;
-  padding: 1rem 1.8rem;
-  background: linear-gradient(135deg, #0a3d22, #5a8f73);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1.15rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(90, 143, 115, 0.25);
-}
-
-.feedback-form button:hover {
-  background: linear-gradient(135deg, #3d6b52, #6aab88);
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(90, 143, 115, 0.4);
-}
-
-.feedback-form button:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 10px rgba(90, 143, 115, 0.2);
 }
 
 /* ═══════════════════════════════════════════════════

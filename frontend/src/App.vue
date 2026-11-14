@@ -92,8 +92,6 @@ const fetchPageCategories = async () => {
   }
 };
 
-// 未处理留言数量
-const pendingFeedbacksCount = ref(0);
 const showQRModal = ref(false);
 const fabricGoBtn = ref(null);
 const sideDrawerRef = ref(null);
@@ -102,15 +100,6 @@ const tutorialRef = ref(null);
 // --- SideDrawer 全局状态 ---
 // 收藏夹（只在Gallery页面使用）
 const favorites = ref([]);
-
-// 简单的 UUID 生成函数
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0,
-      v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
 
 // 提供给子组件使用的方法
 const addToFavorites = (material) => {
@@ -124,62 +113,9 @@ const addToFavorites = (material) => {
 // 监听localStorage变化
 const updateLoginState = () => {
   loginState.value = !!localStorage.getItem('authToken');
-  
-  // 登录状态变化时，重新获取未处理留言数量
-  if (loginState.value) {
-    fetchPendingFeedbacksCount();
-  } else {
-    pendingFeedbacksCount.value = 0;
-  }
-};
-
-// 获取未处理留言数量
-const fetchPendingFeedbacksCount = async () => {
-  if (!loginState.value) return;
-  
-  try {
-    const token = localStorage.getItem('authToken');
-    const response = await apiClient.get('/api/v1/feedbacks/stats/unprocessed', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    
-    // 确保正确解析响应数据
-    const count = response.data?.data?.count || response.data?.count || 0;
-    pendingFeedbacksCount.value = count;
-  } catch (error) {
-    console.error('获取未处理留言数量失败:', error);
-    pendingFeedbacksCount.value = 0;
-  }
 };
 
 // --- SideDrawer 处理方法 ---
-// 处理反馈提交
-const handleFeedbackSubmit = async (feedbackData) => {
-  // 获取或生成用户ID
-  let userId = localStorage.getItem('user_id');
-  if (!userId) {
-    userId = generateUUID();
-    localStorage.setItem('user_id', userId);
-  }
-
-  try {
-    // 处理从SideDrawer传来的字符串格式
-    const message = typeof feedbackData === 'string' ? feedbackData : feedbackData.message;
-    
-    const response = await apiClient.post('/api/v1/feedbacks', {
-      message: message,
-      user_id: userId
-    });
-    
-    if (response.data.success) {
-      // 显示成功提示（可以使用Element Plus的消息提示）
-      // 留言成功，感谢反馈
-    }
-  } catch (error) {
-    console.error('提交留言失败:', error);
-  }
-};
-
 // Gallery页面的回调引用
 const galleryCallbacks = ref({
   handleQuickFilter: null,
@@ -318,15 +254,6 @@ onMounted(async () => { // 将 onMounted 变为 async 函数
   // 加载动态页面分类配置（用于主页排除标签和动态导航）
   fetchPageCategories();
 
-  // 如果已登录，开始定期获取未处理留言数量
-  if (loginState.value) {
-    fetchPendingFeedbacksCount();
-    // 每60秒刷新一次未处理留言数量
-    setInterval(fetchPendingFeedbacksCount, 60000);
-  }
-  
-
-  
   // 等待路由准备就绪
   await router.isReady();
   updateSlider(); // 现在再执行，就能确保找到激活的链接了
@@ -422,7 +349,6 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
       @showMedia="handleShowMedia"
       @removeFromFavorites="handleRemoveFromFavorites"
       @applyFilter="handleQuickFilter"
-      @submitFeedback="handleFeedbackSubmit"
     />
 
     <div v-if="isAdminRoute" class="admin-topbar">
@@ -542,7 +468,6 @@ const closeMobileNav = () => { mobileNavOpen.value = false; };
 
     <FabricGoQRModal v-if="publicVisible && site.moduleEnabled('fabricDetail')" v-model="showQRModal" />
 
-    <!-- 反馈小助手（与侧栏反馈同属 drawer 模块，后端同样按此模块拦截） -->
     <FeedbackBot v-if="publicVisible && site.moduleEnabled('drawer')" />
 
     <!-- 新手引导 -->
