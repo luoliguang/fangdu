@@ -12,6 +12,7 @@ const { createFeedbackGuard } = require('../middleware/feedbackGuard');
  * POST /feedback      AI 未启用时的普通留言，仅保留到后台
  * POST /request       明确提交找图需求，返回一次性查询码并按既有服务推送飞书
  * POST /request/lookup 凭查询码跨设备查询这一条需求与回复
+ * POST /request/by-email 按主动填写的查询邮箱查看需求列表与回复
  *
  * 新客户端传随机 sessionId：收集成功的 AI 对话，关闭或空闲后只落一条值得处理的总结。
  * 未传 sessionId 的旧客户端仍按原有话题留言方式工作。
@@ -122,11 +123,27 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
     res.set('Cache-Control', 'no-store');
     try {
       const result = await feedbackService.submitFeedback(
-        { message: req.body.message, user_id: req.body.user_id }, {}, { issueAccessCode: true }
+        { message: req.body.message, user_id: req.body.user_id, lookup_email: req.body.lookupEmail }, {}, { issueAccessCode: true }
       );
       return res.status(201).json(result);
     } catch (error) {
       return res.status(400).json({ success: false, message: error.message || '留言提交失败' });
+    }
+  });
+
+  router.post('/request/by-email', rateLimit({
+    windowMs: 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false,
+    message: { success: false, message: '查询太频繁，请稍后再试' }
+  }), async (req, res) => {
+    if (!feedbackService) return res.status(503).json({ success: false, message: '查询暂不可用' });
+    res.set('Cache-Control', 'no-store');
+    try {
+      const result = await feedbackService.getFeedbacksByLookupEmail(req.body?.email, req.body?.page);
+      return res.json({ success: true, ...result });
+    } catch (error) {
+      if (error.message === '请输入有效的查询邮箱') return res.status(400).json({ success: false, message: error.message });
+      console.error('[bot] 邮箱查询失败:', error?.message);
+      return res.status(503).json({ success: false, message: '查询暂不可用，请稍后再试' });
     }
   });
 

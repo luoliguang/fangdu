@@ -28,6 +28,7 @@ test('an explicit photo request notifies once and an admin reply reaches the sam
   await migrations.run();
   await migrations.run();
   assert.equal((await get(db, 'SELECT message FROM feedbacks WHERE id = 1')).message, '旧留言');
+  assert.equal((await get(db, 'SELECT lookup_email FROM feedbacks WHERE id = 1')).lookup_email, null);
   const notices = [];
   const original = lark.getShared;
   lark.getShared = () => ({ notifyFeedback: item => { notices.push(item); } });
@@ -43,7 +44,7 @@ test('an explicit photo request notifies once and an admin reply reaches the sam
   const userId = randomUUID();
   const submit = await fetch(`${base}/bot/request`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: '【没找到想要的】试过蓝色、条纹，希望找蓝色条纹实拍图', user_id: userId })
+    body: JSON.stringify({ message: '【没找到想要的】试过蓝色、条纹，希望找蓝色条纹实拍图', user_id: userId, lookupEmail: '  Client@Example.com ' })
   });
   assert.equal(submit.status, 201);
   const saved = (await submit.json()).data;
@@ -52,6 +53,7 @@ test('an explicit photo request notifies once and an admin reply reaches the sam
   assert.match(code, /^[A-Za-z0-9_-]{32}$/);
   const stored = await get(db, 'SELECT access_token_hash FROM feedbacks WHERE id = ?', [id]);
   assert.equal(stored.access_token_hash, createHash('sha256').update(code).digest('hex'));
+  assert.equal((await get(db, 'SELECT lookup_email FROM feedbacks WHERE id = ?', [id])).lookup_email, 'client@example.com');
   assert.equal(notices.length, 1);
   assert.equal(notices[0].id, id);
   assert.ok(!JSON.stringify(notices[0]).includes(code));
@@ -76,4 +78,23 @@ test('an explicit photo request notifies once and an admin reply reaches the sam
   const other = await (await fetch(`${base}/feedbacks/user/${randomUUID()}`)).json();
   assert.deepEqual(other.data, []);
   assert.equal(notices.length, 1, 'admin replying must not send another Feishu notification');
+  const secondId = randomUUID();
+  const secondSubmit = await fetch(`${base}/bot/request`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: '【没找到想要的】还想找蓝色纯色实拍图', user_id: secondId, lookupEmail: 'client@example.com' })
+  });
+  assert.equal(secondSubmit.status, 201);
+  const byEmail = (email, page = 1) => fetch(`${base}/bot/request/by-email`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, page })
+  });
+  const grouped = await (await byEmail(' CLIENT@example.COM ')).json();
+  assert.equal(grouped.meta.total, 2);
+  assert.equal(grouped.data.length, 2);
+  assert.ok(grouped.data.some(item => item.id === id && item.admin_reply === '找到了，请搜索：蓝色条纹'));
+  assert.ok(!JSON.stringify(grouped).includes('access_token_hash'));
+  assert.ok(!JSON.stringify(grouped).includes('client@example.com'));
+  assert.deepEqual((await (await byEmail('other@example.com')).json()).data, []);
+  assert.equal((await byEmail('bad-email')).status, 400);
+  assert.equal(grouped.data.some(item => item.message === '旧留言'), false);
+  assert.equal(notices.length, 2, 'each explicit request notifies once');
 });

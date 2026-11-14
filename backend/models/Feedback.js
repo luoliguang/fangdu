@@ -19,7 +19,8 @@ class Feedback {
       ipAddress = null,
       userAgent = null,
       user_id = null,
-      access_token_hash = null
+      access_token_hash = null,
+      lookup_email = null
     } = feedbackData;
 
     // 验证必填字段
@@ -28,11 +29,11 @@ class Feedback {
     }
 
     const sql = `
-      INSERT INTO feedbacks (message, status, user_id, access_token_hash, created_at)
-      VALUES (?, 'pending', ?, ?, datetime('now'))
+      INSERT INTO feedbacks (message, status, user_id, access_token_hash, lookup_email, created_at)
+      VALUES (?, 'pending', ?, ?, ?, datetime('now'))
     `;
 
-    const result = await this.run(sql, [message, user_id, access_token_hash]);
+    const result = await this.run(sql, [message, user_id, access_token_hash, lookup_email]);
     return { id: result.lastID, message, user_id, status: 'pending', created_at: new Date().toISOString() };
   }
 
@@ -129,6 +130,17 @@ class Feedback {
         totalPages: Math.ceil(total.total / limit)
       }
     };
+  }
+
+  async getByLookupEmail(email, { page = 1, limit = 20 } = {}) {
+    const offset = (page - 1) * limit;
+    const total = await this.queryOne('SELECT COUNT(*) AS total FROM feedbacks WHERE lookup_email = ?', [email]);
+    const data = await this.queryAll(
+      `SELECT id, message, status, created_at, admin_reply FROM feedbacks
+       WHERE lookup_email = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+      [email, limit, offset]
+    );
+    return { data, meta: { total: total.total, page, limit, totalPages: Math.ceil(total.total / limit) } };
   }
 
   async getByAccessTokenHash(hash) {

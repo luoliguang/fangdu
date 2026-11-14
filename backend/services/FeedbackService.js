@@ -1,6 +1,13 @@
 const Feedback = require('../models/Feedback');
 const { randomBytes, createHash } = require('crypto');
 
+function normalizeLookupEmail(value) {
+  if (typeof value !== 'string') throw new Error('请输入有效的查询邮箱');
+  const email = value.trim().toLowerCase();
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('请输入有效的查询邮箱');
+  return email;
+}
+
 /**
  * Feedback 服务层
  * 处理留言反馈相关的业务逻辑
@@ -16,6 +23,7 @@ class FeedbackService {
   async submitFeedback(feedbackData, clientInfo = {}, { notify = true, issueAccessCode = false } = {}) {
     try {
       const { message, user_id } = feedbackData;
+      const lookupEmail = feedbackData.lookup_email == null ? null : normalizeLookupEmail(feedbackData.lookup_email);
 
       // 验证必填字段
       if (!message) {
@@ -38,6 +46,7 @@ class FeedbackService {
         message: this.sanitizeInput(message),
         user_id: user_id || null,
         access_token_hash: accessCode ? createHash('sha256').update(accessCode).digest('hex') : null,
+        lookup_email: lookupEmail,
         status: 'pending'
       });
 
@@ -64,6 +73,12 @@ class FeedbackService {
       console.error('提交留言失败:', error);
       throw error;
     }
+  }
+
+  async getFeedbacksByLookupEmail(email, page = 1) {
+    const normalized = normalizeLookupEmail(email);
+    const currentPage = Number.isSafeInteger(Number(page)) && Number(page) > 0 ? Math.min(Number(page), 10000) : 1;
+    return this.feedbackModel.getByLookupEmail(normalized, { page: currentPage, limit: 20 });
   }
 
   async getFeedbackByAccessCode(accessCode) {

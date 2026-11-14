@@ -48,12 +48,14 @@ const streaming = ref(false);
 const checkingReplies = ref(false);
 const showCodeLookup = ref(false);
 const lookupCode = ref('');
+const lookupEmail = ref(localStorage.getItem('fbot-lookup-email') || '');
 const lookingUpCode = ref(false);
+const emailLookupMode = ref(false);
+const activeLookupEmail = ref('');
 const feedbackRecords = ref([]);
 const feedbackTotal = ref(0);
 const feedbackPages = ref({});
 const showFeedbackRecords = ref(false);
-const pendingFeedbackId = ref(null);
 const bodyRef = ref(null);
 const inputRef = ref(null);
 
@@ -125,8 +127,6 @@ function onExternalOpen(e) {
 onMounted(() => {
   window.addEventListener('pointermove', onPointerMove, { passive: true });
   window.addEventListener('fbot:open', onExternalOpen);
-  window.addEventListener('hashchange', onFeedbackLink);
-  onFeedbackLink();
   if (cooldownLeft.value > 0) runTicker();
   // AI 状态只影响展示，失败时保持普通留言模式
   apiClient.get('/api/v1/bot/status').then(res => {
@@ -141,7 +141,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('pointermove', onPointerMove);
   window.removeEventListener('fbot:open', onExternalOpen);
-  window.removeEventListener('hashchange', onFeedbackLink);
   clearInterval(tickTimer);
   if (open.value) finishConversation();
 });
@@ -198,44 +197,6 @@ function getUserId() {
   }
   return id;
 }
-function onFeedbackLink() {
-  const id = /^#fbot-feedback=([0-9a-f-]{36})$/i.exec(window.location.hash)?.[1];
-  if (!USER_ID_RE.test(id || '')) return;
-  if (!open.value) toggle();
-  if (id === getUserId()) {
-    window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
-    checkReplies();
-    return;
-  }
-  pendingFeedbackId.value = id;
-}
-async function acceptFeedbackLink() {
-  if (!pendingFeedbackId.value) return;
-  const previousId = getUserId();
-  const incomingId = pendingFeedbackId.value;
-  if (previousId && previousId !== incomingId) {
-    let others = [];
-    try { others = JSON.parse(localStorage.getItem('feedback_other_user_ids') || '[]'); } catch (_) { /* Ignore invalid local data. */ }
-    others = Array.isArray(others) ? others.filter(id => USER_ID_RE.test(id) && id !== incomingId) : [];
-    localStorage.setItem('feedback_other_user_ids', JSON.stringify([previousId, ...others].slice(0, 5)));
-  }
-  localStorage.setItem('user_id', incomingId);
-  pendingFeedbackId.value = null;
-  window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
-  pushBot('已在这台设备使用反馈链接。以后提交的新需求也会显示在这条链接里；原本在本设备的需求仍可在下方查看。');
-  await checkReplies();
-}
-async function copyFeedbackLink() {
-  const id = getUserId();
-  if (!id) {
-    ElMessage.error('当前浏览器无法生成私密链接，请保留查询码');
-    return;
-  }
-  const link = `${window.location.origin}/#fbot-feedback=${id}`;
-  if (await copyText(link)) ElMessage.success('私密链接已复制，请保存到自己的收藏，勿转发给他人');
-  else ElMessage.error('复制失败，请稍后再试');
-}
-
 // —— AI 回复的 Markdown 渲染与复制 ——
 function renderMarkdown(text) {
   return md.render(String(text ?? ''));
@@ -311,6 +272,32 @@ function isExplicitFeedback(content) {
 }
 async function checkReplies() {
   if (checkingReplies.value) return;
+  const email = lookupEmail.value.trim();
+  if (email) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+      pushBot('请输入有效的查询邮箱。');
+      return;
+    }
+    checkingReplies.value = true;
+    try {
+      const response = await apiClient.post('/api/v1/bot/request/by-email', { email });
+      feedbackRecords.value = Array.isArray(response.data?.data) ? response.data.data : [];
+      feedbackTotal.value = Number(response.data?.meta?.total) || 0;
+      feedbackPages.value = { email: { page: 1, totalPages: Number(response.data?.meta?.totalPages) || 1 } };
+      emailLookupMode.value = true;
+      activeLookupEmail.value = email;
+      localStorage.setItem('fbot-lookup-email', email);
+      showFeedbackRecords.value = true;
+      if (!feedbackRecords.value.length) pushBot('这个邮箱下还没有新需求。提交找图需求时填写同一个邮箱，之后就能在这里查到。');
+      scrollBottom();
+    } catch (error) {
+      pushBot(error?.response?.data?.message || '邮箱查询暂时不可用，请稍后再试。');
+    } finally {
+      checkingReplies.value = false;
+    }
+    return;
+  }
+  emailLookupMode.value = false;
   const activeId = getUserId();
   if (!activeId) {
     pushBot('当前浏览器无法保存反馈身份，请用提交时保存的查询码查询。');
@@ -318,16 +305,12 @@ async function checkReplies() {
   }
   checkingReplies.value = true;
   try {
-    let others = [];
-    try { others = JSON.parse(localStorage.getItem('feedback_other_user_ids') || '[]'); } catch (_) { /* Ignore invalid local data. */ }
-    const ids = [activeId, ...(Array.isArray(others) ? others.filter(id => USER_ID_RE.test(id) && id !== activeId).slice(0, 5) : [])];
-    const responses = await Promise.all(ids.map(id => apiClient.get(`/api/v1/feedbacks/user/${id}`, { params: { limit: 50 } })));
-    feedbackRecords.value = responses.flatMap(res => Array.isArray(res.data?.data) ? res.data.data : [])
-      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id);
-    feedbackTotal.value = responses.reduce((count, res) => count + (Number(res.data?.meta?.total) || 0), 0);
-    feedbackPages.value = Object.fromEntries(ids.map((id, i) => [id, { page: 1, totalPages: Number(responses[i].data?.meta?.totalPages) || 1 }]));
+    const response = await apiClient.get(`/api/v1/feedbacks/user/${activeId}`, { params: { limit: 50 } });
+    feedbackRecords.value = Array.isArray(response.data?.data) ? response.data.data : [];
+    feedbackTotal.value = Number(response.data?.meta?.total) || 0;
+    feedbackPages.value = { [activeId]: { page: 1, totalPages: Number(response.data?.meta?.totalPages) || 1 } };
     showFeedbackRecords.value = true;
-    if (!feedbackRecords.value.length) pushBot('还没有反馈记录。需要找图时可以提交需求，再保存一条私密链接，换设备也能查看。');
+    if (!feedbackRecords.value.length) pushBot('这台设备还没有需求记录。提交找图需求后可在这里查看处理状态和掌柜回复；换设备请填写查询邮箱。');
     scrollBottom();
   } catch (_) {
     pushBot('暂时无法读取反馈回复，请稍后再试。');
@@ -341,8 +324,9 @@ async function loadMoreFeedbackRecords() {
   if (!entries.length) return;
   checkingReplies.value = true;
   try {
-    const responses = await Promise.all(entries.map(([id, state]) =>
-      apiClient.get(`/api/v1/feedbacks/user/${id}`, { params: { limit: 50, page: state.page + 1 } })
+    const responses = await Promise.all(entries.map(([id, state]) => emailLookupMode.value
+      ? apiClient.post('/api/v1/bot/request/by-email', { email: activeLookupEmail.value, page: state.page + 1 })
+      : apiClient.get(`/api/v1/feedbacks/user/${id}`, { params: { limit: 50, page: state.page + 1 } })
     ));
     feedbackRecords.value = [...feedbackRecords.value, ...responses.flatMap(res => res.data?.data || [])]
       .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id);
@@ -475,6 +459,12 @@ async function streamAiReply(content, history, topicLabel, currentSessionId) {
 async function send() {
   if (!canSend.value) return;
   const content = text.value.trim();
+  const requestEmail = lookupEmail.value.trim();
+  if ((topic.value || isExplicitFeedback(content)) && requestEmail &&
+    (requestEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requestEmail))) {
+    ElMessage.warning('请输入有效的查询邮箱，或清空邮箱后匿名提交');
+    return;
+  }
   const currentSessionId = sessionId.value;
   // 取历史要在把本条消息放进列表之前，服务端会单独追加当前消息；话题卡片不带历史，避免上下文干扰
   const history = topic.value ? [] : messages.value
@@ -489,7 +479,7 @@ async function send() {
       const message = topic.value ? `【${topic.value.label}】${content}` : content;
       let submitted;
       try {
-        submitted = await apiClient.post('/api/v1/bot/request', { message, user_id: getUserId() });
+        submitted = await apiClient.post('/api/v1/bot/request', { message, user_id: getUserId(), ...(requestEmail ? { lookupEmail: requestEmail } : {}) });
       } catch (error) {
         if (error?.response?.status !== 404) throw error;
         submitted = await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
@@ -497,10 +487,13 @@ async function send() {
       startCooldown(COOLDOWN_MS);
       topic.value = null;
       const accessCode = submitted.data?.data?.accessCode;
+      if (requestEmail && accessCode) localStorage.setItem('fbot-lookup-email', requestEmail);
       showFeedbackRecords.value = false;
-      pushBot(accessCode
-        ? `需求已提交。点“我的需求”可查看全部记录；想换设备查看，请点“复制我的反馈链接”保存私密链接。单条需求的备用查询码：\`${accessCode}\`。链接与查询码都不要转发给别人。`
-        : '需求已经提交给掌柜的。处理后点“我的需求”查看结果，也可以复制私密链接在别的设备查看。', undefined, { md: true });
+      pushBot(requestEmail && accessCode
+        ? `需求已提交。换设备时输入同一个邮箱，在“我的需求”查看这组需求和掌柜的回复。`
+        : accessCode
+          ? `匿名需求已提交。换设备查询这条需求，请保存并点击复制查询码：\`${accessCode}\`。`
+          : '需求已经提交。处理后可在这台设备点“我的需求”查看结果。', undefined, { md: true });
       return;
     }
     if (aiEnabled.value) {
@@ -607,9 +600,13 @@ function onKeydown(e) {
           </div>
         </div>
 
-        <div v-if="pendingFeedbackId" class="fbot-link-import">
-          <span>检测到私密反馈链接。使用后，这台设备提交的新需求会归到该链接；原有需求仍可在本设备查看。</span>
-          <button type="button" @click="acceptFeedbackLink">使用链接并查看</button>
+        <div class="fbot-email-entry">
+          <label for="fbot-lookup-email">查询邮箱（选填；提交时填写同一个邮箱可跨设备查看）</label>
+          <div class="fbot-email-entry-row">
+            <input id="fbot-lookup-email" v-model="lookupEmail" type="email" maxlength="254" autocomplete="email" placeholder="你的邮箱" @keydown.enter.prevent="checkReplies" />
+            <button type="button" :disabled="checkingReplies" @click="checkReplies">查看需求</button>
+          </div>
+          <small>无需验证邮箱；知道邮箱的人也能查看该邮箱下的新需求和回复，请勿填写私人信息。</small>
         </div>
         <div v-if="showCodeLookup" class="fbot-code-lookup">
           <label for="fbot-access-code">查询码</label>
@@ -634,7 +631,6 @@ function onKeydown(e) {
         <div class="fbot-hint">
           <span>Enter 发送 · Shift+Enter 换行</span>
           <button class="fbot-check-replies" type="button" :disabled="checkingReplies" @click="checkReplies">{{ checkingReplies ? '查询中…' : '我的需求' }}</button>
-          <button class="fbot-check-replies" type="button" @click="copyFeedbackLink">复制我的反馈链接</button>
           <button class="fbot-check-replies" type="button" @click="showCodeLookup = !showCodeLookup">凭查询码查询</button>
           <span v-if="text.length > MAX_LEN * 0.8" :class="{ 'is-warn': remaining < 50 }">{{ text.length }}/{{ MAX_LEN }}</span>
         </div>
@@ -993,8 +989,13 @@ function onKeydown(e) {
 .fbot-record .fbot-record-reply { padding-top: 8px; border-top: 1px solid var(--fb-line); color: var(--fb-accent); }
 .fbot-record-more { border: 1px solid var(--fb-line); border-radius: 8px; padding: 6px; background: var(--fb-bg); color: var(--fb-accent); font: inherit; cursor: pointer; }
 .fbot-record-more:disabled { opacity: .6; cursor: wait; }
-.fbot-link-import { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; background: var(--fb-bot-bubble); color: var(--fb-text); font-size: 12px; }
-.fbot-link-import button { flex: none; border: 1px solid var(--fb-accent); border-radius: 8px; padding: 5px 8px; background: var(--fb-bg); color: var(--fb-accent); cursor: pointer; }
+.fbot-email-entry { padding: 7px 12px; background: var(--fb-bg); border-top: 1px solid var(--fb-line); font-size: 11px; color: var(--fb-sub); }
+.fbot-email-entry label { display: block; margin-bottom: 5px; }
+.fbot-email-entry-row { display: flex; gap: 6px; }
+.fbot-email-entry-row input { min-width: 0; flex: 1; border: 1px solid var(--fb-line); border-radius: 8px; padding: 5px 7px; color: var(--fb-text); background: var(--fb-bg); font: inherit; font-size: 12px; }
+.fbot-email-entry-row button { border: 1px solid var(--fb-line); border-radius: 8px; background: var(--fb-bot-bubble); color: var(--fb-accent); padding: 5px 7px; cursor: pointer; white-space: nowrap; }
+.fbot-email-entry-row button:disabled { opacity: .6; cursor: wait; }
+.fbot-email-entry small { display: block; margin-top: 4px; line-height: 1.35; }
 .fbot-check-replies { border: 0; background: transparent; color: var(--fb-accent); font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
 .fbot-check-replies:hover, .fbot-check-replies:focus-visible { text-decoration: underline; }
 .fbot-check-replies:disabled { opacity: .6; cursor: wait; }
