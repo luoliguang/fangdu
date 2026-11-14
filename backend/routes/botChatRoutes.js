@@ -10,7 +10,8 @@ const { createFeedbackGuard } = require('../middleware/feedbackGuard');
  * POST /chat/stream   流式 AI 对话（SSE）；未启用时返回 ai:false
  * POST /chat/end      结束本次会话并异步整理反馈
  * POST /feedback      AI 未启用时的普通留言，仅保留到后台
- * POST /request       用户明确提交找图/网站反馈，记录并按既有服务推送一次飞书
+ * POST /request       明确提交找图需求，返回一次性查询码并按既有服务推送飞书
+ * POST /request/lookup 凭查询码跨设备查询这一条需求与回复
  *
  * 新客户端传随机 sessionId：收集成功的 AI 对话，关闭或空闲后只落一条值得处理的总结。
  * 未传 sessionId 的旧客户端仍按原有话题留言方式工作。
@@ -54,8 +55,8 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
       if (sessionId != null && !validSessionId(sessionId)) return res.status(400).json({ success: false, message: '会话标识无效' });
       const result = await service.chat({ message, userId, history, topicLabel, materialSearch });
       if (!result.enabled) return res.json({ success: true, data: { ai: false, reply: null } });
-      if (sessionId && conversations) conversations.record({ sessionId, message, userId, topicLabel });
-      else await logFeedback({ message, userId, topicLabel });
+      if (sessionId && conversations && topicLabel) conversations.record({ sessionId, message, userId, topicLabel });
+      else if (!sessionId) await logFeedback({ message, userId, topicLabel });
       res.json({ success: true, data: { ai: true, reply: result.reply } });
     } catch (error) {
       const known = error.status === 400 || error.status === 429;
@@ -103,8 +104,8 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
         }
       }
       if (completed && full.trim()) {
-        if (sessionId && conversations) conversations.record({ sessionId, message, userId, topicLabel });
-        else await logFeedback({ message, userId, topicLabel });
+        if (sessionId && conversations && topicLabel) conversations.record({ sessionId, message, userId, topicLabel });
+        else if (!sessionId) await logFeedback({ message, userId, topicLabel });
         res.write(`data: ${JSON.stringify({ done: true, full })}\n\n`);
       } else if (!failed && !completed) {
         res.write(`data: ${JSON.stringify({ error: '回复中断了，请稍后重试' })}\n\n`);
@@ -118,11 +119,27 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
 
   router.post('/request', ...createFeedbackGuard(), async (req, res) => {
     if (!feedbackService) return res.status(503).json({ success: false, message: '留言暂不可用' });
+    res.set('Cache-Control', 'no-store');
     try {
-      const result = await feedbackService.submitFeedback({ message: req.body.message, user_id: req.body.user_id });
+      const result = await feedbackService.submitFeedback(
+        { message: req.body.message, user_id: req.body.user_id }, {}, { issueAccessCode: true }
+      );
       return res.status(201).json(result);
     } catch (error) {
       return res.status(400).json({ success: false, message: error.message || '留言提交失败' });
+    }
+  });
+
+  router.post('/request/lookup', rateLimit({ windowMs: 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }), async (req, res) => {
+    if (!feedbackService) return res.status(503).json({ success: false, message: '查询暂不可用' });
+    res.set('Cache-Control', 'no-store');
+    try {
+      const feedback = await feedbackService.getFeedbackByAccessCode(req.body?.accessCode);
+      if (!feedback) return res.status(404).json({ success: false, message: '查询码无效，请核对后重试' });
+      return res.json({ success: true, data: feedback });
+    } catch (error) {
+      console.error('[bot] 查询反馈回复失败:', error?.message);
+      return res.status(503).json({ success: false, message: '查询暂不可用，请稍后再试' });
     }
   });
 

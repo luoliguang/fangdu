@@ -1,4 +1,5 @@
 const Feedback = require('../models/Feedback');
+const { randomBytes, createHash } = require('crypto');
 
 /**
  * Feedback 服务层
@@ -12,7 +13,7 @@ class FeedbackService {
   /**
    * 提交留言
    */
-  async submitFeedback(feedbackData, clientInfo = {}, { notify = true } = {}) {
+  async submitFeedback(feedbackData, clientInfo = {}, { notify = true, issueAccessCode = false } = {}) {
     try {
       const { message, user_id } = feedbackData;
 
@@ -31,10 +32,12 @@ class FeedbackService {
         throw new Error('留言内容包含不当信息');
       }
 
-      // 创建留言
+      // 查询码仅在提交成功时返回一次；数据库只保存其哈希。
+      const accessCode = issueAccessCode ? randomBytes(24).toString('base64url') : null;
       const feedback = await this.feedbackModel.create({
         message: this.sanitizeInput(message),
         user_id: user_id || null,
+        access_token_hash: accessCode ? createHash('sha256').update(accessCode).digest('hex') : null,
         status: 'pending'
       });
 
@@ -53,13 +56,20 @@ class FeedbackService {
           message: feedback.message,
           status: feedback.status,
           created_at: feedback.created_at,
-          user_id: feedback.user_id
+          user_id: feedback.user_id,
+          ...(accessCode ? { accessCode } : {})
         }
       };
     } catch (error) {
       console.error('提交留言失败:', error);
       throw error;
     }
+  }
+
+  async getFeedbackByAccessCode(accessCode) {
+    if (typeof accessCode !== 'string' || !/^[A-Za-z0-9_-]{32}$/.test(accessCode)) return null;
+    const hash = createHash('sha256').update(accessCode).digest('hex');
+    return this.feedbackModel.getByAccessTokenHash(hash);
   }
 
   /**

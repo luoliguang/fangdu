@@ -18,7 +18,8 @@ class Feedback {
       materialId = null,
       ipAddress = null,
       userAgent = null,
-      user_id = null
+      user_id = null,
+      access_token_hash = null
     } = feedbackData;
 
     // 验证必填字段
@@ -27,11 +28,11 @@ class Feedback {
     }
 
     const sql = `
-      INSERT INTO feedbacks (message, status, user_id, created_at) 
-      VALUES (?, 'pending', ?, datetime('now'))
+      INSERT INTO feedbacks (message, status, user_id, access_token_hash, created_at)
+      VALUES (?, 'pending', ?, ?, datetime('now'))
     `;
-    
-    const result = await this.run(sql, [message, user_id]);
+
+    const result = await this.run(sql, [message, user_id, access_token_hash]);
     return { id: result.lastID, message, user_id, status: 'pending', created_at: new Date().toISOString() };
   }
 
@@ -110,8 +111,8 @@ class Feedback {
 
     // 获取分页数据
     const dataSql = `
-      SELECT f.* 
-      FROM feedbacks f 
+      SELECT f.id, f.message, f.status, f.created_at, f.user_id, f.admin_reply
+      FROM feedbacks f
       WHERE f.user_id = ? 
       ORDER BY f.created_at DESC 
       LIMIT ? OFFSET ?
@@ -128,6 +129,13 @@ class Feedback {
         totalPages: Math.ceil(total.total / limit)
       }
     };
+  }
+
+  async getByAccessTokenHash(hash) {
+    return this.queryOne(
+      'SELECT id, message, status, created_at, admin_reply FROM feedbacks WHERE access_token_hash = ?',
+      [hash]
+    );
   }
 
   /**

@@ -12,7 +12,7 @@ md.validateLink = url => /^(https?:|mailto:)/i.test(url);
 // 不渲染图片，避免加载外部资源；只显示占位符
 md.renderer.rules.image = (tokens, idx) => `<span class="fbot-md-img">🖼 ${md.utils.escapeHtml(tokens[idx].content || '图片')}</span>`;
 // 只有行内关键词提供复制入口，普通回复和代码块不显示复制按钮。
-md.renderer.rules.code_inline = (tokens, idx) => `<code class="fbot-keyword" role="button" tabindex="0" title="点击复制关键词">${md.utils.escapeHtml(tokens[idx].content)}</code>`;
+md.renderer.rules.code_inline = (tokens, idx) => `<code class="fbot-keyword" role="button" tabindex="0" title="点击复制">${md.utils.escapeHtml(tokens[idx].content)}</code>`;
 
 const MAX_LEN = 1000;
 const COOLDOWN_MS = 10000;
@@ -46,6 +46,9 @@ const topic = ref(null);
 const sending = ref(false);
 const streaming = ref(false);
 const checkingReplies = ref(false);
+const showCodeLookup = ref(false);
+const lookupCode = ref('');
+const lookingUpCode = ref(false);
 const shownReplies = new Map();
 const bodyRef = ref(null);
 const inputRef = ref(null);
@@ -261,7 +264,7 @@ function askQuick(q) {
   send();
 }
 function isExplicitFeedback(content) {
-  return /^(?:我想反馈|我要反馈|反馈一下|我有个建议|我想提建议|我要提建议|我想投诉|我要投诉|建议新增|建议增加|希望新增|希望增加)/.test(content)
+  return /^(?:我想反馈|我要反馈|反馈一下|我有个建议|我想提建议|我要提建议|我想投诉|我要投诉|我想提交需求|我要提交需求|提交找图需求|建议新增|建议增加|希望新增|希望增加)/.test(content)
     || /(?:网站|页面).{0,8}(?:有问题|出错|打不开|白屏|报错)/.test(content);
 }
 async function checkReplies() {
@@ -272,7 +275,7 @@ async function checkReplies() {
     const records = Array.isArray(response.data?.data) ? response.data.data : [];
     const replies = records.filter(item => typeof item.admin_reply === 'string' && item.admin_reply.trim() && shownReplies.get(item.id) !== item.admin_reply).slice(0, 3);
     if (!replies.length) {
-      pushBot(records.length ? '暂时没有新的回复。掌柜的处理后，你可以再点这里查看。' : '你还没有提交过找图需求。搜不到时可以点“没找到想要的”告诉掌柜的。');
+      pushBot(records.length ? '暂时没有新的回复。掌柜的处理后，你可以再点这里查看。换设备可用保存的查询码。' : '这台设备还没有反馈记录。换设备可用查询码查看；搜不到图时也可以提交新需求。');
       return;
     }
     for (const item of replies.reverse()) {
@@ -283,6 +286,30 @@ async function checkReplies() {
     pushBot('暂时无法读取反馈回复，请稍后再试。');
   } finally {
     checkingReplies.value = false;
+  }
+}
+async function lookupReply() {
+  const accessCode = lookupCode.value.trim();
+  if (!/^[A-Za-z0-9_-]{32}$/.test(accessCode)) {
+    pushBot('查询码格式不正确，请粘贴提交需求时保存的完整查询码。');
+    return;
+  }
+  if (lookingUpCode.value) return;
+  lookingUpCode.value = true;
+  try {
+    const response = await apiClient.post('/api/v1/bot/request/lookup', { accessCode });
+    const feedback = response.data?.data;
+    if (feedback?.admin_reply) {
+      pushBot(`掌柜的回复（反馈 #${feedback.id}）：\n${feedback.admin_reply}`, undefined, { md: true });
+    } else {
+      pushBot('这条需求还在处理中。可以保留查询码，稍后再来查看。');
+    }
+    lookupCode.value = '';
+    showCodeLookup.value = false;
+  } catch (error) {
+    pushBot(error?.response?.data?.message || '暂时查不到这条反馈，请稍后再试。');
+  } finally {
+    lookingUpCode.value = false;
   }
 }
 function fallbackAck(content) {
@@ -392,15 +419,19 @@ async function send() {
   try {
     if (topic.value || isExplicitFeedback(content)) {
       const message = topic.value ? `【${topic.value.label}】${content}` : content;
+      let submitted;
       try {
-        await apiClient.post('/api/v1/bot/request', { message, user_id: getUserId() });
+        submitted = await apiClient.post('/api/v1/bot/request', { message, user_id: getUserId() });
       } catch (error) {
         if (error?.response?.status !== 404) throw error;
-        await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
+        submitted = await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
       }
       startCooldown(COOLDOWN_MS);
       topic.value = null;
-      pushBot('需求已经提交给掌柜的。处理后点“查看反馈回复”，可以看到查找结果。');
+      const accessCode = submitted.data?.data?.accessCode;
+      pushBot(accessCode
+        ? `需求已提交。以后可点“查看反馈回复”查看；换设备请保存查询码，点它可复制：\`${accessCode}\`。查询码请勿发给别人。`
+        : '需求已经提交给掌柜的。处理后用这台设备点“查看反馈回复”查看结果。', undefined, { md: true });
       return;
     }
     if (aiEnabled.value) {
@@ -498,6 +529,11 @@ function onKeydown(e) {
           </div>
         </div>
 
+        <div v-if="showCodeLookup" class="fbot-code-lookup">
+          <label for="fbot-access-code">查询码</label>
+          <input id="fbot-access-code" v-model="lookupCode" maxlength="32" autocomplete="off" placeholder="粘贴保存的查询码" @keydown.enter.prevent="lookupReply" />
+          <button type="button" :disabled="lookingUpCode" @click="lookupReply">{{ lookingUpCode ? '查询中…' : '查询' }}</button>
+        </div>
         <footer class="fbot-foot">
           <textarea
             ref="inputRef"
@@ -516,6 +552,7 @@ function onKeydown(e) {
         <div class="fbot-hint">
           <span>Enter 发送 · Shift+Enter 换行</span>
           <button class="fbot-check-replies" type="button" :disabled="checkingReplies" @click="checkReplies">{{ checkingReplies ? '查询中…' : '查看反馈回复' }}</button>
+          <button class="fbot-check-replies" type="button" @click="showCodeLookup = !showCodeLookup">凭查询码查回复</button>
           <span v-if="text.length > MAX_LEN * 0.8" :class="{ 'is-warn': remaining < 50 }">{{ text.length }}/{{ MAX_LEN }}</span>
         </div>
       </section>
@@ -793,6 +830,9 @@ function onKeydown(e) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: .92em;
   cursor: pointer;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .fbot-copy-terms { align-self: flex-end; margin-top: 6px; padding: 3px 10px; border: 1px solid var(--fb-line); border-radius: 999px; background: transparent; color: var(--fb-accent); font-size: 11px; cursor: pointer; }
 .fbot-copy-terms:hover, .fbot-copy-terms:focus-visible { border-color: var(--fb-accent); outline: 2px solid var(--fb-accent); outline-offset: 2px; }
@@ -867,6 +907,11 @@ function onKeydown(e) {
 .fbot-followup { padding: 6px 12px 12px; text-align: right; }
 .fbot-followup button { border: 1px solid var(--fb-line); border-radius: 12px; background: var(--fb-bg); color: var(--fb-accent); padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; }
 .fbot-followup button:hover, .fbot-followup button:focus-visible { border-color: var(--fb-accent); }
+.fbot-code-lookup { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--fb-bg); color: var(--fb-sub); font-size: 12px; }
+.fbot-code-lookup label { white-space: nowrap; }
+.fbot-code-lookup input { flex: 1; min-width: 0; border: 1px solid var(--fb-line); border-radius: 6px; padding: 6px; color: var(--fb-text); background: var(--fb-bg); }
+.fbot-code-lookup button { border: 0; border-radius: 6px; padding: 6px 10px; background: var(--fb-accent); color: #fff; white-space: nowrap; cursor: pointer; }
+.fbot-code-lookup button:disabled { opacity: .6; }
 .fbot-foot textarea {
   flex: 1;
   min-width: 0;

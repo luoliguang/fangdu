@@ -339,6 +339,21 @@ test('session chat is collected without immediate feedback and end is idempotent
   assert.equal(invalid.status, 400);
 });
 
+test('ordinary search sessions never create a hidden feedback without a retrieval code', async t => {
+  const recorded = [];
+  const { url, adminHeaders, feedbacks } = await setup(t, undefined, {
+    record: item => recorded.push(item), finish: async () => false
+  });
+  await fetch(`${url}/api/v1/bot-config`, { method: 'PUT', headers: adminHeaders, body: JSON.stringify(enabledInput()) });
+  const reply = await fetch(`${url}/api/v1/bot/chat`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: '希望新增蓝色实拍图', sessionId: randomUUID(), userId: randomUUID() })
+  });
+  assert.equal(reply.status, 200);
+  assert.equal(recorded.length, 0);
+  assert.equal(feedbacks.length, 0);
+});
+
 test('stream records completed sessions but skips failed responses', async t => {
   const recorded = [];
   let upstreamOk = true;
@@ -387,7 +402,7 @@ test('explicit photo request is stored once and follows the Feishu notification 
   const first = await send();
   assert.equal(first.status, 201);
   assert.equal(feedbacks[0].message, payload.message);
-  assert.deepEqual(feedbackOptions, [undefined], 'explicit request uses the normal Feishu notification path');
+  assert.deepEqual(feedbackOptions, [{ issueAccessCode: true }], 'explicit request creates a retrieval code and uses the normal Feishu notification path');
   assert.equal((await send()).status, 429);
   assert.equal(feedbacks.length, 1);
   const invalid = await fetch(`${url}/api/v1/bot/request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: '', user_id: payload.user_id }) });
