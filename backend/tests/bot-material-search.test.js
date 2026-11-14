@@ -18,7 +18,9 @@ test('read-only catalog search returns real visible names and excludes cotton/co
     ['Cotton blend', '涤纶,cotton', '/cotton.jpg', null],
     ['涤纶运动转码', '涤纶,运动', '/d.mov', 'converting'],
     ['涤纶运动未上传', '涤纶,运动', null, null],
-    ['经典速干小方格', '涤纶,速干', '/e.jpg', null]
+    ['经典速干小方格', '涤纶,速干', '/e.jpg', null],
+    ['雪纺印花', '雪纺', '/chiffon.jpg', null],
+    ['礼服廓形', '礼服', '/dress.jpg', null]
   ]) await run(db, 'INSERT INTO materials (name, tags, file_path, conversion_status) VALUES (?, ?, ?, ?)', [name, tags, filePath, status]);
   // 最近 35 条只命中“涤纶”；较早的精确名称仍应优先于它们。
   for (let i = 0; i < 35; i++) {
@@ -30,6 +32,7 @@ test('read-only catalog search returns real visible names and excludes cotton/co
   assert.ok(names.every(name => !/棉|cotton|转码|未上传/i.test(name)));
   assert.deepEqual(await search.search('速干布'), ['经典速干小方格']);
   assert.deepEqual(await search.search('完全不存在的昵称'), []);
-  assert.ok((await search.examples()).every(name => !name.includes('棉')));
+  assert.deepEqual(termsFromMessage('你们有雪纺礼服吗？').sort(), ['礼服', '雪纺']);
+  assert.deepEqual(await search.search('你们有雪纺礼服吗？'), [], '不同素材分别命中一个词，也不能拼成不存在的品类');
   assert.ok(termsFromMessage('帮我找涤纶面料').includes('涤纶'));
 });

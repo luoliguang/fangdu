@@ -22,7 +22,7 @@ async function setup(t, fetchImpl, conversations, materialSearch) {
   const app = express();
   app.use(express.json());
   app.use('/api/v1/bot-config', createBotConfigRoutes(service));
-  app.use('/api/v1/bot', createBotChatRoutes(service, { feedbackService: fakeFeedback, conversations, materialSearch }));
+  app.use('/api/v1/bot', createBotChatRoutes(service, { feedbackService: fakeFeedback, conversations, materialSearch: materialSearch || { search: async () => [] } }));
   const server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
   t.after(async () => { await new Promise(resolve => server.close(resolve)); await db.close(); });
   const url = `http://127.0.0.1:${server.address().port}`;
@@ -45,6 +45,18 @@ test('getPublic and save never expose the api key', async t => {
   await service.save({ enabled: false, clearApiKey: true });
   assert.equal((await service.get()).apiKey, '');
   assert.ok(await repository.findOne({ where: { key: 'chat_bot' } }));
+});
+
+test('old custom bot configuration survives the prompt migration', async t => {
+  const { service, repository } = await setup(t);
+  await repository.upsert({ key: 'chat_bot', value: JSON.stringify({
+    ...enabledInput({ systemPrompt: '管理员的自定义说明', quotePolicy: '自定义报价政策', welcomeMessage: '自定义欢迎语' }),
+    promptVersion: 4
+  }) });
+  const config = await service.get();
+  assert.equal(config.systemPrompt, '管理员的自定义说明');
+  assert.equal(config.quotePolicy, '自定义报价政策');
+  assert.equal(config.welcomeMessage, '自定义欢迎语');
 });
 
 test('save rejects invalid input without overwriting stored config', async t => {
@@ -78,7 +90,7 @@ test('chat sends the expected DeepSeek request with quote policy in the system m
   const { service, calls } = await setup(t);
   await service.save(enabledInput({ temperature: 0.3, maxTokens: 200 }));
   const history = [{ role: 'user', content: '你好' }, { role: 'assistant', content: '嗨' }];
-  const result = await service.chat({ userId: 'u1', message: '  多少钱？ ', history });
+  const result = await service.chat({ userId: 'u1', message: '  网站怎么用？ ', history });
   assert.deepEqual(result, { enabled: true, reply: '你好呀' });
   const { url, init } = calls[0];
   assert.equal(url, DEEPSEEK_URL);
@@ -92,7 +104,7 @@ test('chat sends the expected DeepSeek request with quote policy in the system m
   assert.equal(body.messages[0].role, 'system');
   assert.ok(body.messages[0].content.includes(DEFAULT_QUOTE_POLICY));
   assert.match(body.messages[0].content, /主要做涤纶.*做不了含棉或纯棉/);
-  assert.deepEqual(body.messages.slice(1), [...history, { role: 'user', content: '多少钱？' }]);
+  assert.deepEqual(body.messages.slice(1), [...history, { role: 'user', content: '网站怎么用？' }]);
 });
 
 test('chat validates message and history', async t => {
@@ -111,30 +123,35 @@ test('chat validates message and history', async t => {
 test('capability and cotton questions give verified process answers and only catalog names', async t => {
   const { service, calls } = await setup(t);
   await service.save(enabledInput());
-  const materialSearch = { examples: async () => ['涤纶运动面料'], search: async () => ['涤纶提花纹样'] };
+  const materialSearch = { search: async () => ['涤纶提花纹样'] };
   const capability = await service.chat({ message: '你能做什么？', materialSearch });
   assert.match(capability.reply, /涤纶/);
   assert.match(capability.reply, /含棉或纯棉.*做不了/);
-  assert.match(capability.reply, /`涤纶运动面料`/);
+  assert.doesNotMatch(capability.reply, /涤纶运动面料|雪纺礼服|素材库中实际找到/);
   const cotton = await service.chat({ message: '可以做棉吗？', materialSearch });
   assert.match(cotton.reply, /含棉或纯棉的做不了/);
   const cottonPrice = await service.chat({ message: '纯棉多少钱？', materialSearch });
   assert.match(cottonPrice.reply, /不报价.*含棉或纯棉的做不了/);
+  const dress = await service.chat({ message: '能做雪纺礼服吗？', materialSearch });
+  assert.doesNotMatch(dress.reply, /可以做|能做雪纺礼服/);
+  assert.match(dress.reply, /具体款式能否加工需要掌柜的确认/);
+  const dressPrice = await service.chat({ message: '雪纺礼服多少钱？', materialSearch });
+  assert.match(dressPrice.reply, /不报价/);
+  assert.doesNotMatch(dressPrice.reply, /有雪纺礼服/);
   assert.equal(calls.length, 0, 'known business boundaries should not depend on model improvisation');
 });
 
-test('search adds only real catalog names to the model context and reply', async t => {
-  const { service, calls } = await setup(t);
+test('catalog questions are answered only from database names even if the model would invent products', async t => {
+  const { service, calls } = await setup(t, async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '有雪纺礼服，可以做。' } }] }) }));
   await service.save(enabledInput());
   const materialSearch = { search: async () => ['涤纶提花纹样'] };
   const result = await service.chat({ message: '帮我找涤纶提花面料', materialSearch });
   assert.match(result.reply, /素材库中实际找到：`涤纶提花纹样`/);
-  const body = JSON.parse(calls[0].init.body);
-  assert.match(body.messages[0].content, /涤纶提花纹样/);
-  assert.doesNotMatch(body.messages[0].content, /纯棉运动面料/);
-  const missing = await service.chat({ message: '找不存在的款式', materialSearch: { search: async () => [] } });
-  assert.match(missing.reply, /没匹配到可以确认的素材名字/);
-  assert.equal(calls.length, 1, 'empty results must not be invented by the model');
+  assert.doesNotMatch(result.reply, /雪纺礼服/);
+  const missing = await service.chat({ message: '你们有雪纺礼服吗？', materialSearch: { search: async () => [] } });
+  assert.match(missing.reply, /没有查到匹配的名称/);
+  assert.doesNotMatch(missing.reply, /雪纺礼服/);
+  assert.equal(calls.length, 0, 'catalog answers must not use unrestricted AI text');
   await assert.rejects(service.chat({ message: '推荐涤纶素材', materialSearch: { search: async () => { throw new Error('database down'); } } }),
     { status: 502, message: '素材库暂时无法查询，请稍后再试' });
 });
@@ -222,7 +239,7 @@ test('custom admin prompt keeps the polyester process boundary and does not over
   assert.match(system, /主要做涤纶.*做不了含棉或纯棉/);
 });
 
-test('streaming search appends the same verified catalog names', async t => {
+test('streaming search returns only verified names without calling the model', async t => {
   const { service, calls } = await setup(t, async () => ({ ok: true, body: new ReadableStream({ start(controller) {
     controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"找到了"}}]}\n\ndata: [DONE]\n\n'));
     controller.close();
@@ -232,7 +249,7 @@ test('streaming search appends the same verified catalog names', async t => {
   for await (const ev of service.streamChat({ message: '推荐运动面料', materialSearch: { search: async () => ['涤纶运动面料'] } })) events.push(ev);
   assert.equal(events.map(event => event.content || '').join('').includes('`涤纶运动面料`'), true);
   assert.equal(events.at(-1).type, 'done');
-  assert.match(JSON.parse(calls[0].init.body).messages[0].content, /涤纶运动面料/);
+  assert.equal(calls.length, 0);
 });
 
 test('truncated DeepSeek stream cannot be marked complete or recorded as feedback', async t => {
@@ -317,6 +334,7 @@ test('stream records completed sessions but skips failed responses', async t => 
   assert.equal(recorded.length, 1);
   assert.equal(feedbacks.length, 0);
   upstreamOk = false;
+  payload.message = '你好';
   const failed = await send();
   assert.match(await failed.text(), /"error":/);
   assert.equal(recorded.length, 1);
