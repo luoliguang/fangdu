@@ -145,6 +145,13 @@ const botMouthPath = computed(() => ({
   listening: 'M35 48 Q40 53 45 48',
   idle: 'M36 48 Q40 52 44 48'
 }[botMood.value]));
+const botHeadMouthPath = computed(() => ({
+  happy: 'M12 20 Q16 25 20 20',
+  concerned: 'M13 23 Q16 19.5 19 23',
+  thinking: 'M14 22 Q16 20 18 22',
+  listening: 'M13 21 Q16 24 19 21',
+  idle: 'M13.5 21 Q16 23 18.5 21'
+}[botMood.value]));
 function showBotExpression(expression, duration = 1800) {
   clearTimeout(expressionTimer);
   botExpression.value = expression;
@@ -695,8 +702,32 @@ function onKeydown(e) {
           <button v-if="panelView === 'requests'" class="fbot-head-back" type="button" aria-label="返回聊天" @click="panelView = 'chat'">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
           </button>
-          <span v-else class="fbot-head-avatar" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.7 5 5 1.7-5 1.7L12 16.4l-1.7-5-5-1.7 5-1.7z"/><path d="M19 15v4M17 17h4"/></svg>
+          <span v-else class="fbot-head-avatar" :class="`is-${botMood}`" aria-hidden="true">
+            <svg viewBox="0 0 32 32">
+              <g class="fbot-head-robot">
+                <line x1="16" y1="4.5" x2="16" y2="8" stroke="#0a3d22" stroke-width="1.6" stroke-linecap="round" />
+                <circle class="fbot-head-light" cx="16" cy="3.7" r="2" fill="#ffd36e" />
+                <rect x="6" y="8" width="20" height="18" rx="8" fill="#5a8f73" stroke="#0a3d22" stroke-width="1.2" />
+                <rect x="9" y="12" width="14" height="10" rx="5" fill="#f4fbf7" />
+                <g v-if="botMood === 'happy'" class="fbot-head-happy-eyes" fill="none" stroke="#0a3d22" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M11.5 17 Q13 15 14.5 17" />
+                  <path d="M17.5 17 Q19 15 20.5 17" />
+                </g>
+                <g v-else class="fbot-head-eyes" fill="#0a3d22">
+                  <ellipse cx="13" cy="16.6" rx="1.25" ry="1.65" />
+                  <ellipse cx="19" cy="16.6" rx="1.25" ry="1.65" />
+                </g>
+                <g v-if="botMood === 'concerned'" fill="none" stroke="#0a3d22" stroke-width="1" stroke-linecap="round">
+                  <path d="M11.2 13.7 L14.2 14.4" />
+                  <path d="M17.8 14.4 L20.8 13.7" />
+                </g>
+                <g v-if="botMood === 'thinking'" class="fbot-head-thought" fill="#0a3d22">
+                  <circle cx="24.8" cy="9.4" r="0.8" />
+                  <circle cx="27.5" cy="7" r="1.1" />
+                </g>
+                <path class="fbot-head-mouth" :d="botHeadMouthPath" fill="none" stroke="#0a3d22" stroke-width="1.2" stroke-linecap="round" />
+              </g>
+            </svg>
           </span>
           <span class="fbot-head-meta">
             <strong>{{ panelView === 'chat' ? '小度' : '我的需求' }}</strong>
@@ -1041,6 +1072,25 @@ function onKeydown(e) {
   border-radius: 50%;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 2px 6px rgba(0, 0, 0, 0.18);
 }
+.fbot-head-avatar svg { width: 29px; height: 29px; overflow: visible; }
+.fbot-head-robot { transform-origin: 16px 17px; animation: fbot-head-breathe 2.8s ease-in-out infinite; }
+.fbot-head-light { animation: fbot-blink-light 1.8s ease-in-out infinite; }
+.fbot-head-eyes { transform-origin: center; transform-box: fill-box; animation: fbot-blink 4.5s infinite; }
+.fbot-head-mouth { transition: d 0.18s ease; }
+.fbot-head-avatar.is-listening .fbot-head-robot { animation-duration: 1.8s; }
+.fbot-head-avatar.is-listening .fbot-head-light { fill: #fff0a8; animation-duration: 1.15s; }
+.fbot-head-avatar.is-thinking .fbot-head-robot { animation: fbot-head-think 1.15s ease-in-out infinite; }
+.fbot-head-avatar.is-thinking .fbot-head-eyes { animation: fbot-think-eyes 1.15s ease-in-out infinite; }
+.fbot-head-avatar.is-thinking .fbot-head-light { fill: #8ed8ff; animation-duration: 0.75s; }
+.fbot-head-avatar.is-thinking .fbot-head-thought { animation: fbot-thought 1.15s ease-in-out infinite; }
+.fbot-head-avatar.is-happy { animation: fbot-head-happy 0.65s ease-in-out 2; }
+.fbot-head-avatar.is-happy .fbot-head-light { fill: #ffe168; animation-duration: 0.55s; }
+.fbot-head-avatar.is-concerned { animation: fbot-head-concerned 0.65s ease-in-out 2; }
+.fbot-head-avatar.is-concerned .fbot-head-light { fill: #ffbd86; animation-duration: 1s; }
+@keyframes fbot-head-breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-0.7px) scale(1.02); } }
+@keyframes fbot-head-think { 0%, 100% { transform: translateX(-0.5px); } 50% { transform: translateX(0.5px); } }
+@keyframes fbot-head-happy { 0%, 100% { transform: translateY(0) rotate(0); } 40% { transform: translateY(-2px) rotate(-4deg); } 70% { transform: translateY(-1px) rotate(4deg); } }
+@keyframes fbot-head-concerned { 0%, 100% { transform: rotate(0); } 33% { transform: rotate(-3deg); } 66% { transform: rotate(3deg); } }
 .fbot-head-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
 .fbot-head-meta strong { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
 .fbot-head-sub { font-size: 11px; opacity: 0.85; font-weight: 500; }
@@ -1392,9 +1442,9 @@ function onKeydown(e) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fbot-float, .fbot-shadow, .fbot-light, .fbot-eyes, .fbot-thought-dots, .fbot-typing i, .fbot-head-dot, .fbot-wait-pulse { animation: none; }
+  .fbot-float, .fbot-shadow, .fbot-light, .fbot-eyes, .fbot-thought-dots, .fbot-head-avatar, .fbot-head-robot, .fbot-head-light, .fbot-head-eyes, .fbot-head-thought, .fbot-typing i, .fbot-head-dot, .fbot-wait-pulse { animation: none; }
   .fbot-bubble.is-streaming .fbot-md::after { content: none; }
-  .fbot-light, .fbot-mouth { transition: none; }
+  .fbot-light, .fbot-mouth, .fbot-head-mouth { transition: none; }
   .fbot-panel, .fbot-record-list, .fbot-panel-enter-active, .fbot-panel-leave-active, .fbot-backdrop-enter-active, .fbot-backdrop-leave-active, .fbot-view-enter-active, .fbot-view-leave-active, .fbot-state-enter-active, .fbot-state-leave-active, .fbot-record-enter-active, .fbot-record-leave-active, .fbot-record-move { transition: none; }
 }
 </style>
