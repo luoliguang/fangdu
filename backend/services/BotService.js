@@ -105,14 +105,14 @@ function normalizeTopicLabel(value) {
 }
 
 function capabilityQuestion(message) {
-  return message.length <= 80 && !/价格|报价|多少钱|费用|收费|便宜/.test(message)
-    && /你能做什么|你会做什么|你能干什么|你可以做什么|你能帮.{0,6}(什么|啥)|你是谁|介绍一下自己|你们有(什么|哪些)|有什么素材|你们卖什么|介绍下你们/.test(message);
+  return message.length <= 80 && !/价格|报价|多少钱|费用|收费|便宜|找|搜|推荐|素材|面料|款式|名字|昵称|花型|样品/.test(message)
+    && /你能做什么|你会做什么|你能干什么|你可以做什么|你能帮.{0,6}(什么|啥)|你是谁|介绍一下自己|介绍下你们/.test(message);
 }
 function cottonQuestion(message) {
   return /棉|cotton/i.test(message);
 }
 function searchQuestion(message) {
-  return !/价格|报价|多少钱|费用|收费|便宜|怎么(搜|找)|如何(搜|找)|在哪里(搜|找)|网站怎么用/.test(message)
+  return !/价格|报价|多少钱|费用|收费|便宜|网站怎么用/.test(message)
     && (/(找|搜|推荐|素材|面料|款式|名字|昵称|花型|样品|有没有|你们有|这里有|有.{1,30}吗)/.test(message)
       || (/^[\p{Script=Han}\p{N}\s]{2,32}$/u.test(message) && !/^(你好|谢谢|再见|早上好|晚上好)/.test(message)));
 }
@@ -247,7 +247,7 @@ class BotService {
     if (cottonQuestion(message)) {
       return { direct: '这边主要做涤纶工艺，含棉或纯棉的做不了。你可以告诉我涤纶素材的款式、颜色或名称，我会到素材库里查找；其他需求可以留言给掌柜的。' };
     }
-    if (/(能做|可以做|能加工|能生产|能制作|做得了).{1,32}(吗|么|\?|？)/.test(message)) {
+    if (/(能做|可以做|能加工|能生产|能制作|做得了).{1,32}(吗|么|\?|？)/.test(message.replace(/你能做什么[?？]?/g, ''))) {
       return { direct: '具体款式能否加工需要掌柜的确认；这里只能按素材库里的现有名称查找。工艺主要做涤纶，含棉或纯棉的做不了。' };
     }
     if (/做什么面料|做哪种面料|做哪些面料|能做什么面料|能做哪些面料|支持什么工艺|支持哪些工艺|做什么材质|做哪种材质/.test(message)) {
@@ -256,9 +256,16 @@ class BotService {
     if (!searchQuestion(message)) return {};
     if (!materialSearch) throw fail('素材库暂时无法查询，请稍后再试', 502);
     try {
-      const names = await materialSearch.search(message);
-      if (!names.length) return { direct: '素材库没有查到匹配的名称。可以换个更短的关键词，或者把想找的具体名称告诉我，作为素材需求转达给掌柜的。' };
-      return { direct: `按素材名称查到以下记录（仅代表库里有该名称，不代表能加工）：${catalogFooter(names)}` };
+      const result = materialSearch.recommend
+        ? await materialSearch.recommend(message)
+        : { kind: 'exact', names: await materialSearch.search(message) };
+      if (!result.names.length) return { direct: '素材库暂时没找到相关名称。可以换个描述方式，或直接选“想要新素材”把需求反馈给掌柜的。' };
+      const introduction = result.kind === 'exact'
+        ? '素材库中有这些名称（仅代表素材记录，不代表能加工）：'
+        : result.kind === 'related'
+          ? '没有查到完全匹配的名称；以下是只匹配部分描述的现有素材，不代表你要的款式已经收录：'
+          : '如果还没有具体关键词，可以先看看库里最近的素材名称，再告诉我喜欢的方向：';
+      return { direct: introduction + catalogFooter(result.names) };
     } catch (error) {
       console.error('[bot] 素材名称查询失败:', error?.message);
       throw fail('素材库暂时无法查询，请稍后再试', 502);

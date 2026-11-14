@@ -18,8 +18,8 @@ const MAX_LEN = 1000;
 const COOLDOWN_MS = 10000;
 
 const quickTopics = [
-  { key: 'material', label: '想要新素材', icon: 'sparkle', hint: '告诉我你想要的款式、面料或颜色吧~' },
-  { key: 'notfound', label: '没找到想要的', icon: 'search', hint: '你在找什么呢？说说关键词，我帮你记下来~' },
+  { key: 'material', label: '想要新素材', icon: 'sparkle', hint: '告诉我具体需求，发送后直接记给掌柜的~' },
+  { key: 'notfound', label: '没找到想要的', icon: 'search', hint: '说说你找过的关键词，发送后我会直接记下来~' },
   { key: 'bug', label: '网站有问题', icon: 'bug', hint: '哪里不对劲啦？描述一下，我马上转告~' },
   { key: 'other', label: '其他想说的', icon: 'chat', hint: '想说什么都可以，我在听~' }
 ];
@@ -258,6 +258,10 @@ function askQuick(q) {
   text.value = q;
   send();
 }
+function isExplicitFeedback(content) {
+  return /^(?:我想反馈|我要反馈|反馈一下|我有个建议|我想提建议|我要提建议|我想投诉|我要投诉|建议新增|建议增加|希望新增|希望增加)/.test(content)
+    || /(?:网站|页面).{0,8}(?:有问题|出错|打不开|白屏|报错)/.test(content);
+}
 function fallbackAck(content) {
   const t = String(content || '');
   if (/你能做什么|你会做什么|你能干啥|你会啥|你是谁|介绍一下/.test(t)) {
@@ -363,6 +367,19 @@ async function send() {
   text.value = '';
   sending.value = true;
   try {
+    if (topic.value || isExplicitFeedback(content)) {
+      const message = topic.value ? `【${topic.value.label}】${content}` : content;
+      try {
+        await apiClient.post('/api/v1/bot/feedback', { message, user_id: getUserId() });
+      } catch (error) {
+        if (error?.response?.status !== 404) throw error;
+        await apiClient.post('/api/v1/feedbacks', { message, user_id: getUserId() });
+      }
+      startCooldown(COOLDOWN_MS);
+      topic.value = null;
+      pushBot('反馈已经记下来，掌柜的可以在后台看到。');
+      return;
+    }
     if (aiEnabled.value) {
       const topicLabel = topic.value?.label || null;
       const beforeReplyCount = messages.value.length;

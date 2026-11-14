@@ -149,11 +149,32 @@ test('catalog questions are answered only from database names even if the model 
   assert.match(result.reply, /素材库中实际找到：`涤纶提花纹样`/);
   assert.doesNotMatch(result.reply, /雪纺礼服/);
   const missing = await service.chat({ message: '你们有雪纺礼服吗？', materialSearch: { search: async () => [] } });
-  assert.match(missing.reply, /没有查到匹配的名称/);
+  assert.match(missing.reply, /没找到相关名称/);
   assert.doesNotMatch(missing.reply, /雪纺礼服/);
   assert.equal(calls.length, 0, 'catalog answers must not use unrestricted AI text');
   await assert.rejects(service.chat({ message: '推荐涤纶素材', materialSearch: { search: async () => { throw new Error('database down'); } } }),
     { status: 502, message: '素材库暂时无法查询，请稍后再试' });
+});
+
+test('discovery replies distinguish exact, partial and exploratory database recommendations', async t => {
+  const { service, calls } = await setup(t, async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '有雪纺礼服' } }] }) }));
+  await service.save(enabledInput());
+  const materialSearch = { recommend: async message => {
+    if (message.includes('雪纺')) return { kind: 'related', names: ['雪纺印花', '礼服廓形'] };
+    if (message.includes('怎么搜索')) return { kind: 'explore', names: ['经典速干小方格'] };
+    return { kind: 'exact', names: ['涤纶运动面料'] };
+  } };
+  const partial = await service.chat({ message: '你们有雪纺礼服吗？', materialSearch });
+  assert.match(partial.reply, /没有查到完全匹配.*只匹配部分描述/);
+  assert.match(partial.reply, /`雪纺印花`.*`礼服廓形`/);
+  assert.doesNotMatch(partial.reply, /有雪纺礼服/);
+  const mixed = await service.chat({ message: '你能做什么？我想找雪纺礼服', materialSearch });
+  assert.match(mixed.reply, /只匹配部分描述/);
+  const guide = await service.chat({ message: '怎么搜索素材？', materialSearch });
+  assert.match(guide.reply, /没有具体关键词[\s\S]*`经典速干小方格`/);
+  const exact = await service.chat({ message: '找涤纶运动面料', materialSearch });
+  assert.match(exact.reply, /素材库中有这些名称[\s\S]*`涤纶运动面料`/);
+  assert.equal(calls.length, 0);
 });
 
 test('public bot chat route uses the injected catalog lookup', async t => {
