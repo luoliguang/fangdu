@@ -196,7 +196,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
         </template>
       </DataTable>
 
-      <el-dialog v-model="replyOpen" class="fm-reply-dialog" title="回复客户的找图需求" width="min(480px, 90vw)" top="6vh" :close-on-click-modal="false">
+      <el-dialog v-model="replyOpen" class="fm-reply-dialog" title="回复客户的找图需求" width="min(480px, 90vw)" align-center :close-on-click-modal="false">
         <p v-if="replyItem" class="reply-source">{{ replyItem.message }}</p>
         <el-input v-model="replyText" type="textarea" :rows="5" maxlength="500" show-word-limit placeholder="填写找到的实拍图名称、搜索词或可打开的链接…" />
         <template #footer>
