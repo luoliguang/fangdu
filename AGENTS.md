@@ -2,7 +2,8 @@
 
 ## 开发约定
 
-- 每次完成优化后，在交付回复中提供一条简短、可直接使用的 commit message；由用户自行提交，不自动执行 git commit。
+- 每次完成优化并验证后，只暂存本次任务相关文件并提交到本地 Git 仓库；交付时提供 commit message 和 hash。除非用户明确授权，不执行 push、发布或部署。
+- 用户已授权本项目编码任务按需使用子代理。适合并行只读调查、独立复核或隔离验证时采用最小委派；简单任务直接完成。主代理负责最终修改、验证与本地提交。
 - 开工时阅读 `PROJECT_CONTEXT.md`，按任务核对相关源码；文档与代码不一致时，以实际实现为准并更新文档。
 - 前端保持 Vue 3 Composition API、ES modules；后端保持 CommonJS 和 routes → controllers → services → models 分层。
 - 前端请求复用 `src/axiosConfig.js`，交互请求优先使用 `src/composables/useApi.js` 的加载与错误状态处理。

@@ -2,6 +2,21 @@
  * Feedback 数据模型
  * 处理留言反馈相关的数据库操作
  */
+function buildFeedbackSearch(search) {
+  if (!search) return { clause: '', params: [], terms: [] };
+  const terms = search.split(/[\s,，、;；]+/).map(term => term.trim()).filter(Boolean).slice(0, 8);
+  const clauses = terms.map(() => `(message LIKE ? ESCAPE '\\' OR admin_reply LIKE ? ESCAPE '\\')`);
+  const params = terms.flatMap(term => {
+    const escaped = term.replace(/[\\%_]/g, '\\$&');
+    return [`%${escaped}%`, `%${escaped}%`];
+  });
+  return {
+    clause: clauses.length ? ` AND ${clauses.join(' AND ')}` : '',
+    params,
+    terms
+  };
+}
+
 class Feedback {
   constructor(db) {
     this.db = db;
@@ -106,51 +121,52 @@ class Feedback {
     } = options;
 
     const offset = (page - 1) * limit;
-    const escapedSearch = search.replace(/[\\%_]/g, '\\$&');
-    const searchClause = search ? ` AND (message LIKE ? ESCAPE '\\' OR admin_reply LIKE ? ESCAPE '\\')` : '';
-    const searchParams = search ? [`%${escapedSearch}%`, `%${escapedSearch}%`] : [];
+    const searchFilter = buildFeedbackSearch(search);
 
     // 获取总数
-    const countSql = `SELECT COUNT(*) as total FROM feedbacks WHERE user_id = ?${searchClause}`;
-    const total = await this.queryOne(countSql, [userId, ...searchParams]);
+    const countSql = `SELECT COUNT(*) as total FROM feedbacks WHERE user_id = ?${searchFilter.clause}`;
+    const total = await this.queryOne(countSql, [userId, ...searchFilter.params]);
 
     // 获取分页数据
     const dataSql = `
       SELECT f.id, f.message, f.status, f.created_at, f.user_id, f.admin_reply
       FROM feedbacks f
-      WHERE f.user_id = ?${searchClause}
+      WHERE f.user_id = ?${searchFilter.clause}
       ORDER BY f.created_at DESC, f.id DESC
       LIMIT ? OFFSET ?
     `;
 
-    const feedbacks = await this.queryAll(dataSql, [userId, ...searchParams, limit, offset]);
+    const feedbacks = await this.queryAll(dataSql, [userId, ...searchFilter.params, limit, offset]);
 
     return {
       data: feedbacks,
       meta: {
         total: total.total,
-        page: page,
-        limit: limit,
-        totalPages: Math.ceil(total.total / limit)
+        page,
+        limit,
+        totalPages: Math.ceil(total.total / limit),
+        search,
+        searchTerms: searchFilter.terms
       }
     };
   }
 
   async getByLookupEmail(email, { page = 1, limit = 20, search = '' } = {}) {
     const offset = (page - 1) * limit;
-    const escapedSearch = search.replace(/[\\%_]/g, '\\$&');
-    const searchClause = search ? ` AND (message LIKE ? ESCAPE '\\' OR admin_reply LIKE ? ESCAPE '\\')` : '';
-    const searchParams = search ? [`%${escapedSearch}%`, `%${escapedSearch}%`] : [];
+    const searchFilter = buildFeedbackSearch(search);
     const total = await this.queryOne(
-      `SELECT COUNT(*) AS total FROM feedbacks WHERE lookup_email = ?${searchClause}`,
-      [email, ...searchParams]
+      `SELECT COUNT(*) AS total FROM feedbacks WHERE lookup_email = ?${searchFilter.clause}`,
+      [email, ...searchFilter.params]
     );
     const data = await this.queryAll(
       `SELECT id, message, status, created_at, admin_reply FROM feedbacks
-       WHERE lookup_email = ?${searchClause} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
-      [email, ...searchParams, limit, offset]
+       WHERE lookup_email = ?${searchFilter.clause} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+      [email, ...searchFilter.params, limit, offset]
     );
-    return { data, meta: { total: total.total, page, limit, totalPages: Math.ceil(total.total / limit) } };
+    return {
+      data,
+      meta: { total: total.total, page, limit, totalPages: Math.ceil(total.total / limit), search, searchTerms: searchFilter.terms }
+    };
   }
 
   async getByAccessTokenHash(hash) {

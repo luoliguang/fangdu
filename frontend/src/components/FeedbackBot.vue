@@ -305,6 +305,17 @@ function startFeedbackLookup(useDevice = false) {
 function searchFeedbackRecords() {
   checkReplies(!emailLookupMode.value);
 }
+function clearFeedbackSearch() {
+  if (!feedbackSearch.value && !activeFeedbackSearch.value) return;
+  feedbackSearch.value = '';
+  checkReplies(!emailLookupMode.value);
+}
+function assertSearchApplied(response, search) {
+  if (!search || response.data?.meta?.search === search) return;
+  const error = new Error('搜索服务尚未更新，请重启后端后再试。');
+  error.isSearchCompatibilityError = true;
+  throw error;
+}
 async function checkReplies(useDevice = false) {
   if (checkingReplies.value) return;
   showFeedbackRecords.value = false;
@@ -321,6 +332,7 @@ async function checkReplies(useDevice = false) {
     feedbackLookupMessage.value = '';
     try {
       const response = await apiClient.post('/api/v1/bot/request/by-email', { email, ...(search ? { search } : {}) });
+      assertSearchApplied(response, search);
       feedbackRecords.value = Array.isArray(response.data?.data) ? response.data.data : [];
       feedbackTotal.value = Number(response.data?.meta?.total) || 0;
       feedbackPages.value = { email: { page: 1, totalPages: Number(response.data?.meta?.totalPages) || 1 } };
@@ -335,7 +347,9 @@ async function checkReplies(useDevice = false) {
         : '这个邮箱下还没有新需求。提交找图需求时填写同一个邮箱，之后就能在这里查到。';
     } catch (error) {
       feedbackLookupDone.value = true;
-      feedbackLookupMessage.value = error?.response?.data?.message || '邮箱查询暂时不可用，请稍后再试。';
+      feedbackLookupMessage.value = error?.isSearchCompatibilityError
+        ? error.message
+        : error?.response?.data?.message || '邮箱查询暂时不可用，请稍后再试。';
     } finally {
       checkingReplies.value = false;
     }
@@ -352,6 +366,7 @@ async function checkReplies(useDevice = false) {
   feedbackLookupMessage.value = '';
   try {
     const response = await apiClient.get(`/api/v1/feedbacks/user/${activeId}`, { params: { limit: 50, ...(search ? { search } : {}) } });
+    assertSearchApplied(response, search);
     feedbackRecords.value = Array.isArray(response.data?.data) ? response.data.data : [];
     feedbackTotal.value = Number(response.data?.meta?.total) || 0;
     feedbackPages.value = { [activeId]: { page: 1, totalPages: Number(response.data?.meta?.totalPages) || 1 } };
@@ -361,9 +376,11 @@ async function checkReplies(useDevice = false) {
     if (!feedbackRecords.value.length) feedbackLookupMessage.value = search
       ? `没有找到包含“${search}”的需求或回复。`
       : '这台设备还没有需求记录。提交找图需求后可在这里查看处理状态和跟单回复。';
-  } catch (_) {
+  } catch (error) {
     feedbackLookupDone.value = true;
-    feedbackLookupMessage.value = '暂时无法读取需求回复，请稍后再试。';
+    feedbackLookupMessage.value = error?.isSearchCompatibilityError
+      ? error.message
+      : error?.response?.data?.message || '暂时无法读取需求回复，请稍后再试。';
   } finally {
     checkingReplies.value = false;
   }
@@ -689,10 +706,12 @@ function onKeydown(e) {
           <section v-if="showFeedbackRecords && (feedbackRecords.length || activeFeedbackSearch)" class="fbot-record-list" aria-label="需求查询结果">
             <form class="fbot-record-search" role="search" @submit.prevent="searchFeedbackRecords">
               <label class="sr-only" for="fbot-record-search">搜索需求和回复</label>
-              <input id="fbot-record-search" v-model="feedbackSearch" type="search" maxlength="100" placeholder="搜索需求或跟单回复" />
+              <input id="fbot-record-search" v-model="feedbackSearch" type="search" maxlength="100" placeholder="输入关键词，如：蓝色 条纹" />
+              <button v-if="activeFeedbackSearch" class="is-clear" type="button" :disabled="checkingReplies" @click="clearFeedbackSearch">清除</button>
               <button type="submit" :disabled="checkingReplies">{{ checkingReplies ? '搜索中…' : '搜索' }}</button>
             </form>
-            <div class="fbot-record-summary"><strong>{{ activeFeedbackSearch ? '搜索结果' : '查询结果' }}</strong><span>共 {{ feedbackTotal }} 条</span></div>
+            <small class="fbot-search-help">支持空格、逗号分隔多个关键词，同时匹配需求内容和跟单回复。</small>
+            <div class="fbot-record-summary"><strong>{{ activeFeedbackSearch ? `“${activeFeedbackSearch}”的搜索结果` : '全部查询结果' }}</strong><span>共 {{ feedbackTotal }} 条</span></div>
             <article v-for="item in feedbackRecords" :key="item.id" class="fbot-record">
               <div class="fbot-record-head"><span>需求 #{{ item.id }} · 提交于 {{ formatFeedbackTime(item.created_at) }}</span><span :class="{ 'is-replied': item.admin_reply }">{{ item.admin_reply ? '已回复' : item.status === 'pending' ? '待处理' : '已处理' }}</span></div>
               <p>{{ item.message }}</p>
@@ -1111,10 +1130,12 @@ function onKeydown(e) {
 .fbot-record-search { display: flex; gap: 7px; }
 .fbot-record-search input { flex: 1; min-width: 0; border: 1px solid var(--fb-line); border-radius: 9px; padding: 8px 9px; color: var(--fb-text); background: var(--fb-bg); font: inherit; font-size: 12px; }
 .fbot-record-search button { border: 1px solid var(--fb-line); border-radius: 9px; padding: 7px 12px; color: var(--fb-accent); background: var(--fb-bot-bubble); font: inherit; font-size: 12px; cursor: pointer; }
+.fbot-record-search button.is-clear { padding-inline: 8px; color: var(--fb-sub); background: transparent; }
 .fbot-record-search button:disabled { opacity: .6; cursor: wait; }
 .fbot-record-search input:focus { outline: 2px solid rgba(90, 143, 115, .35); border-color: var(--fb-accent); }
-.fbot-record-summary { display: flex; align-items: center; justify-content: space-between; color: var(--fb-sub); font-size: 12px; }
-.fbot-record-summary strong { color: var(--fb-text); font-size: 13px; }
+.fbot-search-help { color: var(--fb-sub); font-size: 10px; line-height: 1.45; }
+.fbot-record-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--fb-sub); font-size: 12px; }
+.fbot-record-summary strong { min-width: 0; color: var(--fb-text); font-size: 13px; overflow-wrap: anywhere; }
 .fbot-record-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; font-size: 11px; line-height: 1.45; color: var(--fb-sub); }
 .fbot-record-head > span:first-child { min-width: 0; }
 .fbot-record-head > span:last-child { flex-shrink: 0; }
