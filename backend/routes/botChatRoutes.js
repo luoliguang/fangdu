@@ -17,6 +17,7 @@ const { createFeedbackGuard } = require('../middleware/feedbackGuard');
 module.exports = function createBotChatRoutes(service, deps = {}) {
   const router = express.Router();
   const feedbackService = deps.feedbackService || null;
+  const materialSearch = deps.materialSearch || null;
   const conversations = deps.conversations || (feedbackService ? new BotConversationService(service, feedbackService) : null);
 
   const chatLimiter = rateLimit({
@@ -50,7 +51,7 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
     try {
       const { message, userId, history, topicLabel, sessionId } = req.body || {};
       if (sessionId != null && !validSessionId(sessionId)) return res.status(400).json({ success: false, message: '会话标识无效' });
-      const result = await service.chat({ message, userId, history, topicLabel });
+      const result = await service.chat({ message, userId, history, topicLabel, materialSearch });
       if (!result.enabled) return res.json({ success: true, data: { ai: false, reply: null } });
       if (sessionId && conversations) conversations.record({ sessionId, message, userId, topicLabel });
       else await logFeedback({ message, userId, topicLabel });
@@ -83,7 +84,7 @@ module.exports = function createBotChatRoutes(service, deps = {}) {
     let completed = false;
     let failed = false;
     try {
-      for await (const ev of service.streamChat({ message, history, topicLabel })) {
+      for await (const ev of service.streamChat({ message, history, topicLabel, materialSearch })) {
         if (ev.type === 'delta') {
           full += ev.content;
           res.write(`data: ${JSON.stringify({ delta: ev.content })}\n\n`);

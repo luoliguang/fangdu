@@ -32,7 +32,8 @@ function createRoutes(db, siteControlService) {
   // 机器人（DeepSeek AI 助手）：后台配置仅管理员，前台状态与对话公开
   apiV1.use('/bot-config', require('./botConfigRoutes')(require('../services/BotService').getShared()));
   apiV1.use('/bot', require('./botChatRoutes')(require('../services/BotService').getShared(), {
-    feedbackService: new (require('../services/FeedbackService'))(db)
+    feedbackService: new (require('../services/FeedbackService'))(db),
+    materialSearch: new (require('../services/BotMaterialSearch').BotMaterialSearch)(db)
   }));
 
   // 访问统计相关路由
