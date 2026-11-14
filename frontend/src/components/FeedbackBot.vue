@@ -70,8 +70,11 @@ const inputRef = ref(null);
 const panelRef = ref(null);
 const containerRef = ref(null);
 const panelModeAnnouncement = ref('');
+const panelModeSwitching = ref(false);
 const botExpression = ref('idle');
 let expressionTimer;
+let panelModeAnimation;
+let panelModeSwitchId = 0;
 
 // 发送冷却：按钮上显示倒计时，不再往聊天里追加提示；刷新页面后仍然有效
 const COOLDOWN_KEY = 'fbot-cooldown-until';
@@ -199,6 +202,8 @@ onUnmounted(() => {
   setBackgroundInert(false);
   clearInterval(tickTimer);
   clearTimeout(expressionTimer);
+  panelModeSwitchId += 1;
+  panelModeAnimation?.cancel();
   if (open.value) finishConversation();
 });
 
@@ -242,10 +247,40 @@ function openRequests() {
   feedbackLookupMessage.value = '';
   if (window.matchMedia?.('(pointer: fine)').matches) nextTick(() => document.getElementById('fbot-lookup-email')?.focus());
 }
-function togglePanelMode() {
+async function togglePanelMode() {
+  const firstRect = panelRef.value?.getBoundingClientRect();
+  const switchId = ++panelModeSwitchId;
+  const activeAnimation = panelModeAnimation;
+  panelModeAnimation = null;
+  activeAnimation?.cancel();
+  panelModeSwitching.value = true;
   panelMode.value = panelMode.value === 'focus' ? 'float' : 'focus';
   localStorage.setItem('fbot-panel-mode', panelMode.value);
   panelModeAnnouncement.value = panelMode.value === 'focus' ? '已切换到居中专注模式' : '已还原为右下角浮动模式';
+  await nextTick();
+  if (switchId !== panelModeSwitchId) return;
+  const panel = panelRef.value;
+  const lastRect = panel?.getBoundingClientRect();
+  if (reduceMotion || !panel?.animate || !firstRect || !lastRect || !lastRect.width || !lastRect.height) {
+    panelModeSwitching.value = false;
+    return;
+  }
+  const animation = panel.animate([
+    {
+      transformOrigin: 'top left',
+      transform: `translate3d(${firstRect.left - lastRect.left}px, ${firstRect.top - lastRect.top}px, 0) scale(${firstRect.width / lastRect.width}, ${firstRect.height / lastRect.height})`
+    },
+    { transformOrigin: 'top left', transform: 'translate3d(0, 0, 0) scale(1, 1)' }
+  ], {
+    duration: 220,
+    easing: 'cubic-bezier(0.22, 1, 0.36, 1)'
+  });
+  panelModeAnimation = animation;
+  animation.finished.catch(() => {}).finally(() => {
+    if (panelModeAnimation !== animation) return;
+    panelModeAnimation = null;
+    panelModeSwitching.value = false;
+  });
 }
 function trapPanelFocus(event) {
   if (panelMode.value !== 'focus' || !panelRef.value) return;
@@ -692,7 +727,7 @@ function onKeydown(e) {
 </script>
 
 <template>
-  <div ref="containerRef" class="fbot" :class="{ 'is-dark': isDark, 'is-open': open, 'is-focus': open && panelMode === 'focus' }">
+  <div ref="containerRef" class="fbot" :class="{ 'is-dark': isDark, 'is-open': open, 'is-focus': open && panelMode === 'focus', 'is-mode-switching': panelModeSwitching }">
     <Transition name="fbot-backdrop">
       <button v-if="open && panelMode === 'focus'" class="fbot-backdrop" type="button" aria-label="关闭专注模式窗口" @click="closePanel"></button>
     </Transition>
@@ -944,7 +979,6 @@ function onKeydown(e) {
   border: 0;
   padding: 0;
   background: rgba(5, 24, 14, 0.38);
-  backdrop-filter: blur(3px);
   pointer-events: auto;
   cursor: default;
 }
@@ -1032,9 +1066,12 @@ function onKeydown(e) {
     0 0 0 1px rgba(10, 61, 34, 0.05),
     0 24px 60px rgba(10, 61, 34, 0.30),
     0 6px 18px rgba(10, 61, 34, 0.16);
-  backdrop-filter: blur(14px);
+  contain: layout;
   transform-origin: bottom right;
   transition: width 0.24s ease, height 0.24s ease, border-radius 0.24s ease;
+}
+.fbot.is-mode-switching .fbot-panel {
+  transition: none;
 }
 .fbot.is-focus .fbot-panel {
   z-index: 1;
