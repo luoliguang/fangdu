@@ -45,17 +45,23 @@ const text = ref('');
 const topic = ref(null);
 const sending = ref(false);
 const streaming = ref(false);
+const panelView = ref('chat');
 const checkingReplies = ref(false);
 const showCodeLookup = ref(false);
+const showSubmitEmail = ref(Boolean(localStorage.getItem('fbot-lookup-email')));
 const lookupCode = ref('');
 const lookupEmail = ref(localStorage.getItem('fbot-lookup-email') || '');
 const lookingUpCode = ref(false);
+const codeLookupResult = ref(null);
+const codeLookupMessage = ref('');
 const emailLookupMode = ref(false);
 const activeLookupEmail = ref('');
 const feedbackRecords = ref([]);
 const feedbackTotal = ref(0);
 const feedbackPages = ref({});
 const showFeedbackRecords = ref(false);
+const feedbackLookupDone = ref(false);
+const feedbackLookupMessage = ref('');
 const bodyRef = ref(null);
 const inputRef = ref(null);
 
@@ -172,7 +178,17 @@ function finishConversation() {
 }
 function closePanel() {
   open.value = false;
+  panelView.value = 'chat';
   finishConversation();
+}
+function onPanelEscape() {
+  if (panelView.value === 'requests') panelView.value = 'chat';
+  else closePanel();
+}
+function openRequests() {
+  panelView.value = 'requests';
+  feedbackLookupMessage.value = '';
+  if (window.matchMedia?.('(pointer: fine)').matches) nextTick(() => document.getElementById('fbot-lookup-email')?.focus());
 }
 function toggle() {
   if (open.value) return closePanel();
@@ -270,15 +286,19 @@ function isExplicitFeedback(content) {
   return /^(?:我想反馈|我要反馈|反馈一下|我有个建议|我想提建议|我要提建议|我想投诉|我要投诉|我想提交需求|我要提交需求|提交找图需求|建议新增|建议增加|希望新增|希望增加)/.test(content)
     || /(?:网站|页面).{0,8}(?:有问题|出错|打不开|白屏|报错)/.test(content);
 }
-async function checkReplies() {
+async function checkReplies(useDevice = false) {
   if (checkingReplies.value) return;
-  const email = lookupEmail.value.trim();
+  showFeedbackRecords.value = false;
+  feedbackLookupDone.value = false;
+  const email = useDevice ? '' : lookupEmail.value.trim();
   if (email) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
-      pushBot('请输入有效的查询邮箱。');
+      feedbackLookupDone.value = true;
+      feedbackLookupMessage.value = '请输入有效的查询邮箱。';
       return;
     }
     checkingReplies.value = true;
+    feedbackLookupMessage.value = '';
     try {
       const response = await apiClient.post('/api/v1/bot/request/by-email', { email });
       feedbackRecords.value = Array.isArray(response.data?.data) ? response.data.data : [];
@@ -288,10 +308,11 @@ async function checkReplies() {
       activeLookupEmail.value = email;
       localStorage.setItem('fbot-lookup-email', email);
       showFeedbackRecords.value = true;
-      if (!feedbackRecords.value.length) pushBot('这个邮箱下还没有新需求。提交找图需求时填写同一个邮箱，之后就能在这里查到。');
-      scrollBottom();
+      feedbackLookupDone.value = true;
+      if (!feedbackRecords.value.length) feedbackLookupMessage.value = '这个邮箱下还没有新需求。提交找图需求时填写同一个邮箱，之后就能在这里查到。';
     } catch (error) {
-      pushBot(error?.response?.data?.message || '邮箱查询暂时不可用，请稍后再试。');
+      feedbackLookupDone.value = true;
+      feedbackLookupMessage.value = error?.response?.data?.message || '邮箱查询暂时不可用，请稍后再试。';
     } finally {
       checkingReplies.value = false;
     }
@@ -300,20 +321,23 @@ async function checkReplies() {
   emailLookupMode.value = false;
   const activeId = getUserId();
   if (!activeId) {
-    pushBot('当前浏览器无法保存反馈身份，请用提交时保存的查询码查询。');
+    feedbackLookupDone.value = true;
+    feedbackLookupMessage.value = '当前浏览器无法保存需求身份，请用提交时保存的查询码查询。';
     return;
   }
   checkingReplies.value = true;
+  feedbackLookupMessage.value = '';
   try {
     const response = await apiClient.get(`/api/v1/feedbacks/user/${activeId}`, { params: { limit: 50 } });
     feedbackRecords.value = Array.isArray(response.data?.data) ? response.data.data : [];
     feedbackTotal.value = Number(response.data?.meta?.total) || 0;
     feedbackPages.value = { [activeId]: { page: 1, totalPages: Number(response.data?.meta?.totalPages) || 1 } };
     showFeedbackRecords.value = true;
-    if (!feedbackRecords.value.length) pushBot('这台设备还没有需求记录。提交找图需求后可在这里查看处理状态和掌柜回复；换设备请填写查询邮箱。');
-    scrollBottom();
+    feedbackLookupDone.value = true;
+    if (!feedbackRecords.value.length) feedbackLookupMessage.value = '这台设备还没有需求记录。提交找图需求后可在这里查看处理状态和掌柜回复。';
   } catch (_) {
-    pushBot('暂时无法读取反馈回复，请稍后再试。');
+    feedbackLookupDone.value = true;
+    feedbackLookupMessage.value = '暂时无法读取需求回复，请稍后再试。';
   } finally {
     checkingReplies.value = false;
   }
@@ -333,9 +357,8 @@ async function loadMoreFeedbackRecords() {
     feedbackPages.value = Object.fromEntries(Object.entries(feedbackPages.value).map(([id, state]) =>
       [id, entries.some(([nextId]) => nextId === id) ? { ...state, page: state.page + 1 } : state]
     ));
-    scrollBottom();
   } catch (_) {
-    pushBot('暂时无法加载更多需求，请稍后再试。');
+    feedbackLookupMessage.value = '暂时无法加载更多需求，请稍后再试。';
   } finally {
     checkingReplies.value = false;
   }
@@ -343,23 +366,21 @@ async function loadMoreFeedbackRecords() {
 async function lookupReply() {
   const accessCode = lookupCode.value.trim();
   if (!/^[A-Za-z0-9_-]{32}$/.test(accessCode)) {
-    pushBot('查询码格式不正确，请粘贴提交需求时保存的完整查询码。');
+    codeLookupResult.value = null;
+    codeLookupMessage.value = '查询码格式不正确，请粘贴提交需求时保存的完整查询码。';
     return;
   }
   if (lookingUpCode.value) return;
   lookingUpCode.value = true;
+  codeLookupMessage.value = '';
   try {
     const response = await apiClient.post('/api/v1/bot/request/lookup', { accessCode });
     const feedback = response.data?.data;
-    if (feedback?.admin_reply) {
-      pushBot(`掌柜的回复（反馈 #${feedback.id}）：\n${feedback.admin_reply}`, undefined, { md: true });
-    } else {
-      pushBot('这条需求还在处理中。可以保留查询码，稍后再来查看。');
-    }
-    lookupCode.value = '';
-    showCodeLookup.value = false;
+    codeLookupResult.value = feedback || null;
+    if (!feedback?.admin_reply) codeLookupMessage.value = '这条需求还在处理中。请保留查询码，稍后再来查看。';
   } catch (error) {
-    pushBot(error?.response?.data?.message || '暂时查不到这条反馈，请稍后再试。');
+    codeLookupResult.value = null;
+    codeLookupMessage.value = error?.response?.data?.message || '暂时查不到这条需求，请稍后再试。';
   } finally {
     lookingUpCode.value = false;
   }
@@ -549,20 +570,23 @@ function onKeydown(e) {
 <template>
   <div class="fbot" :class="{ 'is-dark': isDark, 'is-open': open }">
     <Transition name="fbot-panel">
-      <section v-if="open" class="fbot-panel" role="dialog" aria-label="反馈小助手" @keydown.esc="closePanel">
+      <section v-if="open" class="fbot-panel" :class="{ 'is-requests': panelView === 'requests' }" role="dialog" :aria-label="panelView === 'chat' ? '小度实拍图助手' : '我的需求'" @keydown.esc="onPanelEscape">
         <header class="fbot-head">
-          <span class="fbot-head-avatar" aria-hidden="true">
+          <button v-if="panelView === 'requests'" class="fbot-head-back" type="button" aria-label="返回聊天" @click="panelView = 'chat'">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          </button>
+          <span v-else class="fbot-head-avatar" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.7 5 5 1.7-5 1.7L12 16.4l-1.7-5-5-1.7 5-1.7z"/><path d="M19 15v4M17 17h4"/></svg>
           </span>
           <span class="fbot-head-meta">
-            <strong>小度</strong>
-            <span class="fbot-head-sub">{{ aiEnabled ? '实拍图搜索与反馈' : '反馈小助手' }}</span>
+            <strong>{{ panelView === 'chat' ? '小度' : '我的需求' }}</strong>
+            <span class="fbot-head-sub">{{ panelView === 'chat' ? (aiEnabled ? '实拍图搜索与反馈' : '反馈小助手') : '查看处理进度与掌柜回复' }}</span>
           </span>
-          <span class="fbot-head-dot" :class="{ 'is-off': !aiEnabled }"></span>
-          <button class="fbot-close" aria-label="关闭" @click="closePanel">×</button>
+          <button v-if="panelView === 'chat'" class="fbot-head-action" type="button" @click="openRequests">我的需求</button>
+          <button class="fbot-close" type="button" aria-label="关闭" @click="closePanel">×</button>
         </header>
 
-        <div ref="bodyRef" class="fbot-body" role="log" aria-live="polite">
+        <div v-if="panelView === 'chat'" ref="bodyRef" class="fbot-body" role="log" aria-live="polite">
           <div v-for="m in messages" :key="m.id" class="fbot-msg" :class="[`from-${m.from}`, { 'is-ai-reply': m.animate }]">
             <div class="fbot-bubble" :class="{ 'is-ok': m.tone === 'ok', 'is-ai': m.md, 'is-streaming': m.streaming }" @animationend="onReplyAnimationEnd($event, m)">
               <svg v-if="m.tone === 'ok'" class="fbot-ok" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.8 12.4l3 3 5.4-6"/></svg>
@@ -571,15 +595,6 @@ function onKeydown(e) {
               <template v-else-if="!m.md">{{ m.text }}</template>
               <button v-if="m.aiReply && !m.streaming && getKeywords(m.text).length > 1" class="fbot-copy-terms" type="button" title="每行一个；也可点上方关键词单独复制" @click="copyRecommendations(m.text)">复制全部推荐词</button>
             </div>
-          </div>
-          <div v-if="showFeedbackRecords" class="fbot-record-list" aria-label="我的需求">
-            <div class="fbot-record-head"><strong>我的需求（{{ feedbackTotal }}）</strong><button type="button" @click="showFeedbackRecords = false">收起</button></div>
-            <article v-for="item in feedbackRecords" :key="item.id" class="fbot-record">
-              <div class="fbot-record-head"><span>需求 #{{ item.id }}</span><span>{{ item.admin_reply ? '已回复' : item.status === 'pending' ? '待处理' : '已处理' }}</span></div>
-              <p>{{ item.message }}</p>
-              <p v-if="item.admin_reply" class="fbot-record-reply">掌柜回复：{{ item.admin_reply }}</p>
-            </article>
-            <button v-if="feedbackTotal > feedbackRecords.length" class="fbot-record-more" type="button" :disabled="checkingReplies" @click="loadMoreFeedbackRecords">{{ checkingReplies ? '加载中…' : '加载更多需求' }}</button>
           </div>
           <div v-if="sending && !streaming" class="fbot-msg from-bot" role="status">
             <div class="fbot-bubble fbot-typing"><i></i><i></i><i></i><span>{{ aiEnabled ? '正在生成回复…' : '正在发送…' }}</span></div>
@@ -600,39 +615,80 @@ function onKeydown(e) {
           </div>
         </div>
 
-        <div class="fbot-email-entry">
-          <label for="fbot-lookup-email">查询邮箱（选填；提交时填写同一个邮箱可跨设备查看）</label>
-          <div class="fbot-email-entry-row">
-            <input id="fbot-lookup-email" v-model="lookupEmail" type="email" maxlength="254" autocomplete="email" placeholder="你的邮箱" @keydown.enter.prevent="checkReplies" />
-            <button type="button" :disabled="checkingReplies" @click="checkReplies">查看需求</button>
+        <template v-if="panelView === 'chat'">
+          <div v-if="topic" class="fbot-submit-email">
+            <button v-if="!showSubmitEmail" type="button" @click="showSubmitEmail = true">需要换设备看回复？添加邮箱（选填）</button>
+            <template v-else>
+              <label for="fbot-submit-email">跨设备查看回复（选填）</label>
+              <input id="fbot-submit-email" v-model="lookupEmail" type="email" maxlength="254" autocomplete="email" placeholder="填写你的查询邮箱" />
+              <small>邮箱无需验证，请勿填写私人信息。</small>
+            </template>
           </div>
-          <small>无需验证邮箱；知道邮箱的人也能查看该邮箱下的新需求和回复，请勿填写私人信息。</small>
-        </div>
-        <div v-if="showCodeLookup" class="fbot-code-lookup">
-          <label for="fbot-access-code">查询码</label>
-          <input id="fbot-access-code" v-model="lookupCode" maxlength="32" autocomplete="off" placeholder="粘贴保存的查询码" @keydown.enter.prevent="lookupReply" />
-          <button type="button" :disabled="lookingUpCode" @click="lookupReply">{{ lookingUpCode ? '查询中…' : '查询' }}</button>
-        </div>
-        <footer class="fbot-foot">
-          <textarea
-            ref="inputRef"
-            v-model="text"
-            rows="2"
-            :maxlength="MAX_LEN"
-            placeholder="描述要找的实拍图，或提交需求…"
-            aria-label="反馈内容"
-            @keydown="onKeydown"
-          ></textarea>
-          <button class="fbot-send" :disabled="!canSend" @click="send">
-            <svg v-if="cooldownLeft === 0" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
-            <span>{{ cooldownLeft > 0 ? cooldownLabel : '发送' }}</span>
-          </button>
-        </footer>
-        <div class="fbot-hint">
-          <span>Enter 发送 · Shift+Enter 换行</span>
-          <button class="fbot-check-replies" type="button" :disabled="checkingReplies" @click="checkReplies">{{ checkingReplies ? '查询中…' : '我的需求' }}</button>
-          <button class="fbot-check-replies" type="button" @click="showCodeLookup = !showCodeLookup">凭查询码查询</button>
-          <span v-if="text.length > MAX_LEN * 0.8" :class="{ 'is-warn': remaining < 50 }">{{ text.length }}/{{ MAX_LEN }}</span>
+          <footer class="fbot-foot">
+            <textarea
+              ref="inputRef"
+              v-model="text"
+              rows="2"
+              :maxlength="MAX_LEN"
+              placeholder="描述要找的实拍图，或提交需求…"
+              aria-label="反馈内容"
+              @keydown="onKeydown"
+            ></textarea>
+            <button class="fbot-send" :disabled="!canSend" @click="send">
+              <svg v-if="cooldownLeft === 0" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+              <span>{{ cooldownLeft > 0 ? cooldownLabel : '发送' }}</span>
+            </button>
+          </footer>
+          <div class="fbot-hint">
+            <span>Enter 发送 · Shift+Enter 换行</span>
+            <span v-if="text.length > MAX_LEN * 0.8" :class="{ 'is-warn': remaining < 50 }">{{ text.length }}/{{ MAX_LEN }}</span>
+          </div>
+        </template>
+
+        <div v-else class="fbot-requests-view">
+          <section class="fbot-lookup-card" aria-labelledby="fbot-lookup-title">
+            <div class="fbot-lookup-intro">
+              <strong id="fbot-lookup-title">跨设备查询</strong>
+              <span>输入提交需求时填写的邮箱</span>
+            </div>
+            <div class="fbot-email-entry-row">
+              <input id="fbot-lookup-email" v-model="lookupEmail" type="email" maxlength="254" autocomplete="email" placeholder="查询邮箱" aria-describedby="fbot-email-note" @keydown.enter.prevent="checkReplies()" />
+              <button type="button" :disabled="checkingReplies" @click="checkReplies()">{{ checkingReplies ? '查询中…' : '查询' }}</button>
+            </div>
+            <small id="fbot-email-note">邮箱无需验证，知道邮箱的人也能查看关联的新需求和回复，请勿填写私人信息。</small>
+            <button class="fbot-local-lookup" type="button" :disabled="checkingReplies" @click="checkReplies(true)">查看这台设备提交的需求</button>
+          </section>
+
+          <p v-if="feedbackLookupMessage" class="fbot-lookup-state" role="status">{{ feedbackLookupMessage }}</p>
+          <section v-if="showFeedbackRecords && feedbackRecords.length" class="fbot-record-list" aria-label="需求查询结果">
+            <div class="fbot-record-summary"><strong>查询结果</strong><span>共 {{ feedbackTotal }} 条</span></div>
+            <article v-for="item in feedbackRecords" :key="item.id" class="fbot-record">
+              <div class="fbot-record-head"><span>需求 #{{ item.id }}</span><span :class="{ 'is-replied': item.admin_reply }">{{ item.admin_reply ? '已回复' : item.status === 'pending' ? '待处理' : '已处理' }}</span></div>
+              <p>{{ item.message }}</p>
+              <p v-if="item.admin_reply" class="fbot-record-reply"><strong>掌柜回复</strong>{{ item.admin_reply }}</p>
+            </article>
+            <button v-if="feedbackTotal > feedbackRecords.length" class="fbot-record-more" type="button" :disabled="checkingReplies" @click="loadMoreFeedbackRecords">{{ checkingReplies ? '加载中…' : '加载更多需求' }}</button>
+          </section>
+          <div v-else-if="!feedbackLookupDone" class="fbot-requests-empty">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="m4 7 8 6 8-6"/></svg>
+            <strong>掌柜的回复会显示在这里</strong>
+            <span>可以用邮箱跨设备查询，也可以查看本机记录。</span>
+          </div>
+
+          <section class="fbot-code-section">
+            <button class="fbot-code-toggle" type="button" :aria-expanded="showCodeLookup" @click="showCodeLookup = !showCodeLookup">
+              <span>有匿名需求查询码？</span><span>{{ showCodeLookup ? '收起' : '使用查询码' }}</span>
+            </button>
+            <div v-if="showCodeLookup" class="fbot-code-lookup">
+              <label for="fbot-access-code">查询码</label>
+              <div><input id="fbot-access-code" v-model="lookupCode" maxlength="32" autocomplete="off" placeholder="粘贴 32 位查询码" @keydown.enter.prevent="lookupReply" /><button type="button" :disabled="lookingUpCode" @click="lookupReply">{{ lookingUpCode ? '查询中…' : '查询' }}</button></div>
+              <p v-if="codeLookupMessage" class="fbot-code-message" role="status">{{ codeLookupMessage }}</p>
+              <article v-if="codeLookupResult?.admin_reply" class="fbot-record">
+                <div class="fbot-record-head"><span>需求 #{{ codeLookupResult.id }}</span><span class="is-replied">已回复</span></div>
+                <p class="fbot-record-reply"><strong>掌柜回复</strong>{{ codeLookupResult.admin_reply }}</p>
+              </article>
+            </div>
+          </section>
         </div>
       </section>
     </Transition>
@@ -763,6 +819,10 @@ function onKeydown(e) {
   backdrop-filter: blur(14px);
   transform-origin: bottom right;
 }
+.fbot-panel.is-requests {
+  width: min(420px, calc(100vw - 32px));
+  height: min(560px, calc(100vh - 210px));
+}
 .fbot-head {
   display: flex;
   align-items: center;
@@ -790,6 +850,17 @@ function onKeydown(e) {
 .fbot-head-sub { font-size: 11px; opacity: 0.85; font-weight: 500; }
 .fbot-head-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: #9ef0c0; box-shadow: 0 0 0 0 rgba(158, 240, 192, 0.6); animation: fbot-pulse 2s ease-in-out infinite; }
 .fbot-head-dot.is-off { background: rgba(255, 255, 255, 0.5); box-shadow: none; animation: none; }
+.fbot-head-back, .fbot-head-action {
+  flex-shrink: 0;
+  border: 0;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+}
+.fbot-head-back { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border-radius: 50%; }
+.fbot-head-action { padding: 6px 9px; border-radius: 999px; font: inherit; font-size: 11px; font-weight: 600; }
+.fbot-head-back:hover, .fbot-head-action:hover { background: rgba(255, 255, 255, 0.25); }
+.fbot-head-back:focus-visible, .fbot-head-action:focus-visible, .fbot-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 @keyframes fbot-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(158, 240, 192, 0.55); }
   50% { box-shadow: 0 0 0 5px rgba(158, 240, 192, 0); }
@@ -980,33 +1051,56 @@ function onKeydown(e) {
 .fbot-foot { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px dashed var(--fb-line); background: var(--fb-bg); }
 .fbot-hint { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 0 14px 10px; font-size: 11px; color: var(--fb-sub); }
 .fbot-hint .is-warn { color: #d9534f; }
-.fbot-record-list { margin: 4px 12px 12px; display: grid; gap: 8px; }
-.fbot-record-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--fb-sub); }
-.fbot-record-head strong { color: var(--fb-text); }
-.fbot-record-head button { border: 0; background: transparent; color: var(--fb-accent); cursor: pointer; }
-.fbot-record { border: 1px solid var(--fb-line); border-radius: 12px; background: var(--fb-bot-bubble); padding: 10px; overflow-wrap: anywhere; }
-.fbot-record p { margin: 6px 0 0; white-space: pre-wrap; font-size: 13px; color: var(--fb-text); }
-.fbot-record .fbot-record-reply { padding-top: 8px; border-top: 1px solid var(--fb-line); color: var(--fb-accent); }
-.fbot-record-more { border: 1px solid var(--fb-line); border-radius: 8px; padding: 6px; background: var(--fb-bg); color: var(--fb-accent); font: inherit; cursor: pointer; }
-.fbot-record-more:disabled { opacity: .6; cursor: wait; }
-.fbot-email-entry { padding: 7px 12px; background: var(--fb-bg); border-top: 1px solid var(--fb-line); font-size: 11px; color: var(--fb-sub); }
-.fbot-email-entry label { display: block; margin-bottom: 5px; }
-.fbot-email-entry-row { display: flex; gap: 6px; }
-.fbot-email-entry-row input { min-width: 0; flex: 1; border: 1px solid var(--fb-line); border-radius: 8px; padding: 5px 7px; color: var(--fb-text); background: var(--fb-bg); font: inherit; font-size: 12px; }
-.fbot-email-entry-row button { border: 1px solid var(--fb-line); border-radius: 8px; background: var(--fb-bot-bubble); color: var(--fb-accent); padding: 5px 7px; cursor: pointer; white-space: nowrap; }
-.fbot-email-entry-row button:disabled { opacity: .6; cursor: wait; }
-.fbot-email-entry small { display: block; margin-top: 4px; line-height: 1.35; }
-.fbot-check-replies { border: 0; background: transparent; color: var(--fb-accent); font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
-.fbot-check-replies:hover, .fbot-check-replies:focus-visible { text-decoration: underline; }
-.fbot-check-replies:disabled { opacity: .6; cursor: wait; }
+.fbot-submit-email { padding: 8px 12px 0; border-top: 1px solid var(--fb-line); background: var(--fb-bg); }
+.fbot-submit-email button { border: 0; padding: 2px 0; color: var(--fb-accent); background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
+.fbot-submit-email label { display: block; margin-bottom: 4px; color: var(--fb-sub); font-size: 11px; }
+.fbot-submit-email input { width: 100%; box-sizing: border-box; border: 1px solid var(--fb-line); border-radius: 9px; padding: 7px 9px; color: var(--fb-text); background: var(--fb-input); font: inherit; font-size: 12px; }
+.fbot-submit-email small { display: block; margin-top: 4px; color: var(--fb-sub); font-size: 10px; }
 .fbot-followup { padding: 6px 12px 12px; text-align: right; }
 .fbot-followup button { border: 1px solid var(--fb-line); border-radius: 12px; background: var(--fb-bg); color: var(--fb-accent); padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; }
 .fbot-followup button:hover, .fbot-followup button:focus-visible { border-color: var(--fb-accent); }
-.fbot-code-lookup { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--fb-bg); color: var(--fb-sub); font-size: 12px; }
-.fbot-code-lookup label { white-space: nowrap; }
-.fbot-code-lookup input { flex: 1; min-width: 0; border: 1px solid var(--fb-line); border-radius: 6px; padding: 6px; color: var(--fb-text); background: var(--fb-bg); }
-.fbot-code-lookup button { border: 0; border-radius: 6px; padding: 6px 10px; background: var(--fb-accent); color: #fff; white-space: nowrap; cursor: pointer; }
+
+.fbot-requests-view { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 12px 18px; background-image: radial-gradient(rgba(90, 143, 115, 0.07) 1px, transparent 1px); background-size: 18px 18px; }
+.fbot-lookup-card { padding: 13px; border: 1px solid var(--fb-line); border-radius: 15px; background: var(--fb-bg); box-shadow: 0 5px 18px rgba(10, 61, 34, 0.07); }
+.fbot-lookup-intro { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.fbot-lookup-intro strong { font-size: 14px; color: var(--fb-text); }
+.fbot-lookup-intro span, .fbot-lookup-card small { color: var(--fb-sub); font-size: 11px; line-height: 1.45; }
+.fbot-email-entry-row { display: flex; gap: 7px; }
+.fbot-email-entry-row input { min-width: 0; flex: 1; border: 1px solid var(--fb-line); border-radius: 9px; padding: 8px 9px; color: var(--fb-text); background: var(--fb-input); font: inherit; font-size: 12px; }
+.fbot-email-entry-row button { border: 0; border-radius: 9px; background: linear-gradient(135deg, #0a3d22, #5a8f73); color: #fff; padding: 7px 13px; cursor: pointer; white-space: nowrap; font: inherit; font-size: 12px; }
+.fbot-email-entry-row button:disabled { opacity: .6; cursor: wait; }
+.fbot-lookup-card small { display: block; margin-top: 7px; }
+.fbot-local-lookup { width: 100%; margin-top: 9px; padding: 7px; border: 1px solid var(--fb-line); border-radius: 9px; color: var(--fb-accent); background: var(--fb-bot-bubble); font: inherit; font-size: 12px; cursor: pointer; }
+.fbot-lookup-state { margin: 12px 2px 0; padding: 10px 12px; border-radius: 10px; color: var(--fb-sub); background: var(--fb-bot-bubble); font-size: 12px; line-height: 1.5; }
+.fbot-requests-empty { min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--fb-sub); text-align: center; }
+.fbot-requests-empty svg { color: var(--fb-accent); }
+.fbot-requests-empty strong { color: var(--fb-text); font-size: 13px; }
+.fbot-requests-empty span { max-width: 240px; font-size: 11px; line-height: 1.5; }
+.fbot-record-list { margin-top: 14px; display: grid; gap: 9px; }
+.fbot-record-summary { display: flex; align-items: center; justify-content: space-between; color: var(--fb-sub); font-size: 12px; }
+.fbot-record-summary strong { color: var(--fb-text); font-size: 13px; }
+.fbot-record-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: var(--fb-sub); }
+.fbot-record-head .is-replied { color: #357b56; font-weight: 700; }
+.fbot-record { border: 1px solid var(--fb-line); border-radius: 12px; background: var(--fb-bg); padding: 11px; overflow-wrap: anywhere; box-shadow: 0 3px 12px rgba(10, 61, 34, 0.05); }
+.fbot-record p { margin: 7px 0 0; white-space: pre-wrap; font-size: 13px; line-height: 1.55; color: var(--fb-text); }
+.fbot-record .fbot-record-reply { display: flex; flex-direction: column; gap: 4px; padding-top: 9px; border-top: 1px solid var(--fb-line); color: var(--fb-text); }
+.fbot-record-reply strong { color: var(--fb-accent); font-size: 11px; }
+.fbot-record-more { border: 1px solid var(--fb-line); border-radius: 9px; padding: 8px; background: var(--fb-bg); color: var(--fb-accent); font: inherit; cursor: pointer; }
+.fbot-record-more:disabled { opacity: .6; cursor: wait; }
+.fbot-code-section { margin-top: 12px; border-top: 1px solid var(--fb-line); }
+.fbot-code-toggle { width: 100%; display: flex; justify-content: space-between; gap: 8px; padding: 12px 2px 4px; border: 0; color: var(--fb-sub); background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
+.fbot-code-toggle span:last-child { color: var(--fb-accent); font-weight: 600; }
+.fbot-code-lookup { padding: 9px 0 0; color: var(--fb-sub); font-size: 12px; }
+.fbot-code-lookup label { display: block; margin-bottom: 5px; }
+.fbot-code-lookup > div { display: flex; gap: 6px; }
+.fbot-code-lookup input { flex: 1; min-width: 0; border: 1px solid var(--fb-line); border-radius: 8px; padding: 7px; color: var(--fb-text); background: var(--fb-input); }
+.fbot-code-lookup button { border: 0; border-radius: 8px; padding: 7px 11px; background: var(--fb-accent); color: #fff; white-space: nowrap; cursor: pointer; }
 .fbot-code-lookup button:disabled { opacity: .6; }
+.fbot-code-message { margin: 8px 0 0; font-size: 11px; line-height: 1.45; }
+.fbot-code-lookup .fbot-record { margin-top: 9px; }
+.fbot-submit-email input:focus, .fbot-email-entry-row input:focus, .fbot-code-lookup input:focus { outline: 2px solid rgba(90, 143, 115, .35); border-color: var(--fb-accent); }
+.fbot-requests-view::-webkit-scrollbar { width: 6px; }
+.fbot-requests-view::-webkit-scrollbar-thumb { background: rgba(90, 143, 115, 0.35); border-radius: 999px; }
 .fbot-foot textarea {
   flex: 1;
   min-width: 0;
@@ -1060,7 +1154,8 @@ function onKeydown(e) {
 @media (max-width: 768px) {
   .fbot { right: 14px; bottom: 124px; }
   .fbot-tip { display: none; }
-  .fbot-panel { height: min(440px, calc(100vh - 260px)); }
+  .fbot-panel { width: min(352px, calc(100vw - 28px)); height: min(440px, calc(100vh - 260px)); }
+  .fbot-panel.is-requests { width: calc(100vw - 28px); height: min(560px, calc(100vh - 210px)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
