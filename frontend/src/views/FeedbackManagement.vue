@@ -16,9 +16,21 @@ const replyItem = ref(null);
 const replyText = ref('');
 const isReplying = ref(false);
 
-const { feedbacks, isLoading: isFeedbacksLoading, pendingCount: pendingFeedbacksCount } = storeToRefs(feedbackStore);
+const { feedbacks, isLoading: isFeedbacksLoading } = storeToRefs(feedbackStore);
 
-const processedCount = computed(() => feedbacks.value.filter(f => f.status !== 'pending').length);
+const listCounts = computed(() => {
+  const total = feedbacks.value.length;
+  const pending = feedbacks.value.filter(f => f.status === 'pending').length;
+  return { total, pending, processed: total - pending };
+});
+
+const statusTabs = computed(() => [
+  { key: 'all', label: '全部', count: listCounts.value.total },
+  { key: 'pending', label: '待处理', count: listCounts.value.pending },
+  { key: 'processed', label: '已处理', count: listCounts.value.processed }
+]);
+
+const statusClass = status => (status === 'pending' ? 'pending' : status === 'replied' ? 'replied' : 'processed');
 
 const filteredFeedbacks = computed(() => {
   return feedbacks.value.filter(f => {
@@ -34,7 +46,7 @@ const filteredFeedbacks = computed(() => {
 
 const columns = [
   { key: 'message', title: '留言内容', width: '50%' },
-  { key: 'created_at', title: '提交时间', sortable: true, width: '180px' },
+  { key: 'created_at', title: '提交时间', width: '180px' },
   { key: 'status', title: '状态', width: '110px', align: 'center' },
 ];
 
@@ -108,50 +120,43 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
         <p class="page-description">查看搜索实拍图的需求和网站反馈；找到素材后回复名称或链接，客户可在小度查看。</p>
       </div>
 
-      <!-- 统计卡片 -->
-      <div class="stat-row">
-        <div class="stat-card">
-          <span class="stat-num">{{ feedbacks.length }}</span>
-          <span class="stat-label">全部留言</span>
-        </div>
-        <div class="stat-card pending">
-          <span class="stat-num">{{ pendingFeedbacksCount }}</span>
-          <span class="stat-label">待处理</span>
-        </div>
-        <div class="stat-card processed">
-          <span class="stat-num">{{ processedCount }}</span>
-          <span class="stat-label">已处理</span>
-        </div>
-      </div>
-
-      <!-- 筛选栏 -->
+      <!-- 筛选工具栏 -->
       <div class="filter-bar">
-        <div class="filter-tabs">
+        <div class="filter-tabs" role="group" aria-label="按状态筛选留言">
           <button
-            v-for="tab in [{ key:'all', label:'全部' }, { key:'pending', label:'待处理' }, { key:'processed', label:'已处理' }]"
+            v-for="tab in statusTabs"
             :key="tab.key"
+            type="button"
             class="filter-tab"
             :class="{ active: statusFilter === tab.key }"
+            :aria-pressed="statusFilter === tab.key"
             @click="statusFilter = tab.key"
-          >{{ tab.label }}</button>
+          >
+            <span>{{ tab.label }}</span>
+            <span class="filter-tab-count">{{ tab.count }}</span>
+          </button>
         </div>
         <div class="search-box">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input v-model="searchQuery" placeholder="搜索留言内容…" class="search-input" />
-          <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''">×</button>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input v-model="searchQuery" aria-label="搜索留言内容" placeholder="搜索留言内容…" class="search-input" />
+          <button v-if="searchQuery" type="button" class="search-clear" aria-label="清除搜索" @click="searchQuery = ''">×</button>
         </div>
       </div>
 
       <!-- 表格 -->
       <DataTable
+        class="fm-table"
         :data="filteredFeedbacks"
         :columns="columns"
-        :loading="isFeedbacksLoading"
+        :loading="isFeedbacksLoading && !feedbacks.length"
         :empty-text="searchQuery || statusFilter !== 'all' ? '没有符合条件的留言' : '暂无留言数据'"
       >
         <template #column-message="{ item }">
-          <div class="feedback-content" :title="item.message">{{ item.message }}</div>
-          <div v-if="item.admin_reply" class="feedback-reply-preview">已回复：{{ item.admin_reply }}</div>
+          <div class="fm-ticket" :class="`fm-ticket--${statusClass(item.status)}`">
+            <div class="feedback-content" :title="item.message">{{ item.message }}</div>
+            <div v-if="item.admin_reply" class="feedback-receipt">↳ 已回复 · {{ item.admin_reply }}</div>
+            <div v-else-if="item.status === 'pending'" class="feedback-receipt feedback-receipt--pending">待回复</div>
+          </div>
         </template>
 
         <template #column-created_at="{ item }">
@@ -159,30 +164,33 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
         </template>
 
         <template #column-status="{ item }">
-          <span class="status-badge" :class="item.status === 'pending' ? 'status-pending' : 'status-processed'">
+          <span class="status-badge" :class="`status-${statusClass(item.status)}`">
+            <span class="status-dot" aria-hidden="true"></span>
             {{ item.status === 'pending' ? '待处理' : item.status === 'replied' ? '已回复' : '已处理' }}
           </span>
         </template>
 
         <template #actions="{ item }">
           <div class="action-buttons">
-            <button v-if="item.user_id" class="btn-action btn-process" @click="openReply(item)">回复客户</button>
+            <button v-if="item.user_id" type="button" class="btn-action btn-primary" @click="openReply(item)">回复客户</button>
             <button
               v-if="item.status === 'pending' && (!isPhotoRequest(item) || !item.user_id)"
+              type="button"
               class="btn-action btn-process"
               @click="updateFeedbackStatus(item.id, 'approved')"
             >标记已处理</button>
             <button
               v-else-if="item.status !== 'pending' && item.status !== 'replied'"
+              type="button"
               class="btn-action btn-revert"
               @click="updateFeedbackStatus(item.id, 'pending')"
             >恢复待处理</button>
-            <button class="btn-action btn-delete" @click="showDeleteConfirm(item.id)">删除</button>
+            <button type="button" class="btn-action btn-delete" @click="showDeleteConfirm(item.id)">删除</button>
           </div>
         </template>
       </DataTable>
 
-      <el-dialog v-model="replyOpen" title="回复客户的找图需求" width="min(480px, 90vw)" :close-on-click-modal="false">
+      <el-dialog v-model="replyOpen" class="fm-reply-dialog" title="回复客户的找图需求" width="min(480px, 90vw)" top="6vh" :close-on-click-modal="false">
         <p v-if="replyItem" class="reply-source">{{ replyItem.message }}</p>
         <el-input v-model="replyText" type="textarea" :rows="5" maxlength="500" show-word-limit placeholder="填写找到的实拍图名称、搜索词或可打开的链接…" />
         <template #footer>
@@ -206,72 +214,36 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 .admin-page-shell {
   max-width: 960px;
   margin: 0 auto;
-  padding: 24px 16px 60px;
+  padding: 8px 4px 40px;
 }
 
 .page-config-container {
   background: #fff;
-  border-radius: 12px;
-  padding: 28px 32px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(10, 61, 34, 0.12);
+  border-radius: 14px;
+  padding: 22px 24px 24px;
 }
 
 .page-header {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .page-header h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1a2332;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #0a3d22;
   margin: 0 0 6px;
 }
 
 .page-description {
-  color: #64748b;
-  font-size: 0.9rem;
+  color: #5b6d63;
+  font-size: 0.88rem;
   line-height: 1.6;
   margin: 0;
 }
 
-/* 统计卡片 */
-.stat-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 14px 8px;
-  border-radius: 10px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.stat-card.pending { background: #fff7ed; border-color: #fed7aa; }
-.stat-card.processed { background: #f0fdf4; border-color: #bbf7d0; }
-
-.stat-num {
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: #1a2332;
-  line-height: 1;
-}
-
-.stat-card.pending .stat-num { color: #c2410c; }
-.stat-card.processed .stat-num { color: #15803d; }
-
-.stat-label {
-  font-size: 0.78rem;
-  color: #64748b;
-  margin-top: 4px;
-}
-
-/* 筛选栏 */
+/* 筛选工具栏 */
 .filter-bar {
   display: flex;
   align-items: center;
@@ -282,42 +254,76 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 }
 
 .filter-tabs {
-  display: flex;
-  gap: 4px;
-  background: #f1f5f9;
+  display: inline-flex;
+  gap: 2px;
+  background: #f1f5f2;
+  border: 1px solid rgba(10, 61, 34, 0.1);
   padding: 3px;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .filter-tab {
-  padding: 5px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #64748b;
+  color: #5b6d63;
   background: transparent;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
+
+.filter-tab:hover { color: #0a3d22; }
+.filter-tab:focus-visible { outline: 2px solid #5a8f73; outline-offset: 2px; }
 
 .filter-tab.active {
   background: #fff;
   color: #0a3d22;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(10, 61, 34, 0.14);
   font-weight: 600;
+}
+
+.filter-tab-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: rgba(10, 61, 34, 0.08);
+  color: #0a3d22;
+}
+
+.filter-tab.active .filter-tab-count {
+  background: #0a3d22;
+  color: #fff;
 }
 
 .search-box {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  gap: 7px;
+  background: #fff;
+  border: 1px solid rgba(10, 61, 34, 0.32);
+  border-radius: 9px;
   padding: 0 10px;
-  height: 34px;
-  min-width: 200px;
+  height: 36px;
+  min-width: 220px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.search-box svg { color: #5b6d63; flex-shrink: 0; }
+.search-box:focus-within {
+  border-color: #5a8f73;
+  box-shadow: 0 0 0 3px rgba(90, 143, 115, 0.18);
 }
 
 .search-input {
@@ -325,69 +331,130 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
   border: none;
   background: transparent;
   font-size: 0.85rem;
-  color: #374151;
+  color: #20342b;
   outline: none;
 }
 
-.search-input::placeholder { color: #94a3b8; }
+.search-input::placeholder { color: #5b6d63; }
 
 .search-clear {
   border: none;
   background: none;
-  color: #94a3b8;
-  font-size: 16px;
+  color: #5b6d63;
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
-  padding: 0;
+  padding: 2px;
+  border-radius: 4px;
 }
+
+.search-clear:hover { color: #0a3d22; }
+.search-clear:focus-visible { outline: 2px solid #5a8f73; outline-offset: 1px; }
 
 /* 表格 */
-:deep(.data-table) {
-  border-radius: 8px;
+.fm-table :deep(.table-wrapper) {
+  border-radius: 12px;
+  border: 1px solid rgba(10, 61, 34, 0.12);
   overflow: hidden;
-  border: 1px solid #e2e8f0;
 }
 
-:deep(.data-table th) {
-  background: #f8fafc;
-  color: #374151;
-  font-weight: 600;
-  padding: 12px 14px;
-  border-bottom: 1px solid #e2e8f0;
-  font-size: 0.85rem;
+.fm-table :deep(.data-table) { background: #fff; }
+
+.fm-table :deep(th) {
+  background: #eef5f0;
+  color: #0a3d22;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(10, 61, 34, 0.14);
+  white-space: nowrap;
 }
 
-:deep(.data-table td) {
-  padding: 12px 14px;
-  border-bottom: 1px solid #f1f5f9;
+.fm-table :deep(td) {
+  padding: 13px 14px;
+  border-bottom: 1px solid rgba(10, 61, 34, 0.08);
   vertical-align: middle;
+  font-size: 0.88rem;
 }
 
-:deep(.data-table tr:last-child td) { border-bottom: none; }
-:deep(.data-table tr:hover td) { background: #f8fafc; }
+.fm-table :deep(tr:last-child td) { border-bottom: none; }
+.fm-table :deep(tbody tr) { transition: background 0.12s ease; }
+.fm-table :deep(tbody tr:hover) { background: #f4f9f6; }
+
+/* 需求票据：留言 + 回执条（签名元素） */
+.fm-ticket {
+  position: relative;
+  padding-left: 12px;
+  border-left: 3px solid transparent;
+}
+
+.fm-ticket--pending { border-left-color: #d97706; }
+.fm-ticket--replied { border-left-color: #0a3d22; }
+.fm-ticket--processed { border-left-color: #8aa597; }
 
 .feedback-content {
-  word-break: break-all;
-  line-height: 1.5;
+  word-break: break-word;
+  line-height: 1.55;
   font-size: 0.9rem;
-  color: #374151;
+  color: #20342b;
 }
 
-.feedback-reply-preview { margin-top: 6px; color: #5a8f73; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
-.reply-source { margin: 0 0 14px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; color: #374151; }
-.date-text { font-size: 0.85rem; color: #64748b; white-space: nowrap; }
+.feedback-receipt {
+  margin-top: 8px;
+  padding: 7px 10px;
+  background: #eef5f0;
+  border-top: 1px dashed rgba(10, 61, 34, 0.28);
+  border-radius: 0 0 8px 8px;
+  color: #0a3d22;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 
+.feedback-receipt--pending {
+  background: #fff7ed;
+  border-top-color: rgba(217, 119, 6, 0.4);
+  color: #b45309;
+}
+
+.reply-source {
+  margin: 0 0 14px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #20342b;
+}
+
+.date-text {
+  font-size: 0.82rem;
+  color: #5b6d63;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状态徽章 */
 .status-badge {
-  display: inline-block;
-  padding: 3px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
   border-radius: 99px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
 }
 
-.status-pending { background: #fff7ed; color: #c2410c; }
-.status-processed { background: #f0fdf4; color: #15803d; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
+.status-pending { background: #fff7ed; color: #b45309; }
+.status-pending .status-dot { background: #d97706; }
+.status-replied { background: #eef5f0; color: #0a3d22; }
+.status-replied .status-dot { background: #0a3d22; }
+.status-processed { background: #f1f5f2; color: #4a5d53; }
+.status-processed .status-dot { background: #8aa597; }
+
+/* 操作按钮 */
 .action-buttons {
   display: flex;
   gap: 6px;
@@ -395,27 +462,76 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 }
 
 .btn-action {
-  padding: 5px 11px;
-  border: none;
-  border-radius: 6px;
+  padding: 6px 11px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  transition: filter 0.15s;
   white-space: nowrap;
+  min-height: 32px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.btn-action:hover { filter: brightness(0.92); }
+.btn-action:focus-visible { outline: 2px solid #5a8f73; outline-offset: 2px; }
 
-.btn-process { background: linear-gradient(135deg, #0a3d22, #5a8f73); color: #fff; }
-.btn-revert { background: #fef3c7; color: #92400e; }
-.btn-delete { background: #fee2e2; color: #991b1b; }
+.btn-primary { background: #0a3d22; color: #fff; }
+.btn-primary:hover { background: #16492c; }
+.btn-process { background: #eef5f0; color: #0a3d22; border-color: rgba(10, 61, 34, 0.24); }
+.btn-process:hover { background: #dfeee5; }
+.btn-revert { background: #fff; color: #5b6d63; border-color: rgba(10, 61, 34, 0.24); }
+.btn-revert:hover { background: #f4f9f6; }
+.btn-delete { background: #fff; color: #b3261e; border-color: rgba(179, 38, 30, 0.3); }
+.btn-delete:hover { background: #fdf0ef; border-color: rgba(179, 38, 30, 0.5); }
+
+/* 回复弹窗 */
+:deep(.fm-reply-dialog) {
+  --el-color-primary: #0a3d22;
+  --el-color-primary-light-3: #5a8f73;
+  --el-color-primary-light-5: #8fb5a2;
+  --el-color-primary-light-7: #d7e7de;
+  --el-color-primary-light-8: #e8f1ec;
+  --el-color-primary-light-9: #f3f8f5;
+  --el-color-primary-dark-2: #062b18;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+:deep(.fm-reply-dialog .el-dialog__header) {
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid rgba(10, 61, 34, 0.12);
+  background: #fff;
+}
+
+:deep(.fm-reply-dialog .el-dialog__title) {
+  color: #0a3d22;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+}
+
+:deep(.fm-reply-dialog .el-dialog__body) { padding: 18px 20px; }
+:deep(.fm-reply-dialog .el-dialog__footer) { padding: 10px 20px 18px; }
+
+/* 空状态 */
+.fm-table :deep(.empty-state) { padding: 40px 16px; color: #5b6d63; }
+.fm-table :deep(.empty-icon) { font-size: 2.4rem; }
+.fm-table :deep(.empty-text) { font-size: 0.95rem; }
 
 @media (max-width: 640px) {
-  .page-config-container { padding: 20px 16px; }
+  .page-config-container { padding: 18px 14px 20px; border-radius: 12px; }
   .filter-bar { flex-direction: column; align-items: stretch; }
-  .search-box { min-width: unset; }
-  .stat-row { gap: 8px; }
-  .stat-num { font-size: 1.3rem; }
+  .filter-tabs { width: 100%; }
+  .filter-tab { flex: 1; justify-content: center; }
+  .search-box { min-width: unset; width: 100%; }
+  .fm-table :deep(th),
+  .fm-table :deep(td) { padding: 10px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-tab,
+  .search-box,
+  .btn-action,
+  .fm-table :deep(tbody tr) { transition: none; }
 }
 </style>
