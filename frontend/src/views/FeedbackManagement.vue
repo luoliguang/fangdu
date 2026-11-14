@@ -172,20 +172,26 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 
         <template #actions="{ item }">
           <div class="action-buttons">
-            <button v-if="item.user_id" type="button" class="btn-action btn-primary" @click="openReply(item)">回复客户</button>
+            <button v-if="item.user_id" type="button" class="btn-action btn-primary" @click="openReply(item)">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M20 20v-4a6 6 0 0 0-6-6H4"/></svg>
+              <span>回复客户</span>
+            </button>
             <button
               v-if="item.status === 'pending' && (!isPhotoRequest(item) || !item.user_id)"
               type="button"
-              class="btn-action btn-process"
+              class="btn-action btn-ghost"
               @click="updateFeedbackStatus(item.id, 'approved')"
             >标记已处理</button>
             <button
               v-else-if="item.status !== 'pending' && item.status !== 'replied'"
               type="button"
-              class="btn-action btn-revert"
+              class="btn-action btn-ghost"
               @click="updateFeedbackStatus(item.id, 'pending')"
             >恢复待处理</button>
-            <button type="button" class="btn-action btn-delete" @click="showDeleteConfirm(item.id)">删除</button>
+            <button type="button" class="btn-action btn-ghost-danger" @click="showDeleteConfirm(item.id)">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              <span>删除</span>
+            </button>
           </div>
         </template>
       </DataTable>
@@ -457,11 +463,15 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 /* 操作按钮 */
 .action-buttons {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
 .btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 6px 11px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -477,12 +487,10 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 
 .btn-primary { background: #0a3d22; color: #fff; }
 .btn-primary:hover { background: #16492c; }
-.btn-process { background: #eef5f0; color: #0a3d22; border-color: rgba(10, 61, 34, 0.24); }
-.btn-process:hover { background: #dfeee5; }
-.btn-revert { background: #fff; color: #5b6d63; border-color: rgba(10, 61, 34, 0.24); }
-.btn-revert:hover { background: #f4f9f6; }
-.btn-delete { background: #fff; color: #b3261e; border-color: rgba(179, 38, 30, 0.3); }
-.btn-delete:hover { background: #fdf0ef; border-color: rgba(179, 38, 30, 0.5); }
+.btn-ghost { background: transparent; color: #0a3d22; }
+.btn-ghost:hover { background: #eef5f0; }
+.btn-ghost-danger { background: transparent; color: #b3261e; }
+.btn-ghost-danger:hover { background: #fdf0ef; }
 
 /* 回复弹窗 */
 :deep(.fm-reply-dialog) {
