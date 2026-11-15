@@ -32,7 +32,11 @@ const showStickySearch = ref(false); // 滚出视野后显示的粘顶精简搜�
 const visibleTagsCount = ref(20); // 动态计算的可见标签数量
 
 // --- 收藏夹状态（使用全局状态） ---
-const appFavorites = inject('appFavorites', { favorites: ref([]), addToFavorites: () => {} });
+const appFavorites = inject('appFavorites', {
+  favorites: ref([]),
+  removeFromFavorites: () => {},
+  toggleFavorite: () => false
+});
 const favorites = appFavorites.favorites;
 
 // --- 注入Gallery回调引用 ---
@@ -72,20 +76,14 @@ const handleQuickFilter = (filterValue) => {
   }
 };
 
-const addToFavorites = (material) => {
-  const exists = favorites.value.find(fav => fav.id === material.id);
-  if (!exists) {
-    appFavorites.addToFavorites(material);
-    showCustomToast('已添加到收藏夹', 'success');
-  }
+const toggleFavorite = (material) => {
+  const isFavorited = appFavorites.toggleFavorite(material);
+  showCustomToast(isFavorited ? '已添加到收藏夹' : '已取消收藏', 'success');
 };
 
 const removeFromFavorites = (materialId) => {
-  const index = favorites.value.findIndex(fav => fav.id === materialId);
-  if (index > -1) {
-    favorites.value.splice(index, 1);
-    showCustomToast('已从收藏夹移除', 'success');
-  }
+  appFavorites.removeFromFavorites(materialId);
+  showCustomToast('已从收藏夹移除', 'success');
 };
 
 // 移动端检测（≤768px 用横向滚动标签，不走折行逻辑）
@@ -474,18 +472,17 @@ const handleSearchBlur = () => {
 // 提示框状态
 const showToast = ref(false);
 const toastMessage = ref('');
-const toastType = ref('success'); // 'success' | 'error'
+const toastType = ref('success'); // 'success' | 'error' | 'info'
+let toastTimer = null;
 
-// 显示高端提示框
 const showCustomToast = (message, type = 'success') => {
     toastMessage.value = message;
     toastType.value = type;
     showToast.value = true;
-    
-    // 3秒后自动隐藏
-    setTimeout(() => {
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
         showToast.value = false;
-    }, 2000);
+    }, type === 'error' ? 3000 : 1800);
 };
 
 const fetchTags = async () => {
@@ -670,6 +667,7 @@ onUnmounted(() => {
 
     clearTimeout(debounceTimer);
     clearTimeout(suggestionsTimer);
+    clearTimeout(toastTimer);
     stopConversionPolling();
 
     window.removeEventListener('resize', handleWindowResize);
@@ -961,8 +959,8 @@ const quickCopyImage = async (material) => {
             <button
               class="card-fav-inline"
               :class="{ favorited: favorites.find(fav => fav.id === material.id) }"
-              @click.stop="addToFavorites(material)"
-              aria-label="收藏"
+              @click.stop="toggleFavorite(material)"
+              :aria-label="favorites.find(fav => fav.id === material.id) ? '取消收藏' : '收藏'"
             >
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M20.84 4.61C20.3292 4.099 19.7228 3.69364 19.0554 3.41708C18.3879 3.14052 17.6725 2.99817 16.95 2.99817C16.2275 2.99817 15.5121 3.14052 14.8446 3.41708C14.1772 3.69364 13.5708 4.099 13.06 4.61L12 5.67L10.94 4.61C9.9083 3.5783 8.50903 2.9987 7.05 2.9987C5.59096 2.9987 4.19169 3.5783 3.16 4.61C2.1283 5.6417 1.5487 7.04097 1.5487 8.5C1.5487 9.95903 2.1283 11.3583 3.16 12.39L4.22 13.45L12 21.23L19.78 13.45L20.84 12.39C21.351 11.8792 21.7563 11.2728 22.0329 10.6053C22.3095 9.93789 22.4518 9.22248 22.4518 8.5C22.4518 7.77752 22.3095 7.06211 22.0329 6.39467C21.7563 5.72723 21.351 5.1208 20.84 4.61V4.61Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -976,10 +974,11 @@ const quickCopyImage = async (material) => {
         <div class="card-actions">
           <!-- 收藏按钮 -->
           <button 
-            @click.stop="addToFavorites(material)" 
+            @click.stop="toggleFavorite(material)"
             class="action-btn favorite-btn" 
             :class="{ 'favorited': favorites.find(fav => fav.id === material.id) }"
-            title="收藏"
+            :title="favorites.find(fav => fav.id === material.id) ? '取消收藏' : '收藏'"
+            :aria-label="favorites.find(fav => fav.id === material.id) ? '取消收藏' : '收藏'"
           >
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M20.84 4.61C20.3292 4.099 19.7228 3.69364 19.0554 3.41708C18.3879 3.14052 17.6725 2.99817 16.95 2.99817C16.2275 2.99817 15.5121 3.14052 14.8446 3.41708C14.1772 3.69364 13.5708 4.099 13.06 4.61L12 5.67L10.94 4.61C9.9083 3.5783 8.50903 2.9987 7.05 2.9987C5.59096 2.9987 4.19169 3.5783 3.16 4.61C2.1283 5.6417 1.5487 7.04097 1.5487 8.5C1.5487 9.95903 2.1283 11.3583 3.16 12.39L4.22 13.45L12 21.23L19.78 13.45L20.84 12.39C21.351 11.8792 21.7563 11.2728 22.0329 10.6053C22.3095 9.93789 22.4518 9.22248 22.4518 8.5C22.4518 7.77752 22.3095 7.06211 22.0329 6.39467C21.7563 5.72723 21.351 5.1208 20.84 4.61V4.61Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1065,7 +1064,13 @@ const quickCopyImage = async (material) => {
         <div ref="observerEl" class="observer"></div>
     </div>
   <!-- 高端提示框 -->
-  <div v-if="showToast" class="custom-toast" :class="`toast-${toastType}`">
+  <div
+    v-if="showToast"
+    class="custom-toast"
+    :class="`toast-${toastType}`"
+    :role="toastType === 'error' ? 'alert' : 'status'"
+    aria-live="polite"
+  >
     <div class="toast-content">
       <div class="toast-icon">
         <svg v-if="toastType === 'success'" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1076,7 +1081,7 @@ const quickCopyImage = async (material) => {
         </svg>
       </div>
       <span class="toast-message">{{ toastMessage }}</span>
-      <button @click="showToast = false" class="toast-close">
+      <button type="button" class="toast-close" aria-label="关闭提示" @click="showToast = false">
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>

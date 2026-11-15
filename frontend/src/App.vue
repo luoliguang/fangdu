@@ -98,16 +98,30 @@ const sideDrawerRef = ref(null);
 const tutorialRef = ref(null);
 
 // --- SideDrawer 全局状态 ---
-// 收藏夹（只在Gallery页面使用）
+// 全站素材收藏夹（主页和各分类页共享）
 const favorites = ref([]);
 
 // 提供给子组件使用的方法
 const addToFavorites = (material) => {
-  const exists = favorites.value.find(fav => fav.id === material.id);
-  if (!exists) {
-    favorites.value.push(material);
-    // 已添加到收藏夹
+  const exists = favorites.value.some(favorite => favorite.id === material.id);
+  if (!exists) favorites.value.push(material);
+};
+
+const removeFromFavorites = (materialId) => {
+  const index = favorites.value.findIndex(favorite => favorite.id === materialId);
+  if (index > -1) favorites.value.splice(index, 1);
+};
+
+// 返回切换后的收藏状态，供各页面显示一致的反馈文案
+const toggleFavorite = (material) => {
+  const exists = favorites.value.some(favorite => favorite.id === material.id);
+  if (exists) {
+    removeFromFavorites(material.id);
+    return false;
   }
+
+  addToFavorites(material);
+  return true;
 };
 
 // 监听localStorage变化
@@ -146,11 +160,7 @@ const handleRemoveFromFavorites = (materialId) => {
   if (galleryCallbacks.value.handleRemoveFromFavorites) {
     galleryCallbacks.value.handleRemoveFromFavorites(materialId);
   } else {
-    const index = favorites.value.findIndex(fav => fav.id === materialId);
-    if (index > -1) {
-      favorites.value.splice(index, 1);
-      // 已从收藏夹移除
-    }
+    removeFromFavorites(materialId);
   }
 };
 
@@ -185,7 +195,7 @@ const scrollToTop = () => {
 };
 
 // Provide favorites state and callbacks to child components
-provide('appFavorites', { favorites, addToFavorites });
+provide('appFavorites', { favorites, addToFavorites, removeFromFavorites, toggleFavorite });
 provide('galleryCallbacks', galleryCallbacks);
 provide('excludeTagsParam', excludeTagsParam);
 provide('pageCategories', pageCategories);

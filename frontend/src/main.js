@@ -17,17 +17,17 @@ app.use(ElementPlus)
 // 全局配置 Toast
 app.use(Toast, {
     transition: "Vue-Toastification__bounce",
-    maxToasts: 3,
+    maxToasts: 2,
     newestOnTop: true,
-    position: "top-right",
-    timeout: 3000, // 通知默认显示3秒
+    position: "top-center",
+    timeout: 2200, // 轻提示保持短暂，避免遮挡页面操作
     closeOnClick: true,
     pauseOnFocusLoss: true,
     pauseOnHover: true,
     draggable: true,
     draggablePercent: 0.6,
     showCloseButtonOnHover: false,
-    hideProgressBar: false,
+    hideProgressBar: true,
     closeButton: "button",
     icon: true,
     rtl: false
