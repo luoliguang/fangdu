@@ -564,6 +564,9 @@ body.theme-light .sort-tab.active {
 /* 尊重系统「减少动效」设置 */
 @media (prefers-reduced-motion: reduce) {
   .grid-item { animation: none; }
+  .copy-name-btn { transition: none; }
+  .copy-name-btn:hover,
+  .copy-name-btn:active { transform: none; }
 }
 .grid-item:hover {
   transform: translateY(-5px) scale(1.02);
@@ -589,7 +592,15 @@ body.theme-light .sort-tab.active {
   margin-top: 0.6rem;
   text-align: left;
 }
+.card-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  min-width: 0;
+}
 .card-title {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font-weight: 600;
   color: rgba(255,255,255,0.9);
@@ -599,6 +610,54 @@ body.theme-light .sort-tab.active {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.copy-name-btn {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(90, 143, 115, 0.28);
+  border-radius: 8px;
+  background: rgba(90, 143, 115, 0.12);
+  color: #8dc0a4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+.copy-name-btn svg {
+  width: 17px;
+  height: 17px;
+}
+.copy-name-btn:hover {
+  background: #5a8f73;
+  border-color: #5a8f73;
+  color: #fff;
+  transform: translateY(-1px);
+}
+.copy-name-btn:active {
+  transform: translateY(0);
+}
+.copy-name-btn:focus-visible {
+  outline: 3px solid rgba(90, 143, 115, 0.38);
+  outline-offset: 2px;
+}
+body.theme-light .copy-name-btn {
+  background: #edf5f1;
+  border-color: #c6ddd1;
+  color: #35684f;
+}
+body.theme-light .copy-name-btn:hover {
+  background: #5a8f73;
+  border-color: #5a8f73;
+  color: #fff;
+}
+@media (max-width: 768px) {
+  .copy-name-btn {
+    width: 36px;
+    height: 36px;
+  }
 }
 .card-meta {
   /* 浏览量已取消，桌面端此行无内容，隐藏；移动端仅用于放收藏按钮 */

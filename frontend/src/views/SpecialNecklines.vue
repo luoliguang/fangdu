@@ -3,6 +3,7 @@ import { ref, shallowRef, computed, onMounted, onUnmounted, watch, inject, nextT
 import apiClient from '../axiosConfig.js';
 import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
+import { copyText } from '../utils/clipboard.js';
 
 // ── 常量 ─────────────────────────────────────────────────────────
 // 主页排除这两个 tag，这里只展示这两个 tag 的素材
@@ -200,7 +201,17 @@ const showMedia = (material) => {
   }
 };
 
-// 快捷复制图片
+// 快捷复制
+const quickCopyName = async (material) => {
+  try {
+    await copyText(material.name);
+    showCustomToast(`名称“${material.name}”已复制`, 'success');
+  } catch (error) {
+    console.error('复制名称失败:', error);
+    showCustomToast('名称复制失败，请重试', 'error');
+  }
+};
+
 const blobToPngBlob = (blob) => new Promise((resolve, reject) => {
   const url = URL.createObjectURL(blob);
   const img = new Image();
@@ -340,7 +351,20 @@ onUnmounted(() => {
         disablePictureInPicture
         @click.prevent
       />
-      <p>{{ material.name }}</p>
+      <div class="card-title-row">
+        <p class="card-title" :title="material.name">{{ material.name }}</p>
+        <button
+          class="copy-name-btn"
+          type="button"
+          title="复制名称"
+          :aria-label="`复制名称：${material.name}`"
+          @click.stop="quickCopyName(material)"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M8 7V5a2 2 0 0 1 2-2h7l3 3v11a2 2 0 0 1-2 2h-2M13 3v4h4M6 9h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Zm1 4h5m-5 4h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
       <div v-if="material.media_type === 'video'" class="media-icon">▶</div>
 
       <!-- 卡片操作按钮 -->

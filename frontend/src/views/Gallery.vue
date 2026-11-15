@@ -4,6 +4,7 @@ import apiClient from '../axiosConfig.js';
 import VueEasyLightbox from 'vue-easy-lightbox';
 import VideoModal from '../components/VideoModal.vue';
 import { useTheme } from '../composables/useTheme.js';
+import { copyText } from '../utils/clipboard.js';
 
 const { isDark } = useTheme();
 
@@ -745,6 +746,16 @@ const getCopyOptimizedUrl = (url) => {
   return `${base}?x-oss-process=image/resize,m_lfit,w_1500,limit_1,quality,q_92`;
 };
 
+const quickCopyName = async (material) => {
+  try {
+    await copyText(material.name);
+    showCustomToast(`名称“${material.name}”已复制`, 'success');
+  } catch (error) {
+    console.error('复制名称失败:', error);
+    showCustomToast('名称复制失败，请重试', 'error');
+  }
+};
+
 // 快捷复制图片（通过后端代理绕过 CORS，转 PNG 后写入剪贴板）
 const quickCopyImage = async (material) => {
   if (material.media_type !== 'image') return;
@@ -931,7 +942,20 @@ const quickCopyImage = async (material) => {
             @click.prevent
         ></video>
         <div class="card-body">
-          <p class="card-title" :title="material.name">{{ material.name }}</p>
+          <div class="card-title-row">
+            <p class="card-title" :title="material.name">{{ material.name }}</p>
+            <button
+              class="copy-name-btn"
+              type="button"
+              title="复制名称"
+              :aria-label="`复制名称：${material.name}`"
+              @click.stop="quickCopyName(material)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M8 7V5a2 2 0 0 1 2-2h7l3 3v11a2 2 0 0 1-2 2h-2M13 3v4h4M6 9h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Zm1 4h5m-5 4h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
           <div class="card-meta">
             <!-- 移动端收藏：放在信息行右侧，不遮挡图片 -->
             <button
